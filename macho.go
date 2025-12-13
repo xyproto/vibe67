@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -488,6 +489,33 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 	// Calculate addresses - __TEXT starts after zero page
 	textAddr := zeroPageSize // __TEXT segment starts at 4GB (includes headers at start)
 
+	// Build list of unique libraries needed for dynamic linking
+	// Map library path to ordinal (1-based index for dylib references)
+	libraryList := []string{}
+	libraryOrdinals := make(map[string]int)
+
+	if eb.useDynamicLinking {
+		// Collect unique library paths
+		uniqueLibs := make(map[string]bool)
+		for _, libPath := range eb.functionLibraries {
+			uniqueLibs[libPath] = true
+		}
+
+		// Convert to sorted list for consistent ordering
+		for libPath := range uniqueLibs {
+			libraryList = append(libraryList, libPath)
+		}
+		// Sort for deterministic output
+		sort.Strings(libraryList)
+
+		// Assign ordinals (1-based)
+		for i, libPath := range libraryList {
+			libraryOrdinals[libPath] = i + 1
+		}
+	}
+
+	numLibraries := len(libraryList)
+
 	// Calculate where __text section starts (after Mach-O header + load commands)
 	// This is computed later after we know the size of load commands, so use a placeholder
 	var textSectAddr uint64 // Will be set after we know header size
@@ -540,10 +568,19 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 	prelimLoadCmdsSize += uint32(binary.Size(SymtabCommand{}))       // LC_SYMTAB
 	prelimLoadCmdsSize += uint32(binary.Size(LinkEditDataCommand{})) // LC_CODE_SIGNATURE
 
-	// ALL macOS executables must link libSystem (macOS doesn't support true static linking)
-	dylibPath := "/usr/lib/libSystem.B.dylib\x00"
-	dylibCmdSize := (uint32(binary.Size(LoadCommand{})+16+len(dylibPath)) + 7) &^ 7
-	prelimLoadCmdsSize += dylibCmdSize                           // LC_LOAD_DYLIB
+	// Calculate size for LC_LOAD_DYLIB commands (one per library)
+	// If no libraries specified, default to libSystem only
+	if numLibraries == 0 {
+		dylibPath := "/usr/lib/libSystem.B.dylib\x00"
+		dylibCmdSize := (uint32(binary.Size(LoadCommand{})+16+len(dylibPath)) + 7) &^ 7
+		prelimLoadCmdsSize += dylibCmdSize
+	} else {
+		for _, libPath := range libraryList {
+			dylibPathWithNull := libPath + "\x00"
+			dylibCmdSize := (uint32(binary.Size(LoadCommand{})+16+len(dylibPathWithNull)) + 7) &^ 7
+			prelimLoadCmdsSize += dylibCmdSize
+		}
+	}
 	prelimLoadCmdsSize += uint32(binary.Size(DysymtabCommand{})) // LC_DYSYMTAB (always required)
 
 	fileHeaderSize := headerSize + prelimLoadCmdsSize
@@ -663,11 +700,19 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 			strtab.WriteString("_" + funcName)
 			strtab.WriteByte(0)
 
+			// Determine which library this function belongs to
+			dylibOrdinal := uint16(1) // Default to first library (libSystem)
+			if libPath, ok := eb.functionLibraries[funcName]; ok {
+				if ordinal, found := libraryOrdinals[libPath]; found {
+					dylibOrdinal = uint16(ordinal)
+				}
+			}
+
 			sym := Nlist64{
 				N_strx:  strOffset,
 				N_type:  N_UNDF | N_EXT,
 				N_sect:  0,
-				N_desc:  uint16(1 << 8), // Two-level namespace: dylib ordinal 1 (libSystem.B.dylib)
+				N_desc:  dylibOrdinal << 8, // Two-level namespace: dylib ordinal in bits 8-15
 				N_value: 0,
 			}
 			symtab = append(symtab, sym)
@@ -958,10 +1003,16 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 		ncmds++
 	}
 
-	// 7. LC_LOAD_DYLIB for libSystem.B.dylib (REQUIRED - macOS doesn't support true static linking)
-	{
-		dylibPath := "/usr/lib/libSystem.B.dylib\x00"
-		cmdSize := uint32(binary.Size(LoadCommand{}) + 16 + len(dylibPath))
+	// 8. LC_LOAD_DYLIB commands for all needed libraries
+	// If no libraries specified, default to libSystem only
+	libsToLoad := libraryList
+	if len(libsToLoad) == 0 {
+		libsToLoad = []string{"/usr/lib/libSystem.B.dylib"}
+	}
+
+	for _, dylibPath := range libsToLoad {
+		dylibPathWithNull := dylibPath + "\x00"
+		cmdSize := uint32(binary.Size(LoadCommand{}) + 16 + len(dylibPathWithNull))
 		cmdSize = (cmdSize + 7) &^ 7 // 8-byte align
 
 		cmd := LoadCommand{
@@ -969,11 +1020,13 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 			CmdSize: cmdSize,
 		}
 		binary.Write(&loadCmdsBuf, binary.LittleEndian, &cmd)
-		binary.Write(&loadCmdsBuf, binary.LittleEndian, uint32(24))        // name offset
-		binary.Write(&loadCmdsBuf, binary.LittleEndian, uint32(0))         // timestamp
-		binary.Write(&loadCmdsBuf, binary.LittleEndian, uint32(0x54c0000)) // current version 1356.0.0
-		binary.Write(&loadCmdsBuf, binary.LittleEndian, uint32(0x10000))   // compatibility version 1.0.0
-		loadCmdsBuf.WriteString(dylibPath)
+		binary.Write(&loadCmdsBuf, binary.LittleEndian, uint32(24)) // name offset
+		binary.Write(&loadCmdsBuf, binary.LittleEndian, uint32(0))  // timestamp
+
+		// Version numbers: use defaults for all libraries
+		binary.Write(&loadCmdsBuf, binary.LittleEndian, uint32(0x10000)) // current version 1.0.0
+		binary.Write(&loadCmdsBuf, binary.LittleEndian, uint32(0x10000)) // compatibility version 1.0.0
+		loadCmdsBuf.WriteString(dylibPathWithNull)
 
 		// Pad to alignment
 		for loadCmdsBuf.Len()%8 != 0 {

@@ -1957,6 +1957,42 @@ func (acg *ARM64CodeGen) compileCall(call *CallExpr) error {
 	case "write_i8", "write_i16", "write_i32", "write_i64",
 		"write_u8", "write_u16", "write_u32", "write_u64", "write_f64":
 		return acg.compileMemoryWrite(call)
+	case "dlopen":
+		// dlopen(path, flags)
+		sig := &CFunctionSignature{
+			ReturnType: "void*",
+			Params: []CFunctionParam{
+				{Type: "const char*", Name: "path"},
+				{Type: "int", Name: "mode"},
+			},
+		}
+		return acg.compileCFunctionCall("dlopen", call.Args, sig)
+	case "dlsym":
+		// dlsym(handle, symbol)
+		sig := &CFunctionSignature{
+			ReturnType: "void*",
+			Params: []CFunctionParam{
+				{Type: "void*", Name: "handle"},
+				{Type: "const char*", Name: "symbol"},
+			},
+		}
+		return acg.compileCFunctionCall("dlsym", call.Args, sig)
+	case "dlclose":
+		// dlclose(handle)
+		sig := &CFunctionSignature{
+			ReturnType: "int",
+			Params: []CFunctionParam{
+				{Type: "void*", Name: "handle"},
+			},
+		}
+		return acg.compileCFunctionCall("dlclose", call.Args, sig)
+	case "dlerror":
+		// dlerror()
+		sig := &CFunctionSignature{
+			ReturnType: "char*",
+			Params:     []CFunctionParam{},
+		}
+		return acg.compileCFunctionCall("dlerror", call.Args, sig)
 	default:
 		// Check if this is a self-recursive call within a lambda
 		if acg.currentLambda != nil && call.Function == acg.currentLambda.VarName {
@@ -3498,16 +3534,49 @@ func (acg *ARM64CodeGen) compileCFunctionCall(funcName string, args []Expression
 	}
 
 	// Save arguments to stack first (evaluate all expressions)
-	stackSize := numArgs * 8
+	// Calculate stack space needed (8 bytes per argument, 16-byte aligned)
+	stackSize := ((numArgs * 8) + 15) &^ 15
 	if stackSize > 0 {
 		if err := acg.out.SubImm64("sp", "sp", uint32(stackSize)); err != nil {
 			return err
 		}
 
 		for i := 0; i < numArgs; i++ {
-			if err := acg.compileExpression(args[i]); err != nil {
-				return err
+			// Check for StringExpr when expecting a pointer (const char*)
+			if strExpr, ok := args[i].(*StringExpr); ok && argTypes[i] == "ptr" {
+				// Handle C string
+				// Store format string in rodata
+				labelName := fmt.Sprintf("cstr_%d", acg.stringCounter)
+				acg.stringCounter++
+
+				// Add null terminator
+				cstr := strExpr.Value + "\x00"
+				acg.eb.Define(labelName, cstr)
+
+				// Load address into x0
+				offset := uint64(acg.eb.text.Len())
+				acg.eb.pcRelocations = append(acg.eb.pcRelocations, PCRelocation{
+					offset:     offset,
+					symbolName: labelName,
+				})
+				// ADRP x0, label@PAGE
+				acg.out.out.writer.WriteBytes([]byte{0x00, 0x00, 0x00, 0x90})
+				// ADD x0, x0, label@PAGEOFF
+				acg.out.out.writer.WriteBytes([]byte{0x00, 0x00, 0x00, 0x91})
+
+				// Move x0 to d0 (as bits)
+				// fmov d0, x0
+				acg.out.out.writer.WriteBytes([]byte{0x00, 0x00, 0x67, 0x9e})
+			} else {
+				if err := acg.compileExpression(args[i]); err != nil {
+					return err
+				}
+
+				// If argument is a number 0 and type is ptr, it's NULL
+				// compileExpression puts number in d0. If it was 0, d0 is 0.0.
+				// fmov x0, d0 will make x0 = 0.
 			}
+
 			// Store d0 at [sp, #(i*8)]
 			offset := int32(i * 8)
 			if err := acg.out.StrImm64Double("d0", "sp", offset); err != nil {

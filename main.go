@@ -219,6 +219,7 @@ type ExecutableBuilder struct {
 	dynlinker               *DynamicLinker
 	useDynamicLinking       bool
 	neededFunctions         []string
+	functionLibraries       map[string]string // Maps function names to their library paths (for Mach-O multi-lib support)
 	pcRelocations           []PCRelocation
 	callPatches             []CallPatch
 	elf, rodata, data, text bytes.Buffer

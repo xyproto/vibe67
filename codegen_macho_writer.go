@@ -13,6 +13,53 @@ import (
 // This file handles the generation of Mach-O executables for macOS
 // on ARM64 (Apple Silicon) architecture.
 
+// resolveDylibPath resolves a library name to its dylib path on macOS
+func (fc *C67Compiler) resolveDylibPath(libName string) string {
+	// Common library path mappings for macOS
+	switch strings.ToLower(libName) {
+	case "sdl3":
+		// Try common SDL3 installation paths
+		paths := []string{
+			"/opt/homebrew/lib/libSDL3.dylib",
+			"/usr/local/lib/libSDL3.dylib",
+			"/Library/Frameworks/SDL3.framework/SDL3",
+		}
+		for _, path := range paths {
+			if _, err := os.Stat(path); err == nil {
+				return path
+			}
+		}
+		// If not found, use the first path as default (will fail at runtime if missing)
+		return paths[0]
+	case "sdl2":
+		paths := []string{
+			"/opt/homebrew/lib/libSDL2.dylib",
+			"/usr/local/lib/libSDL2.dylib",
+			"/Library/Frameworks/SDL2.framework/SDL2",
+		}
+		for _, path := range paths {
+			if _, err := os.Stat(path); err == nil {
+				return path
+			}
+		}
+		return paths[0]
+	default:
+		// For other libraries, try standard patterns
+		// First try Homebrew
+		homebrewPath := fmt.Sprintf("/opt/homebrew/lib/lib%s.dylib", libName)
+		if _, err := os.Stat(homebrewPath); err == nil {
+			return homebrewPath
+		}
+		// Then try /usr/local
+		usrLocalPath := fmt.Sprintf("/usr/local/lib/lib%s.dylib", libName)
+		if _, err := os.Stat(usrLocalPath); err == nil {
+			return usrLocalPath
+		}
+		// Default to libSystem for unknown libraries
+		return "/usr/lib/libSystem.B.dylib"
+	}
+}
+
 // Confidence that this function is working: 60%
 func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 	// Build neededFunctions list from call patches (actual function calls made)
@@ -44,6 +91,20 @@ func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 	fc.eb.neededFunctions = neededFuncs
 	if len(neededFuncs) > 0 {
 		fc.eb.useDynamicLinking = true
+	}
+
+	// Build function-to-library mapping for multi-library support
+	fc.eb.functionLibraries = make(map[string]string)
+	for _, funcName := range neededFuncs {
+		// Check if we have library mapping from C FFI
+		if libName, ok := fc.cFunctionLibs[funcName]; ok {
+			// Map library name to dylib path
+			dylibPath := fc.resolveDylibPath(libName)
+			fc.eb.functionLibraries[funcName] = dylibPath
+		} else {
+			// Default to libSystem for standard functions (malloc, printf, etc.)
+			fc.eb.functionLibraries[funcName] = "/usr/lib/libSystem.B.dylib"
+		}
 	}
 
 	if VerboseMode {
