@@ -36,11 +36,11 @@
 ## Architecture-Specific
 
 ### x86-64 Optimizations
-- [ ] Add CPUID detection for BMI1/BMI2 support
-- [ ] Implement POPCNT instruction for bit counting
-- [ ] Implement TZCNT instruction for trailing zeros
-- [ ] Implement LZCNT instruction for leading zeros
-- [ ] Use BMI1/BMI2 instructions when available on x86-64
+- [x] Add CPUID detection for BMI1/BMI2 support
+- [x] Implement POPCNT instruction for bit counting
+- [x] Implement TZCNT instruction for trailing zeros
+- [x] Implement LZCNT instruction for leading zeros
+- [x] Use BMI1/BMI2 instructions when available on x86-64
 
 ### ARM64 Optimizations
 - [ ] Add CSEL instruction support in ARM64 backend
