@@ -3574,10 +3574,11 @@ func (p *Parser) parseUnary() Expression {
 		return &UnaryExpr{Operator: op, Operand: operand}
 	}
 
-	// Handle bitwise NOT: ~b
-	if p.current.Type == TOKEN_TILDE_B {
-		p.nextToken() // skip '~b'
+	// Handle bitwise NOT: ~b or !
+	if p.current.Type == TOKEN_TILDE_B || p.current.Type == TOKEN_BANG {
+		p.nextToken() // skip '~b' or '!'
 		operand := p.parseUnary()
+		// Normalize both to "~b" internally
 		return &UnaryExpr{Operator: "~b", Operand: operand}
 	}
 

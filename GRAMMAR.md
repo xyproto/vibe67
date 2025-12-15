@@ -620,7 +620,7 @@ multiplicative_expr = power_expr { ("*" | "/" | "%") power_expr } ;
 
 power_expr      = unary_expr { ( "**" | "^" ) unary_expr } ;
 
-unary_expr      = ( "-" | "not" | "!b" | "#" | "µ" ) unary_expr
+unary_expr      = ( "-" | "not" | "!b" | "~b" | "#" | "µ" ) unary_expr
                 | postfix_expr ;
 
 postfix_expr    = primary_expr { postfix_op } ;
@@ -1006,6 +1006,7 @@ All bitwise operators use `b` suffix:
 |b    Bitwise OR
 ^b    Bitwise XOR
 !b    Bitwise NOT (unary)
+~b    Bitwise NOT (alias for !b)
 <<b   Left shift
 >>b   Arithmetic right shift
 <<<b  Rotate left

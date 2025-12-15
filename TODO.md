@@ -27,7 +27,22 @@
   - Automatic scalar cleanup loop for non-aligned sizes
   - Pattern matching for: result[i] = a[i] OP b[i]
 
-## High Priority - Feasible Sub-tasks
+## High Priority - Language Features from Design Decisions
+
+### Operator Implementation
+- [ ] Implement `~` as bitwise NOT operator (in addition to `!`)
+- [ ] Implement `µ` operator for memory ownership/movement
+- [ ] Add `?` suffix for optional types (e.g., `x?: int`)
+- [ ] Implement `.?` safe navigation operator
+- [ ] Add `??` null coalescing operator
+
+### Safety Features
+- [ ] Implement optional types with None/Some semantics
+- [ ] Add compile-time null safety checks
+- [ ] Implement bounds checking for array access
+- [ ] Add division by zero checks
+- [ ] Implement stack overflow detection
+- [ ] Add integer overflow detection options
 
 ### Defer Statement Enhancements
 - [ ] Define exception propagation semantics for defer

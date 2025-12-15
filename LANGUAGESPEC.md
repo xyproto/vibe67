@@ -200,7 +200,7 @@ All bitwise operations are suffixed with `b` to eliminate ambiguity:
 
 ```c67
 <<b >>b <<<b >>>b    // Shifts and rotates
-&b |b ^b ~b          // Bitwise logic
+&b |b ^b !b ~b          // Bitwise logic
 ?b                   // Bit test (tests if bit at position is set)
 ```
 
@@ -3197,6 +3197,7 @@ x | transform // Clearly pipe
 x |b mask     // Clearly bitwise OR
 not x         // Clearly logical NOT
 !b x          // Clearly bitwise NOT
+~b x          // Also bitwise NOT (alternative syntax)
 x ?b 5        // Bit test: is bit 5 set?
 ```
 

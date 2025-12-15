@@ -89,6 +89,7 @@ const (
 	TOKEN_AMP        // & (used in unsafe blocks, not for lists)
 	TOKEN_UNDERSCORE // _ (wildcard for default match)
 	TOKEN_DOLLAR     // $ (address value operator)
+	TOKEN_MU         // µ (memory ownership/movement operator)
 	TOKEN_LTLT_B     // <<b (shift left)
 	TOKEN_GTGT_B     // >>b (shift right)
 	TOKEN_LTLTLT_B   // <<<b (rotate left)
@@ -643,10 +644,14 @@ func (l *Lexer) NextToken() Token {
 		l.pos++
 		return Token{Type: TOKEN_GT, Value: ">", Line: l.line, Column: tokenColumn}
 	case '!':
-		// Check for !=
+		// Check for !=, then !b
 		if l.peek() == '=' {
 			l.pos += 2
 			return Token{Type: TOKEN_NE, Value: "!=", Line: l.line, Column: tokenColumn}
+		}
+		if l.peek() == 'b' {
+			l.pos += 2
+			return Token{Type: TOKEN_TILDE_B, Value: "!b", Line: l.line, Column: tokenColumn}
 		}
 		// Standalone ! is move operator
 		l.pos++
@@ -877,6 +882,9 @@ func (l *Lexer) NextToken() Token {
 	case '$':
 		l.pos++
 		return Token{Type: TOKEN_DOLLAR, Value: "$", Line: l.line, Column: tokenColumn}
+	case 'µ':
+		l.pos += len("µ") // µ is multi-byte UTF-8
+		return Token{Type: TOKEN_MU, Value: "µ", Line: l.line, Column: tokenColumn}
 	}
 
 	return Token{Type: TOKEN_EOF, Line: l.line, Column: tokenColumn}
