@@ -15,6 +15,7 @@
 - [x] Implement simple register use/def analysis
 - [x] Create data structures for live ranges
 - [x] Add loop analysis to detect vectorization candidates
+- [x] Implement simple loop dependency analysis
 
 ## High Priority - Feasible Sub-tasks
 
