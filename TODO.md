@@ -29,6 +29,12 @@
 
 ## High Priority - Feasible Sub-tasks
 
+### Defer Statement Enhancements
+- [ ] Define exception propagation semantics for defer
+- [ ] Implement defer stack unwinding on error
+- [ ] Add exception propagation semantics for defer statements
+- [ ] Add defer ordering guarantees in documentation
+
 ### SIMD and Vectorization
 - [x] Add loop analysis to detect vectorization candidates
 - [x] Implement simple loop dependency analysis
@@ -38,7 +44,6 @@
 
 ### Module-level mutable globals in lambdas
 - [x] Add test cases to reproduce the closure capture issue
-- [ ] Document current behavior vs expected behavior
 - [ ] Fix variable scope tracking in lambda compilation
 - [ ] Ensure mutable globals are properly referenced through rbp
 
@@ -92,12 +97,6 @@
 - [ ] Implement method lookup cache for polymorphic calls
 - [ ] Add cache invalidation on type changes
 - [ ] Implement polymorphic inline caching for dynamic dispatch optimization
-
-### Defer Statement Enhancements
-- [ ] Define exception propagation semantics for defer
-- [ ] Implement defer stack unwinding on error
-- [ ] Add exception propagation semantics for defer statements
-- [ ] Add defer ordering guarantees in documentation
 
 ### Pattern Matching Enhancements
 - [ ] Add support for tuple pattern matching: `(x, y) = tuple`
