@@ -40,7 +40,7 @@
 ### Safety Features
 - [ ] Implement optional types with None/Some semantics
 - [ ] Add compile-time null safety checks
-- [ ] Implement bounds checking for array access
+- [x] Implement bounds checking for array access
 - [ ] Add division by zero checks
 - [ ] Implement stack overflow detection
 - [ ] Add integer overflow detection options
