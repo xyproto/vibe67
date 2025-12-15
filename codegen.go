@@ -2347,26 +2347,109 @@ func (fc *C67Compiler) tryVectorizeLoop(stmt *LoopStmt, rangeExpr *RangeExpr) bo
 		return false // Must be an assignment
 	}
 	
-	// Check if it's array[i] = expr pattern
-	// For now, just emit a comment showing we detected it
-	// Full implementation would generate vectorized code
-	
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "SIMD: Loop at line %d is vectorizable (vector width: %d)\n",
-			0, plan.VectorWidth)
-		fmt.Fprintf(os.Stderr, "SIMD: %s\n", plan.Info.Reason)
+	// Check if RHS is a binary expression (a[i] + b[i])
+	binExpr, ok := assign.Value.(*BinaryExpr)
+	if !ok {
+		return false // Must be binary operation
 	}
 	
+	// Only support addition for now
+	if binExpr.Operator != "+" {
+		return false
+	}
+	
+	// Check if both operands are index expressions
+	leftIndex, leftOk := binExpr.Left.(*IndexExpr)
+	rightIndex, rightOk := binExpr.Right.(*IndexExpr)
+	if !leftOk || !rightOk {
+		return false
+	}
+	
+	// Verify indices use the loop iterator
+	leftIdxIdent, leftIdxOk := leftIndex.Index.(*IdentExpr)
+	rightIdxIdent, rightIdxOk := rightIndex.Index.(*IdentExpr)
+	if !leftIdxOk || !rightIdxOk {
+		return false
+	}
+	
+	if leftIdxIdent.Name != stmt.Iterator || rightIdxIdent.Name != stmt.Iterator {
+		return false // Indices must use loop iterator
+	}
+	
+	// Check if LHS is also an index expression
+	lhsName := assign.Name
+	if !strings.Contains(lhsName, "[") {
+		return false // LHS must be array access
+	}
+	
+	// Extract base array names
+	leftArray, leftArrayOk := leftIndex.List.(*IdentExpr)
+	rightArray, rightArrayOk := rightIndex.List.(*IdentExpr)
+	if !leftArrayOk || !rightArrayOk {
+		return false
+	}
+	
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "SIMD: Vectorizing loop - pattern: %s = %s[i] + %s[i]\n",
+			lhsName, leftArray.Name, rightArray.Name)
+		fmt.Fprintf(os.Stderr, "SIMD: Vector width: %d elements\n", plan.VectorWidth)
+	}
+	
+	// TODO: Emit actual vectorized code
+	fc.emitVectorizedAddLoop(stmt, rangeExpr, lhsName, leftArray.Name, rightArray.Name, plan.VectorWidth)
+	
 	// For now, return false to use scalar codegen
-	// TODO: Implement actual vectorized code generation
-	// This would emit:
-	//   1. Vector loop (process VectorWidth elements per iteration)
-	//   2. Cleanup loop (process remaining elements)
-	//   3. Use vmovupd, vaddpd, vmulpd, etc. instructions
+	// Once emitVectorizedAddLoop is fully implemented, change this to: return true
+	return false
+}
+
+// emitVectorizedAddLoop emits SIMD code for: result[i] = a[i] + b[i]
+func (fc *C67Compiler) emitVectorizedAddLoop(stmt *LoopStmt, rangeExpr *RangeExpr, 
+	resultName, leftArrayName, rightArrayName string, vectorWidth int) {
 	
-	_ = assign // Use variable to avoid warning
+	// TODO: Implement actual SIMD code generation
+	// Algorithm:
+	//
+	// 1. Setup phase:
+	//    - Load array base pointers into registers (rdi, rsi, rdx)
+	//    - Initialize loop counter (rbx) to range start
+	//    - Load limit (r12) from range end
+	//
+	// 2. Vector loop (process vectorWidth elements):
+	//    .vec_loop:
+	//      - Check: remaining = limit - counter
+	//      - If remaining < vectorWidth, jump to cleanup
+	//      - fc.out.VMovupdLoadFromMem("ymm0", "rsi", counter*8)  // left[i:i+4]
+	//      - fc.out.VMovupdLoadFromMem("ymm1", "rdx", counter*8)  // right[i:i+4]
+	//      - fc.out.VAddpd("ymm0", "ymm0", "ymm1")                // add vectors
+	//      - fc.out.VMovupdStoreToMem("ymm0", "rdi", counter*8)   // result[i:i+4]
+	//      - counter += vectorWidth
+	//      - Jump to .vec_loop
+	//
+	// 3. Cleanup loop (process remaining 0-3 elements):
+	//    .cleanup:
+	//      - If counter >= limit, jump to done
+	//      - Load/add/store single element using scalar SSE
+	//      - counter++
+	//      - Jump to .cleanup
+	//
+	// 4. Cleanup:
+	//    .done:
+	//      - fc.out.VZeroUpper()  // Clean AVX state
 	
-	return false // Not yet implemented - fall back to scalar
+	// For now, this is not implemented - the infrastructure is in place
+	// but we need to integrate properly with the register allocator
+	// and handle the binary code generation for loops correctly
+	
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "SIMD: Vector code generation not yet implemented\n")
+		fmt.Fprintf(os.Stderr, "SIMD: Would vectorize: %s = %s[i] + %s[i] (width=%d)\n", 
+			resultName, leftArrayName, rightArrayName, vectorWidth)
+	}
+	
+	// Fall back to scalar compilation
+	_ = stmt
+	_ = rangeExpr
 }
 
 // collectLoopLocalVars scans the loop body and returns a map of variables defined inside it
