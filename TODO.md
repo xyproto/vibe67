@@ -3,6 +3,14 @@
 ## Completed
 - [x] Let `println` handle multiple arguments.
 - [x] Implement peephole optimization patterns (infrastructure exists in optimizer.go).
+- [x] Add register pressure tracking to identify spill-heavy code
+- [x] Add vector width detection for target platform
+- [x] Add test cases to reproduce the closure capture issue
+- [x] Add CPUID detection for BMI1/BMI2 support
+- [x] Implement POPCNT instruction for bit counting
+- [x] Implement TZCNT instruction for trailing zeros
+- [x] Implement LZCNT instruction for leading zeros
+- [x] Use BMI1/BMI2 instructions when available on x86-64
 
 ## High Priority - Feasible Sub-tasks
 
