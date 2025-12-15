@@ -111,7 +111,7 @@ func testInlineC67(t *testing.T, name, source, expected string) {
 		t.Skip(strings.TrimPrefix(expected, "SKIP: "))
 		return
 	}
-	
+
 	result := compileAndRun(t, source)
 	if !strings.Contains(result, expected) {
 		t.Errorf("Output mismatch:\nExpected to contain:\n%s\nActual:\n%s", expected, result)

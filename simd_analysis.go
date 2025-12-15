@@ -86,35 +86,35 @@ func (sa *SIMDAnalyzer) getVectorWidth() int {
 // findMemoryAccesses finds all memory accesses in loop body
 func (sa *SIMDAnalyzer) findMemoryAccesses(body []Statement) []string {
 	accesses := []string{}
-	
+
 	for _, stmt := range body {
 		// For now, collect variable names from assignments
 		if assign, ok := stmt.(*AssignStmt); ok {
 			accesses = append(accesses, assign.Name)
 		}
 	}
-	
+
 	return accesses
 }
 
 // findOperations finds all operations in loop body
 func (sa *SIMDAnalyzer) findOperations(body []Statement) []string {
 	ops := []string{}
-	
+
 	for _, stmt := range body {
 		if assign, ok := stmt.(*AssignStmt); ok {
 			// Analyze the expression to find operations
 			ops = append(ops, sa.findExprOps(assign.Value)...)
 		}
 	}
-	
+
 	return ops
 }
 
 // findExprOps recursively finds operations in an expression
 func (sa *SIMDAnalyzer) findExprOps(expr Expression) []string {
 	ops := []string{}
-	
+
 	switch e := expr.(type) {
 	case *BinaryExpr:
 		ops = append(ops, e.Operator)
@@ -126,18 +126,18 @@ func (sa *SIMDAnalyzer) findExprOps(expr Expression) []string {
 	case *CallExpr:
 		ops = append(ops, "call:"+e.Function)
 	}
-	
+
 	return ops
 }
 
 // checkDependencies checks if loop has iteration-to-iteration dependencies
 func (sa *SIMDAnalyzer) checkDependencies(loop *LoopStmt, accesses []string) bool {
-	// Simple heuristic: if loop body reads and writes same variable, 
+	// Simple heuristic: if loop body reads and writes same variable,
 	// it might have dependencies
-	
+
 	writes := make(map[string]bool)
 	reads := make(map[string]bool)
-	
+
 	for _, stmt := range loop.Body {
 		if assign, ok := stmt.(*AssignStmt); ok {
 			writes[assign.Name] = true
@@ -145,14 +145,14 @@ func (sa *SIMDAnalyzer) checkDependencies(loop *LoopStmt, accesses []string) boo
 			sa.findReads(assign.Value, reads)
 		}
 	}
-	
+
 	// If any variable is both read and written, flag as potential dependency
 	for varName := range writes {
 		if reads[varName] {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -183,14 +183,14 @@ func (sa *SIMDAnalyzer) hasVectorizableOperations(ops []string) bool {
 		"<": true, ">": true, "<=": true, ">=": true, "==": true, "!=": true,
 		"call:sqrt": true, "call:abs": true, "call:min": true, "call:max": true,
 	}
-	
+
 	// Need at least one vectorizable operation
 	for _, op := range ops {
 		if vectorizableOps[op] {
 			return true
 		}
 	}
-	
+
 	return false
 }
 

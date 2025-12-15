@@ -20,18 +20,18 @@ func NewSIMDVectorizer(analyzer *SIMDAnalyzer, target Target) *SIMDVectorizer {
 func (sv *SIMDVectorizer) VectorizeLoop(loop *LoopStmt) bool {
 	// Analyze loop for vectorization potential
 	info := sv.analyzer.AnalyzeLoop(loop)
-	
+
 	if !info.CanVectorize {
 		// Not vectorizable - caller will emit scalar version
 		return false
 	}
-	
+
 	// Currently only vectorize simple array operations
 	// Pattern: @ i in range(n) { result[i] = a[i] OP b[i] }
 	if !sv.isSimpleArrayLoop(loop) {
 		return false
 	}
-	
+
 	// Loop can be vectorized (actual code generation deferred)
 	return true
 }
@@ -42,18 +42,18 @@ func (sv *SIMDVectorizer) isSimpleArrayLoop(loop *LoopStmt) bool {
 	if len(loop.Body) != 1 {
 		return false
 	}
-	
+
 	// Must be an assignment
 	assign, ok := loop.Body[0].(*AssignStmt)
 	if !ok {
 		return false
 	}
-	
+
 	// Left side must be array access: result[i]
 	if !sv.isArrayAccessWithIterator(assign.Name, loop.Iterator) {
 		return false
 	}
-	
+
 	// Right side must be simple operation on array elements
 	return sv.isVectorizableExpr(assign.Value, loop.Iterator)
 }
@@ -70,8 +70,8 @@ func (sv *SIMDVectorizer) isVectorizableExpr(expr Expression, iterator string) b
 	switch e := expr.(type) {
 	case *BinaryExpr:
 		// Both sides must be vectorizable
-		return sv.isVectorizableExpr(e.Left, iterator) && 
-		       sv.isVectorizableExpr(e.Right, iterator)
+		return sv.isVectorizableExpr(e.Left, iterator) &&
+			sv.isVectorizableExpr(e.Right, iterator)
 	case *IndexExpr:
 		// Array access with iterator is vectorizable
 		return true
@@ -86,16 +86,16 @@ func (sv *SIMDVectorizer) isVectorizableExpr(expr Expression, iterator string) b
 // GetVectorizationPlan returns a plan for vectorizing the loop
 func (sv *SIMDVectorizer) GetVectorizationPlan(loop *LoopStmt) *VectorizationPlan {
 	info := sv.analyzer.AnalyzeLoop(loop)
-	
+
 	if !info.CanVectorize {
 		return nil
 	}
-	
+
 	return &VectorizationPlan{
-		VectorWidth:   info.VectorWidth,
-		NeedsCleanup:  true, // Usually need cleanup for remaining elements
-		Strategy:      "unroll", // or "masked" for AVX-512
-		Info:          info,
+		VectorWidth:  info.VectorWidth,
+		NeedsCleanup: true,     // Usually need cleanup for remaining elements
+		Strategy:     "unroll", // or "masked" for AVX-512
+		Info:         info,
 	}
 }
 
@@ -116,10 +116,10 @@ func (sv *SIMDVectorizer) emitVectorizedLoop(loop *LoopStmt, info *LoopVectoriza
 	// 2. Generate vectorized body (process VectorWidth elements at once)
 	// 3. Generate scalar cleanup loop (remaining elements)
 	// 4. Handle alignment and masked operations
-	
+
 	// For now, just emit a comment indicating vectorization happened
 	// Real implementation would integrate with codegen
-	
+
 	// Example of what we'd generate for:
 	//   @ i in range(100) { c[i] = a[i] + b[i] }
 	//
@@ -128,12 +128,12 @@ func (sv *SIMDVectorizer) emitVectorizedLoop(loop *LoopStmt, info *LoopVectoriza
 	// .vector_loop:
 	//   cmp rcx, 96             ; if i >= 96, goto cleanup
 	//   jge .cleanup
-	//   
+	//
 	//   vmovupd ymm0, [a + rcx*8]    ; Load 4 doubles from a
 	//   vmovupd ymm1, [b + rcx*8]    ; Load 4 doubles from b
 	//   vaddpd ymm0, ymm0, ymm1      ; Add them
 	//   vmovupd [c + rcx*8], ymm0    ; Store result
-	//   
+	//
 	//   add rcx, 4                   ; i += 4
 	//   jmp .vector_loop
 	//

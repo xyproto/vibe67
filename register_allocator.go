@@ -39,17 +39,17 @@ type LiveInterval struct {
 
 // DefUseChain represents a definition and its uses
 type DefUseChain struct {
-	DefPos   int   // Position of definition
+	DefPos   int    // Position of definition
 	VarName  string // Variable being defined
-	UsePos   []int // Positions where this definition is used
-	ReachEnd bool  // True if this def reaches end of scope
+	UsePos   []int  // Positions where this definition is used
+	ReachEnd bool   // True if this def reaches end of scope
 }
 
 // UseDefChain represents a use and its reaching definitions
 type UseDefChain struct {
-	UsePos  int      // Position of use
-	VarName string   // Variable being used
-	DefPos  []int    // Positions of definitions that reach this use
+	UsePos  int    // Position of use
+	VarName string // Variable being used
+	DefPos  []int  // Positions of definitions that reach this use
 }
 
 // RegisterAllocator manages register allocation for a function
