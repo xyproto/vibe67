@@ -27,6 +27,27 @@
   - Automatic scalar cleanup loop for non-aligned sizes
   - Pattern matching for: result[i] = a[i] OP b[i]
 
+## High Priority - Executable Size Optimization (for 64k demos)
+
+### Current Status
+- Minimal program (x := 42): 45KB
+- Code segment: 36KB
+- Data segment: ~1KB  
+- Removed unused debug strings: ~500 bytes saved
+
+### Size Reduction Tasks
+- [ ] Make runtime functions conditionally included (only when used)
+  - [ ] Arena allocator code (if no `alloc` used)
+  - [ ] Bounds checking code (if no array access)
+  - [ ] Recursion depth tracking (if no recursion)
+  - [ ] Loop iteration limiting (if no loops)
+- [ ] Remove or minimize ELF headers overhead
+- [ ] Implement dead code elimination pass
+- [ ] Strip unnecessary alignment padding
+- [ ] Optimize common patterns (e.g., initialization code)
+- [ ] Add `-tiny` flag for demo-optimized builds
+- [ ] Target: <8KB for minimal "Hello World"
+
 ## High Priority - Language Features from Design Decisions
 
 ### Operator Implementation
