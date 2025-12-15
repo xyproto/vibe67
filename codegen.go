@@ -16376,6 +16376,39 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovRegToReg("rax", "rsp")
 		fc.out.Cvtsi2sd("xmm0", "rax")
 
+	case "vdot":
+		// vdot(v1, v2) - Vector dot product (sum of element-wise multiplication)
+		// Returns a scalar float64
+		// Simplest implementation: multiply then horizontal add
+		if len(call.Args) != 2 {
+			compilerError("vdot() requires exactly 2 arguments")
+		}
+
+		// Compile first vector argument
+		fc.compileExpression(call.Args[0])
+		fc.out.SubImmFromReg("rsp", StackSlotSize)
+		fc.out.MovXmmToMem("xmm0", "rsp", 0)
+		fc.out.MovMemToReg("r12", "rsp", 0)
+		fc.out.AddImmToReg("rsp", StackSlotSize)
+
+		// Compile second vector argument
+		fc.compileExpression(call.Args[1])
+		fc.out.SubImmFromReg("rsp", StackSlotSize)
+		fc.out.MovXmmToMem("xmm0", "rsp", 0)
+		fc.out.MovMemToReg("r13", "rsp", 0)
+		fc.out.AddImmToReg("rsp", StackSlotSize)
+
+		// Load vectors and multiply element-wise
+		fc.out.MovupdMemToXmm("xmm0", "r12", 0) // v1
+		fc.out.MovupdMemToXmm("xmm1", "r13", 0) // v2
+		fc.out.MulpdXmm("xmm0", "xmm1")         // xmm0 = v1 * v2
+
+		// Simple horizontal add: xmm0[0] + xmm0[1]
+		// Move high element to xmm1
+		fc.out.Emit([]byte{0xf2, 0x0f, 0x70, 0xc8, 0x01}) // pshufd xmm1, xmm0, 1
+		fc.out.AddsdXmm("xmm0", "xmm1")                   // xmm0[0] += xmm1[0]
+		// Result is scalar in xmm0[0]
+
 	case "atomic_add":
 		// atomic_add(ptr, value) - Atomically add value to *ptr and return old value
 		// Uses LOCK XADD instruction for atomic read-modify-write

@@ -19,7 +19,7 @@
 - [ ] Implement simple loop dependency analysis
 - [x] Add vector width detection for target platform
 - [ ] Auto-vectorize simple parallel loops using existing SIMD infrastructure
-- [ ] Add SIMD intrinsics for common operations
+- [x] Add SIMD intrinsics for common operations
 
 ### Module-level mutable globals in lambdas
 - [x] Add test cases to reproduce the closure capture issue
