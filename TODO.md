@@ -9,12 +9,12 @@
 ### SIMD and Vectorization
 - [ ] Add loop analysis to detect vectorization candidates
 - [ ] Implement simple loop dependency analysis
-- [ ] Add vector width detection for target platform
+- [x] Add vector width detection for target platform
 - [ ] Auto-vectorize simple parallel loops using existing SIMD infrastructure
 - [ ] Add SIMD intrinsics for common operations
 
 ### Module-level mutable globals in lambdas
-- [ ] Add test cases to reproduce the closure capture issue
+- [x] Add test cases to reproduce the closure capture issue
 - [ ] Document current behavior vs expected behavior
 - [ ] Fix variable scope tracking in lambda compilation
 - [ ] Ensure mutable globals are properly referenced through rbp

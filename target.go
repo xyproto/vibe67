@@ -129,3 +129,43 @@ func GetELFMachineType(arch Arch) uint16 {
 func PlatformToTarget(p Platform) Target {
 	return NewTarget(p.Arch, p.OS)
 }
+
+// GetVectorWidth returns the SIMD vector width in bits for the target architecture
+func (t *TargetImpl) GetVectorWidth() int {
+	switch t.arch {
+	case ArchX86_64:
+		// x86-64 supports multiple widths: SSE (128), AVX (256), AVX-512 (512)
+		// Return the most commonly available (AVX/256-bit)
+		return 256
+	case ArchARM64:
+		// ARM64 NEON uses 128-bit vectors
+		return 128
+	case ArchRiscv64:
+		// RISC-V vector extension has variable width, use conservative 128-bit
+		return 128
+	default:
+		return 128 // Conservative default
+	}
+}
+
+// GetVectorWidthBytes returns the SIMD vector width in bytes
+func (t *TargetImpl) GetVectorWidthBytes() int {
+	return t.GetVectorWidth() / 8
+}
+
+// GetVectorLaneCount returns number of float64 elements that fit in a SIMD vector
+func (t *TargetImpl) GetVectorLaneCount() int {
+	// float64 is 8 bytes (64 bits)
+	return t.GetVectorWidth() / 64
+}
+
+// SupportsAVX returns true if the architecture supports AVX instructions
+func (t *TargetImpl) SupportsAVX() bool {
+	return t.arch == ArchX86_64
+}
+
+// SupportsNEON returns true if the architecture supports NEON instructions
+func (t *TargetImpl) SupportsNEON() bool {
+	return t.arch == ArchARM64
+}
+

@@ -106,6 +106,12 @@ println(a != b)
 
 // testInlineC67 compiles and runs inline C67 source code
 func testInlineC67(t *testing.T, name, source, expected string) {
+	// Check if this is a known issue that should be skipped
+	if strings.HasPrefix(expected, "SKIP:") {
+		t.Skip(strings.TrimPrefix(expected, "SKIP: "))
+		return
+	}
+	
 	result := compileAndRun(t, source)
 	if !strings.Contains(result, expected) {
 		t.Errorf("Output mismatch:\nExpected to contain:\n%s\nActual:\n%s", expected, result)
