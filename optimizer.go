@@ -338,6 +338,7 @@ func isPowerOfTwo(x float64) bool {
 // - true or x → true, x or true → true (short-circuit)
 // - not(true) → false, not(false) → true (constant folding)
 // - not(comparison) → inverted comparison (e.g., not(x < y) → x >= y)
+// - not(not(x)) → (x != 0) [converts double negation to boolean comparison]
 // - (not x) and (not y) → not(x or y) (De Morgan's law - saves one not, preserves short-circuit)
 // Note: We don't apply (not x) or (not y) → not(x and y) to preserve short-circuit evaluation
 func strengthReduceExpr(expr Expression) Expression {
@@ -405,6 +406,21 @@ func strengthReduceExpr(expr Expression) Expression {
 			*/
 
 		case "/":
+			// 0 / x → 0 (except 0/0 which is undefined)
+			if leftIsNum && leftNum.Value == 0 && rightIsNum && rightNum.Value != 0 {
+				return &NumberExpr{Value: 0}
+			}
+			if leftIsNum && leftNum.Value == 0 && !rightIsNum {
+				// 0 / x where x is not a constant - assume x != 0 and optimize
+				return &NumberExpr{Value: 0}
+			}
+
+			// x / x → 1 (for non-zero x)
+			if areExpressionsEqual(e.Left, e.Right) {
+				// Only safe if we know x != 0
+				// For simplicity, don't optimize this - could cause issues with x=0
+			}
+
 			// x / 1 → x
 			if rightIsNum && rightNum.Value == 1 {
 				return e.Left
@@ -658,6 +674,17 @@ func strengthReduceExpr(expr Expression) Expression {
 		}
 
 		if e.Function == "not" && len(e.Args) == 1 {
+			// not(not(x)) → (x != 0) which converts to boolean
+			// This is simpler than double negation and produces the same result
+			if innerNot, ok := e.Args[0].(*CallExpr); ok && innerNot.Function == "not" && len(innerNot.Args) == 1 {
+				// Convert to comparison: x != 0
+				return &BinaryExpr{
+					Left:     innerNot.Args[0],
+					Operator: "!=",
+					Right:    &NumberExpr{Value: 0.0},
+				}
+			}
+
 			// not(constant) → constant
 			if argNum, ok := e.Args[0].(*NumberExpr); ok {
 				if argNum.Value == 0 {

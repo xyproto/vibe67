@@ -148,6 +148,15 @@ println(result)
 			wantStdout: "1\n",
 		},
 		{
+			name: "double negation with zero",
+			code: `
+x := 0
+result := not(not(x))
+println(result)
+`,
+			wantStdout: "0\n",
+		},
+		{
 			name: "not of constant true",
 			code: `
 result := not(1)
@@ -214,6 +223,23 @@ result := (not(x > 10) or not(y > 20))
 println(result)
 `,
 			wantStdout: "1\n",
+		},
+		{
+			name: "zero divided by number",
+			code: `
+result := 0 / 5
+println(result)
+`,
+			wantStdout: "0\n",
+		},
+		{
+			name: "zero divided by expression",
+			code: `
+x := 10
+result := 0 / x
+println(result)
+`,
+			wantStdout: "0\n",
 		},
 	}
 
