@@ -20,13 +20,15 @@ type LoopVectorizationInfo struct {
 
 // SIMDAnalyzer analyzes loops for vectorization opportunities
 type SIMDAnalyzer struct {
-	target Target // Target platform for vector width
+	target     Target                  // Target platform for vector width
+	depAnalyzer *LoopDependencyAnalyzer // Dependency analyzer
 }
 
 // NewSIMDAnalyzer creates a new SIMD analyzer
 func NewSIMDAnalyzer(target Target) *SIMDAnalyzer {
 	return &SIMDAnalyzer{
-		target: target,
+		target:      target,
+		depAnalyzer: NewLoopDependencyAnalyzer(),
 	}
 }
 
@@ -54,12 +56,14 @@ func (sa *SIMDAnalyzer) AnalyzeLoop(loop *LoopStmt) *LoopVectorizationInfo {
 	// Analyze loop body for vectorization potential
 	info.MemoryAccesses = sa.findMemoryAccesses(loop.Body)
 	info.Operations = sa.findOperations(loop.Body)
-	info.HasDependencies = sa.checkDependencies(loop, info.MemoryAccesses)
-
-	// Determine if we can vectorize
-	if info.HasDependencies {
+	
+	// Use sophisticated dependency analysis
+	canVectorize, reason := sa.depAnalyzer.CanVectorize(loop)
+	info.HasDependencies = !canVectorize
+	
+	if !canVectorize {
 		info.CanVectorize = false
-		info.Reason = "Loop has dependencies between iterations"
+		info.Reason = reason
 		return info
 	}
 
@@ -128,52 +132,6 @@ func (sa *SIMDAnalyzer) findExprOps(expr Expression) []string {
 	}
 
 	return ops
-}
-
-// checkDependencies checks if loop has iteration-to-iteration dependencies
-func (sa *SIMDAnalyzer) checkDependencies(loop *LoopStmt, accesses []string) bool {
-	// Simple heuristic: if loop body reads and writes same variable,
-	// it might have dependencies
-
-	writes := make(map[string]bool)
-	reads := make(map[string]bool)
-
-	for _, stmt := range loop.Body {
-		if assign, ok := stmt.(*AssignStmt); ok {
-			writes[assign.Name] = true
-			// Check if value reads from variables
-			sa.findReads(assign.Value, reads)
-		}
-	}
-
-	// If any variable is both read and written, flag as potential dependency
-	for varName := range writes {
-		if reads[varName] {
-			return true
-		}
-	}
-
-	return false
-}
-
-// findReads finds all variable reads in an expression
-func (sa *SIMDAnalyzer) findReads(expr Expression, reads map[string]bool) {
-	switch e := expr.(type) {
-	case *IdentExpr:
-		reads[e.Name] = true
-	case *BinaryExpr:
-		sa.findReads(e.Left, reads)
-		sa.findReads(e.Right, reads)
-	case *UnaryExpr:
-		sa.findReads(e.Operand, reads)
-	case *IndexExpr:
-		sa.findReads(e.List, reads)
-		sa.findReads(e.Index, reads)
-	case *CallExpr:
-		for _, arg := range e.Args {
-			sa.findReads(arg, reads)
-		}
-	}
 }
 
 // hasVectorizableOperations checks if operations can be vectorized
