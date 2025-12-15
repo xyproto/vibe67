@@ -13,7 +13,7 @@ sum := 0
 }
 printf("Sum: %v\n", sum)
 `
-	
+
 	// This should compile successfully (even though not vectorized)
 	output := compileAndRun(t, code)
 	if output != "Sum: 45.000000\n" {
@@ -42,22 +42,22 @@ func TestSIMDLoopAnalysis(t *testing.T) {
 		},
 		NumThreads: 0,
 	}
-	
+
 	// Create analyzer
 	target := &TargetImpl{
 		arch: ArchX86_64,
 		os:   OSLinux,
 	}
 	analyzer := NewSIMDAnalyzer(target)
-	
+
 	// Analyze loop
 	info := analyzer.AnalyzeLoop(loop)
-	
+
 	// Check that analysis completes
 	if info == nil {
 		t.Fatal("Expected analysis info, got nil")
 	}
-	
+
 	// This loop has a dependency (sum is read and written)
 	// so it should not be vectorizable
 	// Note: Currently our analyzer may not catch all dependency patterns
@@ -66,7 +66,7 @@ func TestSIMDLoopAnalysis(t *testing.T) {
 		t.Logf("Note: Analyzer detected loop as vectorizable despite dependencies")
 		t.Logf("Reason: %s", info.Reason)
 	}
-	
+
 	// Just verify the analysis completes successfully
 	if info.VectorWidth <= 0 {
 		t.Errorf("Expected positive vector width, got %d", info.VectorWidth)
@@ -94,13 +94,13 @@ func TestSIMDDependencyAnalysis(t *testing.T) {
 		},
 		NumThreads: 0,
 	}
-	
+
 	// Create dependency analyzer
 	depAnalyzer := NewLoopDependencyAnalyzer()
-	
+
 	// Analyze dependencies
 	deps := depAnalyzer.AnalyzeDependencies(parallelLoop)
-	
+
 	// Should have minimal dependencies
 	if len(deps) > 1 {
 		t.Errorf("Simple loop should have minimal dependencies, got %d", len(deps))
@@ -124,7 +124,7 @@ printf("Result: ")
 }
 printf("\n")
 `
-	
+
 	output := compileAndRun(t, code)
 	expected := "Result: 11.000000 22.000000 33.000000 44.000000 55.000000 66.000000 77.000000 88.000000 \n"
 	if output != expected {

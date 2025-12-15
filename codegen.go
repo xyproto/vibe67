@@ -2019,7 +2019,7 @@ func (fc *C67Compiler) compileRangeLoop(stmt *LoopStmt, rangeExpr *RangeExpr) {
 		// Loop was successfully vectorized
 		return
 	}
-	
+
 	// Fall back to scalar compilation
 	// REGISTER ALLOCATION OPTIMIZATION:
 	// Use rbx for loop counter, r12 for loop limit
@@ -2314,110 +2314,110 @@ func (fc *C67Compiler) tryVectorizeLoop(stmt *LoopStmt, rangeExpr *RangeExpr) bo
 	if fc.platform.Arch != ArchX86_64 {
 		return false
 	}
-	
+
 	// Create a Target wrapper from Platform
 	target := &TargetImpl{
 		arch: fc.platform.Arch,
 		os:   fc.platform.OS,
 	}
-	
+
 	// Create SIMD analyzer and vectorizer
 	analyzer := NewSIMDAnalyzer(target)
 	vectorizer := NewSIMDVectorizer(analyzer, target)
-	
+
 	// Check if loop can be vectorized
 	if !vectorizer.VectorizeLoop(stmt) {
 		return false
 	}
-	
+
 	// Get vectorization plan
 	plan := vectorizer.GetVectorizationPlan(stmt)
 	if plan == nil {
 		return false
 	}
-	
+
 	// Only vectorize simple patterns for now:
 	// @ i in range(n) { result[i] = a[i] + b[i] }
 	if len(stmt.Body) != 1 {
 		return false // Only single-statement loops
 	}
-	
+
 	assign, ok := stmt.Body[0].(*AssignStmt)
 	if !ok {
 		return false // Must be an assignment
 	}
-	
+
 	// Check if RHS is a binary expression (a[i] + b[i])
 	binExpr, ok := assign.Value.(*BinaryExpr)
 	if !ok {
 		return false // Must be binary operation
 	}
-	
+
 	// Only support addition for now
 	if binExpr.Operator != "+" {
 		return false
 	}
-	
+
 	// Check if both operands are index expressions
 	leftIndex, leftOk := binExpr.Left.(*IndexExpr)
 	rightIndex, rightOk := binExpr.Right.(*IndexExpr)
 	if !leftOk || !rightOk {
 		return false
 	}
-	
+
 	// Verify indices use the loop iterator
 	leftIdxIdent, leftIdxOk := leftIndex.Index.(*IdentExpr)
 	rightIdxIdent, rightIdxOk := rightIndex.Index.(*IdentExpr)
 	if !leftIdxOk || !rightIdxOk {
 		return false
 	}
-	
+
 	if leftIdxIdent.Name != stmt.Iterator || rightIdxIdent.Name != stmt.Iterator {
 		return false // Indices must use loop iterator
 	}
-	
+
 	// Check if LHS is also an index expression
 	lhsName := assign.Name
 	if !strings.Contains(lhsName, "[") {
 		return false // LHS must be array access
 	}
-	
+
 	// Extract base array names
 	leftArray, leftArrayOk := leftIndex.List.(*IdentExpr)
 	rightArray, rightArrayOk := rightIndex.List.(*IdentExpr)
 	if !leftArrayOk || !rightArrayOk {
 		return false
 	}
-	
+
 	if VerboseMode {
 		fmt.Fprintf(os.Stderr, "SIMD: Vectorizing loop - pattern: %s = %s[i] + %s[i]\n",
 			lhsName, leftArray.Name, rightArray.Name)
 		fmt.Fprintf(os.Stderr, "SIMD: Vector width: %d elements\n", plan.VectorWidth)
 	}
-	
+
 	// Emit vectorized code
 	fc.emitVectorizedAddLoop(stmt, rangeExpr, lhsName, leftArray.Name, rightArray.Name, plan.VectorWidth)
-	
+
 	// Successfully vectorized
 	return true
 }
 
 // emitVectorizedAddLoop emits SIMD code for: result[i] = a[i] + b[i]
-func (fc *C67Compiler) emitVectorizedAddLoop(stmt *LoopStmt, rangeExpr *RangeExpr, 
+func (fc *C67Compiler) emitVectorizedAddLoop(stmt *LoopStmt, rangeExpr *RangeExpr,
 	resultName, leftArrayName, rightArrayName string, vectorWidth int) {
-	
+
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "SIMD: Emitting vectorized loop: %s = %s[i] + %s[i] (width=%d)\n", 
+		fmt.Fprintf(os.Stderr, "SIMD: Emitting vectorized loop: %s = %s[i] + %s[i] (width=%d)\n",
 			resultName, leftArrayName, rightArrayName, vectorWidth)
 	}
-	
+
 	// Get array pointers from variables map
 	// Extract base name from result (might be "result[i]" -> "result")
 	resultBase := strings.Split(resultName, "[")[0]
 	resultOffset, resultExists := fc.variables[resultBase]
 	leftOffset, leftExists := fc.variables[leftArrayName]
 	rightOffset, rightExists := fc.variables[rightArrayName]
-	
+
 	if !resultExists || !leftExists || !rightExists {
 		if VerboseMode {
 			fmt.Fprintf(os.Stderr, "SIMD: Cannot find array variables in symbol table\n")
@@ -2426,122 +2426,122 @@ func (fc *C67Compiler) emitVectorizedAddLoop(stmt *LoopStmt, rangeExpr *RangeExp
 		}
 		return
 	}
-	
+
 	// Evaluate and store range start and end
 	fc.compileExpression(rangeExpr.Start)
 	fc.out.Cvttsd2si("rbx", "xmm0") // rbx = loop counter (start)
-	
+
 	fc.compileExpression(rangeExpr.End)
 	fc.out.Cvttsd2si("r12", "xmm0") // r12 = loop limit (end)
 	if rangeExpr.Inclusive {
 		fc.out.IncReg("r12")
 	}
-	
+
 	// Load array base pointers into registers
 	// Arrays are stored as pointers on the stack
 	fc.out.MovMemToReg("rdi", "rbp", -resultOffset) // rdi = result array ptr
 	fc.out.MovMemToReg("rsi", "rbp", -leftOffset)   // rsi = left array ptr
 	fc.out.MovMemToReg("rdx", "rbp", -rightOffset)  // rdx = right array ptr
-	
+
 	// ===== VECTOR LOOP =====
 	// Process vectorWidth elements per iteration
 	vecLoopStart := fc.eb.text.Len()
-	
+
 	// Check if we have at least vectorWidth elements remaining
 	fc.out.MovRegToReg("rax", "r12")
 	fc.out.SubRegFromReg("rax", "rbx") // rax = limit - counter (remaining)
 	fc.out.CmpRegToImm("rax", int64(vectorWidth))
-	
+
 	// Jump to cleanup if remaining < vectorWidth
 	cleanupJump := fc.eb.text.Len()
 	fc.out.JumpConditional(JumpLess, 0) // Placeholder, will patch later
-	
+
 	// Load vectorWidth doubles from left array: ymm0 = left[rbx:rbx+vectorWidth]
 	// Offset = rbx * 8 (8 bytes per double)
 	fc.out.MovRegToReg("r10", "rbx")
-	fc.out.ShlRegByImm("r10", 3) // r10 = rbx * 8
+	fc.out.ShlRegByImm("r10", 3)     // r10 = rbx * 8
 	fc.out.AddRegToReg("r10", "rsi") // r10 = &left[rbx]
 	fc.out.VMovupdLoadFromMem("ymm0", "r10", 0)
-	
+
 	// Load vectorWidth doubles from right array: ymm1 = right[rbx:rbx+vectorWidth]
 	fc.out.MovRegToReg("r10", "rbx")
 	fc.out.ShlRegByImm("r10", 3)
 	fc.out.AddRegToReg("r10", "rdx") // r10 = &right[rbx]
 	fc.out.VMovupdLoadFromMem("ymm1", "r10", 0)
-	
+
 	// Vector add: ymm0 = ymm0 + ymm1
 	fc.out.VAddPDVectorToVector("ymm0", "ymm0", "ymm1")
-	
+
 	// Store result: result[rbx:rbx+vectorWidth] = ymm0
 	fc.out.MovRegToReg("r10", "rbx")
 	fc.out.ShlRegByImm("r10", 3)
 	fc.out.AddRegToReg("r10", "rdi") // r10 = &result[rbx]
 	fc.out.VMovupdStoreToMem("ymm0", "r10", 0)
-	
+
 	// Increment counter by vectorWidth
 	fc.out.AddImmToReg("rbx", int64(vectorWidth))
-	
+
 	// Jump back to vector loop start
 	vecLoopEnd := fc.eb.text.Len()
 	offset := vecLoopStart - vecLoopEnd - 2
 	fc.out.JumpUnconditional(int32(offset))
-	
+
 	// ===== CLEANUP LOOP =====
 	// Process remaining elements one by one
 	cleanupStart := fc.eb.text.Len()
-	
+
 	// Patch the earlier jump to cleanup
 	cleanupJumpTarget := cleanupStart - cleanupJump - 6
 	fc.patchJump(cleanupJump, cleanupJumpTarget)
-	
+
 	// Check if counter >= limit
 	cleanupLoopStart := fc.eb.text.Len()
 	fc.out.CmpRegToReg("rbx", "r12")
-	
+
 	// Jump to done if rbx >= r12
 	doneJump := fc.eb.text.Len()
 	fc.out.JumpConditional(JumpGreaterOrEqual, 0) // Placeholder, will patch later
-	
+
 	// Load one element from left: xmm0 = left[rbx]
 	fc.out.MovRegToReg("r10", "rbx")
 	fc.out.ShlRegByImm("r10", 3)
 	fc.out.AddRegToReg("r10", "rsi")
 	// Load scalar double (use SSE2 movsd)
 	fc.out.Emit([]byte{0xF2, 0x41, 0x0F, 0x10, 0x02}) // movsd xmm0, [r10]
-	
+
 	// Load one element from right: xmm1 = right[rbx]
 	fc.out.MovRegToReg("r10", "rbx")
 	fc.out.ShlRegByImm("r10", 3)
 	fc.out.AddRegToReg("r10", "rdx")
 	fc.out.Emit([]byte{0xF2, 0x41, 0x0F, 0x10, 0x0A}) // movsd xmm1, [r10]
-	
+
 	// Scalar add: xmm0 = xmm0 + xmm1
 	fc.out.Emit([]byte{0xF2, 0x0F, 0x58, 0xC1}) // addsd xmm0, xmm1
-	
+
 	// Store result: result[rbx] = xmm0
 	fc.out.MovRegToReg("r10", "rbx")
 	fc.out.ShlRegByImm("r10", 3)
 	fc.out.AddRegToReg("r10", "rdi")
 	fc.out.Emit([]byte{0xF2, 0x41, 0x0F, 0x11, 0x02}) // movsd [r10], xmm0
-	
+
 	// Increment counter
 	fc.out.IncReg("rbx")
-	
+
 	// Jump back to cleanup loop start
 	cleanupLoopEnd := fc.eb.text.Len()
 	cleanupOffset := cleanupLoopStart - cleanupLoopEnd - 2
 	fc.out.JumpUnconditional(int32(cleanupOffset))
-	
+
 	// ===== DONE =====
 	doneStart := fc.eb.text.Len()
-	
+
 	// Patch the jump to done
 	doneJumpTarget := doneStart - doneJump - 6
 	fc.patchJump(doneJump, doneJumpTarget)
-	
+
 	// Clean up AVX state
 	fc.out.VZeroUpper()
-	
+
 	if VerboseMode {
 		fmt.Fprintf(os.Stderr, "SIMD: Successfully emitted vectorized loop\n")
 	}

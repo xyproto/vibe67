@@ -20,7 +20,7 @@ type LoopVectorizationInfo struct {
 
 // SIMDAnalyzer analyzes loops for vectorization opportunities
 type SIMDAnalyzer struct {
-	target     Target                  // Target platform for vector width
+	target      Target                  // Target platform for vector width
 	depAnalyzer *LoopDependencyAnalyzer // Dependency analyzer
 }
 
@@ -56,11 +56,11 @@ func (sa *SIMDAnalyzer) AnalyzeLoop(loop *LoopStmt) *LoopVectorizationInfo {
 	// Analyze loop body for vectorization potential
 	info.MemoryAccesses = sa.findMemoryAccesses(loop.Body)
 	info.Operations = sa.findOperations(loop.Body)
-	
+
 	// Use sophisticated dependency analysis
 	canVectorize, reason := sa.depAnalyzer.CanVectorize(loop)
 	info.HasDependencies = !canVectorize
-	
+
 	if !canVectorize {
 		info.CanVectorize = false
 		info.Reason = reason
