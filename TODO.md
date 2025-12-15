@@ -14,6 +14,7 @@
 - [x] Add SIMD intrinsics for common operations
 - [x] Implement simple register use/def analysis
 - [x] Create data structures for live ranges
+- [x] Add loop analysis to detect vectorization candidates
 
 ## High Priority - Feasible Sub-tasks
 
