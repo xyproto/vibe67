@@ -30,8 +30,8 @@
 
 ### Register Allocation Improvements
 - [x] Add register pressure tracking to identify spill-heavy code
-- [ ] Implement simple register use/def analysis
-- [ ] Create data structures for live ranges
+- [x] Implement simple register use/def analysis
+- [x] Create data structures for live ranges
 - [ ] Implement live range analysis for better register allocation
 - [ ] Add register reuse hints based on live ranges
 - [ ] Implement linear scan register allocation to reduce spilling

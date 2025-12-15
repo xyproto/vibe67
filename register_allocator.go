@@ -33,6 +33,23 @@ type LiveInterval struct {
 	Reg       string // Allocated register (empty if spilled)
 	Spilled   bool   // True if spilled to stack
 	SpillSlot int    // Stack offset if spilled
+	Defs      []int  // All definition points (assignments)
+	Uses      []int  // All use points (reads)
+}
+
+// DefUseChain represents a definition and its uses
+type DefUseChain struct {
+	DefPos   int   // Position of definition
+	VarName  string // Variable being defined
+	UsePos   []int // Positions where this definition is used
+	ReachEnd bool  // True if this def reaches end of scope
+}
+
+// UseDefChain represents a use and its reaching definitions
+type UseDefChain struct {
+	UsePos  int      // Position of use
+	VarName string   // Variable being used
+	DefPos  []int    // Positions of definitions that reach this use
 }
 
 // RegisterAllocator manages register allocation for a function
@@ -47,6 +64,8 @@ type RegisterAllocator struct {
 	varToInterval   map[string]*LiveInterval // Variable name -> interval
 	position        int                      // Current program position
 	spillSlots      int                      // Number of spill slots allocated
+	defUseChains    []*DefUseChain           // Def-use chains for analysis
+	useDefChains    []*UseDefChain           // Use-def chains for analysis
 }
 
 // NewRegisterAllocator creates a register allocator for the target architecture
@@ -59,6 +78,8 @@ func NewRegisterAllocator(arch Arch) *RegisterAllocator {
 		usedCalleeSaved: make(map[string]bool),
 		position:        0,
 		spillSlots:      0,
+		defUseChains:    []*DefUseChain{},
+		useDefChains:    []*UseDefChain{},
 	}
 
 	// Initialize register sets based on architecture
@@ -110,10 +131,34 @@ func (ra *RegisterAllocator) BeginVariable(varName string) {
 		End:     ra.position, // Will be updated on each use
 		Reg:     "",
 		Spilled: false,
+		Defs:    []int{ra.position}, // First definition
+		Uses:    []int{},
 	}
 
 	ra.intervals = append(ra.intervals, interval)
 	ra.varToInterval[varName] = interval
+}
+
+// DefVariable marks a definition (assignment) of a variable
+func (ra *RegisterAllocator) DefVariable(varName string) {
+	interval, exists := ra.varToInterval[varName]
+	if !exists {
+		ra.BeginVariable(varName)
+		interval = ra.varToInterval[varName]
+	}
+
+	// Record definition position
+	interval.Defs = append(interval.Defs, ra.position)
+	interval.End = ra.position
+
+	// Create def-use chain entry
+	chain := &DefUseChain{
+		DefPos:   ra.position,
+		VarName:  varName,
+		UsePos:   []int{},
+		ReachEnd: true, // Assume reaches end until proven otherwise
+	}
+	ra.defUseChains = append(ra.defUseChains, chain)
 }
 
 // UseVariable marks a use of a variable, extending its live interval
@@ -125,9 +170,30 @@ func (ra *RegisterAllocator) UseVariable(varName string) {
 		interval = ra.varToInterval[varName]
 	}
 
+	// Record use position
+	interval.Uses = append(interval.Uses, ra.position)
+
 	// Extend the interval to current position
 	if ra.position > interval.End {
 		interval.End = ra.position
+	}
+
+	// Create use-def chain entry (link to most recent def)
+	chain := &UseDefChain{
+		UsePos:  ra.position,
+		VarName: varName,
+		DefPos:  interval.Defs, // All definitions that could reach this use
+	}
+	ra.useDefChains = append(ra.useDefChains, chain)
+
+	// Update the most recent def-use chain
+	if len(ra.defUseChains) > 0 {
+		for i := len(ra.defUseChains) - 1; i >= 0; i-- {
+			if ra.defUseChains[i].VarName == varName {
+				ra.defUseChains[i].UsePos = append(ra.defUseChains[i].UsePos, ra.position)
+				break
+			}
+		}
 	}
 }
 
@@ -414,6 +480,58 @@ func (ra *RegisterAllocator) GenerateEpilogue(out *Out) {
 			// addi sp, sp, totalSize
 			out.AddImmToReg("sp", int64(totalSize))
 		}
+	}
+}
+
+// GetDefsForVariable returns all definition positions for a variable
+func (ra *RegisterAllocator) GetDefsForVariable(varName string) []int {
+	if interval, exists := ra.varToInterval[varName]; exists {
+		return interval.Defs
+	}
+	return []int{}
+}
+
+// GetUsesForVariable returns all use positions for a variable
+func (ra *RegisterAllocator) GetUsesForVariable(varName string) []int {
+	if interval, exists := ra.varToInterval[varName]; exists {
+		return interval.Uses
+	}
+	return []int{}
+}
+
+// GetDefUseChain returns the def-use chain for a specific definition
+func (ra *RegisterAllocator) GetDefUseChain(varName string, defPos int) *DefUseChain {
+	for _, chain := range ra.defUseChains {
+		if chain.VarName == varName && chain.DefPos == defPos {
+			return chain
+		}
+	}
+	return nil
+}
+
+// GetUseDefChain returns the use-def chain for a specific use
+func (ra *RegisterAllocator) GetUseDefChain(varName string, usePos int) *UseDefChain {
+	for _, chain := range ra.useDefChains {
+		if chain.VarName == varName && chain.UsePos == usePos {
+			return chain
+		}
+	}
+	return nil
+}
+
+// PrintDefUseChains prints all def-use chains for debugging
+func (ra *RegisterAllocator) PrintDefUseChains() {
+	fmt.Println("=== Def-Use Chains ===")
+	for _, chain := range ra.defUseChains {
+		fmt.Printf("  %s@%d -> uses: %v\n", chain.VarName, chain.DefPos, chain.UsePos)
+	}
+}
+
+// PrintUseDefChains prints all use-def chains for debugging
+func (ra *RegisterAllocator) PrintUseDefChains() {
+	fmt.Println("=== Use-Def Chains ===")
+	for _, chain := range ra.useDefChains {
+		fmt.Printf("  %s@%d <- defs: %v\n", chain.VarName, chain.UsePos, chain.DefPos)
 	}
 }
 
