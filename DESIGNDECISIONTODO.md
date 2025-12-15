@@ -384,12 +384,15 @@ This document tracks missing, conflicting, or unclear design decisions that need
 **Issue:** Some operators have unclear precedence
 - `or!` precedence vs `or` vs `||`
 - `<>` (composition) precedence
-- `!` (move) vs `!` (not) disambiguation
+- Operator usage: logical not, bitwise not, ownership/movement
 
 **Decision:**
 - [x] `or!` has lower precedence than `or` (error handling last)
 - [x] `<>` (compose) binds tighter than arithmetic (functional style)
-- [x] `!` is only NOT operator (move uses `<-`, clearer)
+- [x] `not` is logical NOT (boolean negation: `not true` → `false`)
+- [x] `!b` is bitwise NOT (binary negation: `!0xFF` → `0xFFFFFFFFFFFFFF00`)
+- [x] `-` is for subtraction and negative numbers
+- [x] `µ` is for memory ownership/movement (unique symbol, visually distinct)
 - [x] Full precedence table in GRAMMAR.md
 
 ## Performance & Debugging
@@ -482,17 +485,22 @@ This document tracks missing, conflicting, or unclear design decisions that need
 - [x] No automatic audit trail (complexity, use code review)
 - [x] Unsafe cannot be disabled - trust programmer (C67 philosophy)
 
-### 39. Buffer Overflow Protection
-**Issue:** No mention of bounds checking
-- Are array accesses bounds-checked?
-- Stack overflow protection?
-- Heap overflow protection?
+### 39. Safety & Runtime Protection
+**Issue:** Balance between performance and preventing common programming errors
+- Null pointer dereferences
+- Division by zero
+- Stack overflow
+- Buffer overflows
+- Array bounds violations
 
 **Decision:**
-- [x] No automatic bounds checking (performance, C philosophy)
-- [x] Bounds checking in debug builds only (future work)
-- [x] No overflow guards (trust programmer, explicit checks if needed)
-- [x] No stack canaries by default (OS/compiler flags handle this)
+- [x] **Null pointer checks:** Enabled by default, emit check before dereference (prevents crashes)
+- [x] **Division by zero:** Enabled by default, check divisor before div/mod (prevents SIGFPE)
+- [x] **Stack overflow:** Guard pages from OS (standard, no compiler work needed)
+- [x] **Buffer overflow:** Bounds checking in safe mode (`-check-bounds` flag), off by default for performance
+- [x] **Array access:** Map lookups safe by default (return 0.0 for missing keys), no UB
+- [x] Can disable all safety checks with `-unsafe` flag (maximum performance)
+- [x] Philosophy: Prevent crashes that corrupt state, allow programmer control for performance
 
 ### 40. Code Signing & Verification
 **Issue:** No mention of executable signing

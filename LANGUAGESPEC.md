@@ -300,10 +300,10 @@ factorial = (n, acc) -> (n == 0) {
 x = ??  // Uses OS CSPRNG
 ```
 
-### 16. Move Operator `!` (Postfix)
+### 16. Memory Ownership Operator `µ` (Prefix)
 
 ```c67
-new_owner = old_owner!  // Transfer ownership
+new_owner = µold_owner  // Transfer ownership
 ```
 
 ### 17. Result Type with NaN Error Encoding
@@ -3185,15 +3185,18 @@ In C-like languages:
 ```c
 if (x & FLAG)  // Bitwise AND - easy to confuse with &&
 if (x | FLAG)  // Bitwise OR - easy to confuse with ||
+if (~x)        // Bitwise NOT - easy to confuse with logical !
 ```
 
-**C67's approach:** Explicit `b` suffix
+**C67's approach:** Explicit `b` suffix for bitwise, word operators for logical
 
 ```c67
-x &b FLAG     // Clearly bitwise
-x and y       // Clearly logical
+x &b FLAG     // Clearly bitwise AND
+x and y       // Clearly logical AND
 x | transform // Clearly pipe
-x |b mask     // Clearly bitwise
+x |b mask     // Clearly bitwise OR
+not x         // Clearly logical NOT
+!b x          // Clearly bitwise NOT
 x ?b 5        // Bit test: is bit 5 set?
 ```
 
@@ -3202,7 +3205,8 @@ x ?b 5        // Bit test: is bit 5 set?
 2. **No precedence confusion:** Different operators, different precedence
 3. **Frees `|` for pipes:** Pipe operator feels natural
 4. **Consistent:** All bitwise ops have `b` suffix
-5. **Efficient bit testing:** `?b` compiles to BT/TEST instructions
+5. **Readable:** `not` is clearer than `!` for logical negation
+6. **Efficient bit testing:** `?b` compiles to BT/TEST instructions
 
 ### Design Principles Summary
 

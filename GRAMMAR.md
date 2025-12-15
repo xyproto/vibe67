@@ -620,7 +620,7 @@ multiplicative_expr = power_expr { ("*" | "/" | "%") power_expr } ;
 
 power_expr      = unary_expr { ( "**" | "^" ) unary_expr } ;
 
-unary_expr      = ( "-" | "!" | "~b" | "#" ) unary_expr
+unary_expr      = ( "-" | "not" | "!b" | "#" | "µ" ) unary_expr
                 | postfix_expr ;
 
 postfix_expr    = primary_expr { postfix_op } ;
@@ -628,7 +628,6 @@ postfix_expr    = primary_expr { postfix_op } ;
 postfix_op      = "[" expression "]"
                 | "." ( identifier | integer )
                 | "(" [ argument_list ] ")"
-                | "!"
                 | "#"
                 | match_block ;
 
@@ -995,7 +994,7 @@ defer c.free(ptr)
 and  Logical AND (short-circuit)
 or   Logical OR (short-circuit)
 xor  Logical XOR
-!    Logical NOT
+not  Logical NOT
 ```
 
 ### Bitwise Operators
@@ -1006,7 +1005,7 @@ All bitwise operators use `b` suffix:
 &b    Bitwise AND
 |b    Bitwise OR
 ^b    Bitwise XOR
-~b    Bitwise NOT (unary)
+!b    Bitwise NOT (unary)
 <<b   Left shift
 >>b   Arithmetic right shift
 <<<b  Rotate left
@@ -1091,7 +1090,7 @@ When a function returns a list, multiple assignment unpacks the elements:
 <>    Function composition (f <> g creates a new function that applies g then f)
 <-    Update/Send (update mutable var OR send to ENet)
 <=    Receive (ENet, prefix) OR less-than-or-equal comparison
-!     Move operator (postfix)
+µ     Memory ownership/movement operator (prefix)
 .     Field access
 []    Indexing
 ()    Function call (parentheses optional for zero or one argument in some contexts)
@@ -1106,8 +1105,8 @@ or!   Error/null handler (executes right side if left is error or null pointer)
 
 From highest to lowest precedence:
 
-1. **Primary**: `()` `[]` `.` function call, postfix `!`, postfix `#`
-2. **Unary**: `-` `!` `~b` `#`
+1. **Primary**: `()` `[]` `.` function call, postfix `#`
+2. **Unary**: `-` `not` `!b` `#` `µ`
 3. **Power**: `**`
 4. **Multiplicative**: `*` `/` `%`
 5. **Additive**: `+` `-`
@@ -1116,10 +1115,10 @@ From highest to lowest precedence:
 8. **Bitwise XOR**: `^b`
 9. **Bitwise OR**: `|b`
 10. **Comparison**: `==` `!=` `<` `<=` `>` `>=`
-11. **Logical AND**: `&&`
-12. **Logical OR**: `||`
+11. **Logical AND**: `and`
+12. **Logical OR**: `or`
 13. **Or-bang**: `or!`
-14. **Function Composition**: `¤`
+14. **Function Composition**: `<>`
 15. **Send**: `<-`
 16. **Receive**: `<=`
 17. **Pipe**: `|` `||`
