@@ -4493,6 +4493,15 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 			fc.out.Cvttsd2si("rcx", "xmm1") // rcx = int64(xmm1)
 			fc.out.RorClReg("rax", "cl")    // ror rax, cl
 			fc.out.Cvtsi2sd("xmm0", "rax")  // xmm0 = float64(rax)
+		case "?b":
+			// Bit test: test if bit at position (xmm1) is set in value (xmm0)
+			// Returns 1.0 if bit is set, 0.0 otherwise
+			fc.out.Cvttsd2si("rax", "xmm0")      // rax = int64(value)
+			fc.out.Cvttsd2si("rcx", "xmm1")      // rcx = int64(bit_position)
+			fc.out.BtRegReg("rax", "rcx")        // BT rax, rcx (sets CF if bit is set)
+			fc.out.SetcReg("al")                 // al = CF ? 1 : 0
+			fc.out.MovzxByteToQword("rax", "al") // Zero-extend al to rax
+			fc.out.Cvtsi2sd("xmm0", "rax")       // xmm0 = float64(result)
 		case "|b":
 			// Bitwise OR: convert to int64, OR, convert back
 			fc.out.Cvttsd2si("rax", "xmm0")   // rax = int64(xmm0)

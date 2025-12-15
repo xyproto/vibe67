@@ -93,6 +93,7 @@ const (
 	TOKEN_GTGT_B     // >>b (shift right)
 	TOKEN_LTLTLT_B   // <<<b (rotate left)
 	TOKEN_GTGTGT_B   // >>>b (rotate right)
+	TOKEN_QUESTION_B // ?b (bit test)
 	TOKEN_AS         // as (type casting)
 	// C type keywords
 	TOKEN_I8   // i8
@@ -651,6 +652,11 @@ func (l *Lexer) NextToken() Token {
 		l.pos++
 		return Token{Type: TOKEN_BANG, Value: "!", Line: l.line, Column: tokenColumn}
 	case '?':
+		// Check for ?b (bit test operator)
+		if l.pos+1 < len(l.input) && l.input[l.pos+1] == 'b' {
+			l.pos += 2
+			return Token{Type: TOKEN_QUESTION_B, Value: "?b", Line: l.line, Column: tokenColumn}
+		}
 		// Check for ?? (random number operator)
 		if l.pos+1 < len(l.input) && l.input[l.pos+1] == '?' {
 			l.pos += 2

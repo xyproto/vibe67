@@ -3512,7 +3512,7 @@ func (p *Parser) parseBitwise() Expression {
 	for p.peek.Type == TOKEN_PIPE_B || p.peek.Type == TOKEN_AMP_B ||
 		p.peek.Type == TOKEN_CARET_B || p.peek.Type == TOKEN_LTLT_B ||
 		p.peek.Type == TOKEN_GTGT_B || p.peek.Type == TOKEN_LTLTLT_B ||
-		p.peek.Type == TOKEN_GTGTGT_B {
+		p.peek.Type == TOKEN_GTGTGT_B || p.peek.Type == TOKEN_QUESTION_B {
 		p.nextToken()
 		op := p.current.Value
 		p.nextToken()

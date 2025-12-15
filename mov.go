@@ -573,3 +573,49 @@ func (o *Out) RepMovsb() {
 		compilerError("RepMovsb not implemented for RISC-V")
 	}
 }
+
+// BtRegReg performs bit test: BT reg1, reg2 (test bit reg2 in reg1, sets CF)
+func (o *Out) BtRegReg(reg1, reg2 string) {
+	switch o.target.Arch() {
+	case ArchX86_64:
+		x64 := NewX86_64CodeGen(o.writer, o.eb)
+		x64.BtRegReg(reg1, reg2)
+	case ArchARM64:
+		// ARM64: Use LSR + AND to test bit
+		// Need to shift right by bit position, then AND with 1
+		compilerError("BtRegReg not fully implemented for ARM64 yet")
+	case ArchRiscv64:
+		// RISC-V: Use SRL + ANDI to test bit
+		compilerError("BtRegReg not fully implemented for RISC-V yet")
+	}
+}
+
+// SetcReg sets a register to 1 if CF=1, 0 otherwise (SETC r/m8)
+func (o *Out) SetcReg(reg string) {
+	switch o.target.Arch() {
+	case ArchX86_64:
+		x64 := NewX86_64CodeGen(o.writer, o.eb)
+		x64.SetcReg(reg)
+	case ArchARM64:
+		// ARM64: Use CSET instruction
+		compilerError("SetcReg not fully implemented for ARM64 yet")
+	case ArchRiscv64:
+		// RISC-V: Use conditional moves or branch
+		compilerError("SetcReg not fully implemented for RISC-V yet")
+	}
+}
+
+// MovzxByteToQword performs MOVZX r64, r/m8 (zero-extend byte to qword)
+func (o *Out) MovzxByteToQword(dstReg, srcReg string) {
+	switch o.target.Arch() {
+	case ArchX86_64:
+		x64 := NewX86_64CodeGen(o.writer, o.eb)
+		x64.MovzxByteToQword(dstReg, srcReg)
+	case ArchARM64:
+		// ARM64: Use UXTB (unsigned extend byte)
+		compilerError("MovzxByteToQword not fully implemented for ARM64 yet")
+	case ArchRiscv64:
+		// RISC-V: Use ANDI with 0xFF
+		compilerError("MovzxByteToQword not fully implemented for RISC-V yet")
+	}
+}
