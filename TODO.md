@@ -11,6 +11,7 @@
 - [x] Implement TZCNT instruction for trailing zeros
 - [x] Implement LZCNT instruction for leading zeros
 - [x] Use BMI1/BMI2 instructions when available on x86-64
+- [x] Add SIMD intrinsics for common operations
 
 ## High Priority - Feasible Sub-tasks
 
