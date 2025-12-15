@@ -268,6 +268,8 @@ type LoopStmt struct {
 	BaseOffset    int         // Stack offset before loop body (set during collectSymbols)
 	NumThreads    int         // Number of threads for parallel execution (0 = sequential, -1 = all cores, N = specific count)
 	Reducer       *LambdaExpr // Optional reduction lambda for parallel loops: | a,b | { a + b }
+	Vectorized    bool        // Whether this loop has been marked for SIMD vectorization
+	VectorWidth   int         // Elements per SIMD vector (e.g., 4 for AVX doubles, 8 for AVX floats)
 }
 
 type WhileStmt struct {

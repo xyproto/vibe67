@@ -75,6 +75,11 @@ func optimizeProgram(program *Program) *Program {
 		program.Statements[i] = foldConstants(stmt)
 	}
 
+	// Pass 7: Loop vectorization (convert scalar loops to SIMD)
+	for i, stmt := range program.Statements {
+		program.Statements[i] = vectorizeLoops(stmt)
+	}
+
 	return program
 }
 
