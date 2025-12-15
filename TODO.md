@@ -6,6 +6,13 @@
 
 ## High Priority - Feasible Sub-tasks
 
+### SIMD and Vectorization
+- [ ] Add loop analysis to detect vectorization candidates
+- [ ] Implement simple loop dependency analysis
+- [ ] Add vector width detection for target platform
+- [ ] Auto-vectorize simple parallel loops using existing SIMD infrastructure
+- [ ] Add SIMD intrinsics for common operations
+
 ### Module-level mutable globals in lambdas
 - [ ] Add test cases to reproduce the closure capture issue
 - [ ] Document current behavior vs expected behavior
@@ -20,32 +27,13 @@
 - [ ] Add register reuse hints based on live ranges
 - [ ] Implement linear scan register allocation to reduce spilling
 
-### Pattern Matching Enhancements
-- [ ] Add support for tuple pattern matching: `(x, y) = tuple`
-- [ ] Add support for nested pattern matching: `[[a, b], c] = nested_list`
-- [ ] Add support for pattern guards in match expressions
-- [ ] Extend pattern matching to support tuple destructuring and nested patterns
-
-### SIMD and Vectorization
-- [ ] Add loop analysis to detect vectorization candidates
-- [ ] Implement simple loop dependency analysis
-- [ ] Add vector width detection for target platform
-- [ ] Auto-vectorize simple parallel loops using existing SIMD infrastructure
-- [ ] Add SIMD intrinsics for common operations
-
-### Incremental Compilation
-- [ ] Add file change detection (hot reload infrastructure exists)
-- [ ] Implement function-level compilation cache
-- [ ] Add dependency tracking between compilation units
-- [ ] Add incremental compilation result caching
-
 ### Import System
 - [ ] Add test for cross-module closure initialization
 - [ ] Fix closure variable capture in imported modules
 - [ ] Verify import system properly initializes closures across modules
 - [ ] Add circular dependency detection
 
-## Architecture-Specific (Lower Priority)
+## Architecture-Specific
 
 ### x86-64 Optimizations
 - [ ] Add CPUID detection for BMI1/BMI2 support
@@ -88,12 +76,22 @@
 - [ ] Add exception propagation semantics for defer statements
 - [ ] Add defer ordering guarantees in documentation
 
+### Pattern Matching Enhancements
+- [ ] Add support for tuple pattern matching: `(x, y) = tuple`
+- [ ] Add support for nested pattern matching: `[[a, b], c] = nested_list`
+- [ ] Add support for pattern guards in match expressions
+- [ ] Extend pattern matching to support tuple destructuring and nested patterns
+
+### Incremental Compilation
+- [ ] Add file change detection (hot reload infrastructure exists)
+- [ ] Implement function-level compilation cache
+- [ ] Add dependency tracking between compilation units
+- [ ] Add incremental compilation result caching
+
 ## Code Quality Improvements
 
 ### Performance
 - [ ] Optimize O(n²) string iteration (codegen.go:10624)
-- [ ] Add constant pool for repeated string literals
-- [ ] Implement string interning for common values
 
 ### Code Generation
 - [ ] Add explicit float precision conversions (codegen.go:5692)
