@@ -16,6 +16,7 @@
 - [x] Create data structures for live ranges
 - [x] Add loop analysis to detect vectorization candidates
 - [x] Implement simple loop dependency analysis
+- [x] Auto-vectorize simple parallel loops using existing SIMD infrastructure
 
 ## High Priority - Feasible Sub-tasks
 
