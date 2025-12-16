@@ -6210,6 +6210,9 @@ func (fc *C67Compiler) compileMatchJump(jumpExpr *JumpExpr) {
 }
 
 func (fc *C67Compiler) compileCastExpr(expr *CastExpr) {
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "DEBUG compileCastExpr: Type=%s, Expr type=%T\n", expr.Type, expr.Expr)
+	}
 	// Check if this is a read syntax: ptr[offset] as TYPE
 	// Transform to: read_TYPE(ptr, offset)
 	if indexExpr, ok := expr.Expr.(*IndexExpr); ok {
@@ -6305,6 +6308,21 @@ func (fc *C67Compiler) compileCastExpr(expr *CastExpr) {
 		if exprType == "string" {
 			// Already a string, no conversion needed
 			// xmm0 already has correct value from fc.compileExpression(expr.Expr)
+			return
+		}
+
+		// Check if it's a list/map - needs special conversion
+		if exprType == "list" || exprType == "map" {
+			// For now, just return a placeholder "[...]" or "{...}"
+			// TODO: Implement proper list/map to string conversion
+			if VerboseMode {
+				fmt.Fprintf(os.Stderr, "DEBUG: Converting %s to string placeholder\n", exprType)
+			}
+			placeholder := "[...]"
+			if exprType == "map" {
+				placeholder = "{...}"
+			}
+			fc.compileExpression(&StringExpr{Value: placeholder})
 			return
 		}
 
