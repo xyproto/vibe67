@@ -671,6 +671,7 @@ unsafe_expr     = "unsafe" "{" { statement { newline } } [ expression ] "}"
                   [ "as" type_cast ] ;
 
 lambda_expr     = [ parameter_list ] "->" lambda_body
+                | parameter_list block  // Arrow optional with parenthesized params + block body
                 | block ;  // Inferred lambda with no parameters in assignment context
 
 parameter_list  = variadic_params
@@ -688,12 +689,14 @@ lambda_body     = [ "->" type_annotation ] ( block | expression [ match_block ] 
 // Lambda Syntax Rules:
 //
 // Explicit lambda syntax (always works):
-//   x -> x * 2                                    // One parameter
+//   x -> x * 2                                    // One parameter, expression body
 //   (x, y) -> x + y                               // Multiple parameters (parens required)
 //   (x, y, rest...) -> sum(rest)                  // Variadic parameters (last param with ...)
 //   -> println("hi")                              // No parameters (explicit ->)
-//   x -> { temp = x * 2; temp }                   // Block body
-//   (n) { n * n }                                 // Block body (arrow optional with parens)
+//   x -> { temp = x * 2; temp }                   // Single param with block body
+//   (n) -> { n * n }                              // Parenthesized param with block body
+//   (n) { n * n }                                 // Arrow optional when params in parens + block
+//   (a, b) { a + b }                              // Multiple params, arrow optional with block
 //
 // With type annotations:
 //   (x: num, y: num) -> num { x + y }             // Parameter and return types
@@ -706,19 +709,21 @@ lambda_body     = [ "->" type_annotation ] ( block | expression [ match_block ] 
 //   handler = { | x > 0 => "pos" }                // Inferred: handler = -> { | x > 0 => "pos" }
 //
 // When `->` can be omitted:
-//   1. In assignment context: `name = { ... }` or `name := { ... }`
-//   2. Right side is a block (not a map literal - map has `:` colons)
+//   1. Parameters in parentheses with block body: `(n) { n * 2 }` or `(a, b) { a + b }`
+//   2. In assignment context with just block: `name = { ... }`
 //   3. Block contains statements or guard match (| at line start)
 //
 // When `->` is REQUIRED:
-//   1. Lambda has one or more parameters: `x -> x * 2`
-//   2. Lambda body is an expression (not a block): `-> 42`
+//   1. Single parameter without parens: `x -> x * 2` (arrow distinguishes from identifier)
+//   2. Lambda body is an expression, not block: `-> 42` or `n -> n * 2`
 //   3. Lambda is NOT being assigned: `[1, 2, 3] | x -> x * 2`
 //   4. Lambda is a function argument: `map(data, x -> x * 2)`
 //
 // Parentheses rules:
-//   - Single parameter: `x -> x * 2` (no parens needed)
+//   - Single parameter: `x -> x * 2` (no parens) OR `(x) -> x * 2` (with parens)
+//   - Single parameter + block: `x -> { ... }` OR `(x) { ... }` (arrow optional with parens)
 //   - Multiple parameters: `(x, y) -> x + y` (parens required)
+//   - Multiple parameters + block: `(x, y) { x + y }` (arrow optional)
 //   - Type annotations: `(x: num) -> num { x * 2 }` (parens required)
 //   - No parameters with explicit ->: `-> println("hi")` (no parens needed)
 //   - No parameters inferred from block: `main = { ... }` (no parens needed)

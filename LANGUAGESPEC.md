@@ -762,17 +762,32 @@ cleanup = -> release_all()              // Cleanup callback
 
 ### Lambda Expressions
 
-Lambdas use `->` for definition:
+Lambdas can be defined with or without the `->` arrow, depending on syntax:
 
 ```c67
-// Inline lambda
+// Inline lambda with arrow (required for expressions)
 [1, 2, 3] | x -> x * 2
+
+// Single parameter with block
+process = n -> { n * 2 + 1 }
+
+// Parenthesized parameters - arrow optional with block body
+square = (n) { n * n }              // Arrow omitted
+add = (a, b) { a + b }              // Arrow omitted  
+mult = (x, y) -> { x * y }          // Arrow included (both work)
 
 // Multi-line lambda
 process = data -> {
     cleaned = data | x -> x.trim()
     cleaned | x -> x.length > 0
 }
+
+// Zero-argument lambda (inferred in assignment)
+greet = { println("Hello!") }
+
+// Explicit zero-argument lambda
+greet = () { println("Hello!") }    // Arrow optional
+greet = () -> { println("Hello!") } // Arrow explicit
 
 // Lambdas can have local variables
 compute = x -> {
@@ -788,6 +803,11 @@ init = {
     // Implicitly returns true (1.0) - no explicit return needed
 }
 ```
+
+**Arrow Rules:**
+- **Required:** Expression body: `x -> x * 2`, non-parenthesized params: `x -> { ... }`, lambda as argument: `map(xs, x -> x * 2)`
+- **Optional:** Parenthesized params with block: `(n) { n * 2 }` or `(a, b) { a + b }`
+- **Inferred:** Zero params in assignment: `main = { ... }` becomes `main = () { ... }`
 
 ### Closures
 
@@ -2254,6 +2274,46 @@ s.bytes             // Map of byte values {0: 72.0, 1: 101.0, ...}
 s.runes             // Map of Unicode code points
 s + " World"        // Concatenation (merges maps)
 ```
+
+#### F-String Interpolation
+
+F-strings provide powerful string interpolation with full expression support:
+
+```c67
+// Basic interpolation
+name = "Alice"
+greeting = f"Hello, {name}!"  // "Hello, Alice!"
+
+// Arithmetic expressions
+x = 10
+y = 20
+result = f"{x} + {y} = {x + y}"  // "10 + 20 = 30"
+
+// Function calls in interpolation
+double = (n) { n * 2 }
+triple = (n) { n * 3 }
+msg = f"double(5) = {double(5)}"  // "double(5) = 10"
+
+// Nested function calls
+msg = f"triple(double(4)) = {triple(double(4))}"  // "triple(double(4)) = 24"
+
+// Multiple interpolations in one string
+a = 3
+b = 4
+result = f"{a} + {b} = {a + b}, {a} * {b} = {a * b}"
+// "3 + 4 = 7, 3 * 4 = 12"
+
+// Complex expressions
+items = [1, 2, 3]
+msg = f"List has {#items} items, first is {items[0]}"
+// "List has 3 items, first is 1"
+
+// Nested f-strings work too
+inner = "world"
+outer = f"Hello, {f"{inner}"}!"  // "Hello, world!"
+```
+
+**Implementation Note:** F-strings are evaluated at runtime, allowing dynamic expressions within `{}`. Any valid C67 expression can be used, including function calls, arithmetic, map access, and nested interpolations.
 
 ### List Operations
 
