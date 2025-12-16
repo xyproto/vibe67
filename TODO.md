@@ -62,7 +62,12 @@ Function-level guards worked correctly because they executed in a lambda context
 - Removed unused debug strings: ~500 bytes saved
 
 ### Size Reduction Tasks
+- [x] Add function usage tracking (usedFunctions map)
 - [ ] Make runtime functions conditionally included (only when used)
+  - [x] String concatenation (_c67_string_concat) - wrapped in conditional
+  - [ ] List functions (cons, head, tail, etc.)
+  - [ ] String manipulation (upper, lower, trim)
+  - [ ] cstr conversion functions
   - [ ] Arena allocator code (if no `alloc` used)
   - [ ] Bounds checking code (if no array access)
   - [ ] Recursion depth tracking (if no recursion)

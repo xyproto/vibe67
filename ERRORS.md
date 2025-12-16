@@ -6,76 +6,44 @@ This document tracks known errors, limitations, and edge cases in the C67 compil
 
 ### 1. Doubly-Nested Recursive Calls with Multiple Arguments
 
-**Status**: Known Issue  
-**Severity**: Medium
+**Status**: FIXED ✅  
+**Date Fixed**: 2025-12-16
 
-**Description**: Functions with multiple arguments that make recursive calls where one argument is itself a recursive call do not work correctly.
+**Description**: Functions with multiple arguments that make recursive calls where one argument is itself a recursive call now work correctly.
 
 **Example**:
 ```c67
-// Ackermann function - DOES NOT WORK CORRECTLY
+// Ackermann function - NOW WORKS CORRECTLY
 ack = (m, n) {
     | m == 0 => n + 1
     | n == 0 => ack(m - 1, 1)
-    ~> ack(m - 1, ack(m, n - 1))  // This pattern fails
+    ~> ack(m - 1, ack(m, n - 1))
 }
 
-ack(1, 1)  // Returns 2 instead of 3
-ack(2, 2)  // Returns 2 instead of 7
+ack(3, 3)  // Returns 61 (correct!)
+ack(3, 4)  // Returns 125 (correct!)
 ```
 
-**Workaround**: Use intermediate variables or refactor to avoid nested recursive calls in arguments.
-
-**Works**:
-```c67
-// Simple recursive two-arg functions work fine
-power = (base, exp) {
-    | exp == 0 => 1
-    ~> base * power(base, exp - 1)  // Single recursive call works
-}
-
-// Nested calls to different functions work
-add(mul(2, 3), 4)  // Works: 10
-```
-
-**Root Cause**: Likely related to memoization or argument evaluation order in multi-argument recursive contexts.
+**Fix**: Register allocation for nested function calls was corrected to properly save/restore registers.
 
 ---
 
-### 2. List Building with Recursive Concatenation
+### 2. List Display in Strings
 
-**Status**: Known Issue  
-**Severity**: Medium
+**Status**: Partially Implemented
+**Date**: 2025-12-16
 
-**Description**: Building lists recursively using concatenation (`acc + [item]`) returns 0 instead of the expected list.
+**Description**: Lists can be created and manipulated, but when converted to strings (e.g., in f-strings or println), they show as a placeholder "[...]" instead of their actual contents.
 
 **Example**:
 ```c67
-// List building - DOES NOT WORK CORRECTLY
-build_list_helper = (current, limit, acc) {
-    | current > limit => acc
-    ~> build_list_helper(current + 1, limit, acc + [current])
-}
-
-build_list = (n) {
-    build_list_helper(1, n, [])
-}
-
-build_list(5)  // Returns 0 instead of [1, 2, 3, 4, 5]
+x = [1, 2, 3]
+println(f"x = {x}")  // Prints: x = [...]
 ```
 
-**Workaround**: Use counting or other accumulator patterns instead of list building.
+**Status**: Lists work internally but need proper string conversion implementation.
 
-**Works**:
-```c67
-// Counting instead of list building works fine
-count_helper = (current, limit, count) {
-    | current > limit => count
-    ~> count_helper(current + 1, limit, count + 1)
-}
-```
-
-**Root Cause**: Issue with list concatenation in recursive contexts or accumulator handling.
+**Note**: List concatenation and other list operations work correctly. This only affects display/printing.
 
 ---
 

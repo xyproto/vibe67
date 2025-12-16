@@ -7838,6 +7838,10 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Don't call fc.eb.EmitArenaRuntimeCode() as it's the old stub from main.go
 	// Arena symbols are predeclared earlier in writeELF() to ensure they're available during code generation
 
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "DEBUG: Used functions: %v\n", fc.usedFunctions)
+	}
+
 	// Generate syscall-based printf runtime on Linux
 	fc.GeneratePrintfSyscallRuntime()
 
@@ -7852,11 +7856,13 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		}
 	}
 
-	// Generate _c67_string_concat(left_ptr, right_ptr) -> new_ptr
-	// Arguments: rdi = left_ptr, rsi = right_ptr
-	// Returns: rax = pointer to new concatenated string
+	// Generate _c67_string_concat only if used
+	if fc.usedFunctions["_c67_string_concat"] {
+		// Generate _c67_string_concat(left_ptr, right_ptr) -> new_ptr
+		// Arguments: rdi = left_ptr, rsi = right_ptr
+		// Returns: rax = pointer to new concatenated string
 
-	fc.eb.MarkLabel("_c67_string_concat")
+		fc.eb.MarkLabel("_c67_string_concat")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -7968,6 +7974,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Function epilogue
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
+	} // end if _c67_string_concat used
 
 	// Generate c67_string_to_cstr(c67_string_ptr) -> cstr_ptr
 	// Converts a C67 string (map format) to a null-terminated C string
