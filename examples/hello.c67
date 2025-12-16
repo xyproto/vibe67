@@ -1,0 +1,8 @@
+// Build and run with:
+// c67 add.c67 hello.c67 -o hello && ./hello
+
+println("Hello, World!")
+
+println(f"The sum of 3+4 is {add(3, 4)}")
+
+printf("The sum of 39+3 is %d\n", add(39, 3))
