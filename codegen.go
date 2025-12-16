@@ -139,6 +139,7 @@ type C67Compiler struct {
 	usesStringToCstr bool // Track if C string conversion is needed
 	usesPrintf       bool // Track if printf/println is used
 	usesArenaAlloc   bool // Track if arena allocation is explicitly used
+	usesCPUFeatures  bool // Track if CPU feature detection is needed (FMA, SIMD, etc.)
 
 	// Runtime function emission flags (all true by default for full compatibility)
 
@@ -737,12 +738,8 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	fc.eb.Define("_bounds_too_large_msg", "ERROR: Array index out of bounds (index >= length)\n\x00")
 	fc.eb.Define("_malloc_failed_msg", "ERROR: Memory allocation failed (out of memory)\n\x00")
 
-	// Define arena metadata symbols early (they're small, but only referenced if arenas are used)
-	// These need to be defined before code generation in case arena allocation is used
-	fc.eb.DefineWritable("_c67_arena_meta", "\x00\x00\x00\x00\x00\x00\x00\x00")     // Pointer to arena array
-	fc.eb.DefineWritable("_c67_arena_meta_cap", "\x00\x00\x00\x00\x00\x00\x00\x00") // Capacity (number of slots)
-	fc.eb.DefineWritable("_c67_arena_meta_len", "\x00\x00\x00\x00\x00\x00\x00\x00") // Length (number of active arenas)
-	fc.eb.Define("_arena_null_error", "ERROR: Arena alloc returned NULL\n\x00")
+	// Arena metadata symbols will be defined later if arenas are used
+	// This is checked during the symbol collection pass
 
 	// Debug strings (only defined when needed - currently unused)
 	// fc.eb.Define("_str_debug_default_arena", "DEBUG: Initializing default arena\n\x00")
@@ -10162,6 +10159,12 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 // initializeMetaArenaAndGlobalArena initializes the meta-arena and creates arena 0 (default arena)
 func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
+	// Define arena metadata symbols now that we know arenas are used
+	fc.eb.DefineWritable("_c67_arena_meta", "\x00\x00\x00\x00\x00\x00\x00\x00")     // Pointer to arena array
+	fc.eb.DefineWritable("_c67_arena_meta_cap", "\x00\x00\x00\x00\x00\x00\x00\x00") // Capacity (number of slots)
+	fc.eb.DefineWritable("_c67_arena_meta_len", "\x00\x00\x00\x00\x00\x00\x00\x00") // Length (number of active arenas)
+	fc.eb.Define("_arena_null_error", "ERROR: Arena alloc returned NULL\n\x00")
+
 	// Initialize meta-arena system - all arenas are malloc'd at runtime
 	const initialCapacity = 4
 

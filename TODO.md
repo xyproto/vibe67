@@ -2,6 +2,13 @@
 
 ## High Priority - Executable Size Optimization (for 64k demos)
 
+When running a C67 program with "c67 run program.c67", the command line
+arguments after that should be passed to the C67 program, so that:
+
+c67 run program.c67 hello
+
+Outputs a string containing "hello" if program.c67 tries to print /proc/self/cmdline.
+
 ### Current Status
 - Minimal program (x := 42): 21KB (was 45KB - 53% reduction achieved!)
 - Code segment: 12KB (was 36KB - dynamic sizing based on actual code)
