@@ -1,6 +1,0 @@
-// Test default only
-test = {
-    ~> 999
-}
-
-println(f"result = {test}")

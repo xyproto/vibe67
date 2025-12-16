@@ -1,7 +1,0 @@
-// Simplest possible guard match
-test = {
-    | 1 == 1 => 100
-    ~> 999
-}
-
-println(f"result = {test}")

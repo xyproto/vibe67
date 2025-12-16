@@ -1,9 +1,0 @@
-// Test global with value match
-x = 1
-test = x {
-    0 => 100
-    1 => 200
-    ~> 999
-}
-
-println(f"test = {test}")

@@ -1,7 +1,0 @@
-// Guard without function parameter
-test = {
-    | 1 == 1 => 100
-    ~> 999
-}
-
-println(f"test = {test}")

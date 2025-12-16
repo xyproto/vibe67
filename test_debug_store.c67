@@ -1,5 +1,0 @@
-// Debug: check if global storage works
-x = 100
-y = 200
-
-println(f"x = {x}, y = {y}")

@@ -1,5 +1,0 @@
-// Test without println
-test = {
-    | 1 == 1 => 100
-    ~> 999
-}

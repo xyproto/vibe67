@@ -1,9 +1,0 @@
-// Simple recursive multi-arg function
-power = (base, exp) {
-    | exp == 0 => 1
-    ~> base * power(base, exp - 1)
-}
-
-println(f"power(2, 0) = {power(2, 0)} (expected: 1)")
-println(f"power(2, 3) = {power(2, 3)} (expected: 8)")
-println(f"power(3, 2) = {power(3, 2)} (expected: 9)")
