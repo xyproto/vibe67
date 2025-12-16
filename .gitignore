@@ -74,4 +74,11 @@ wpo_test
 *.backup
 *.bak
 
-sdl3example
+examples/ackermann
+examples/primes
+examples/fib
+examples/fibonacci
+examples/add
+examples/hello
+examples/sdl3example
+examples/factorial
