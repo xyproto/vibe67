@@ -8311,181 +8311,181 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 		fc.eb.MarkLabel("_c67_slice_string")
 
-	// Function prologue
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
+		// Function prologue
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
 
-	// Save callee-saved registers
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-	fc.out.PushReg("r14")
-	fc.out.PushReg("r15")
+		// Save callee-saved registers
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r14")
+		fc.out.PushReg("r15")
 
-	// Save arguments
-	fc.out.MovRegToReg("r12", "rdi") // r12 = original string pointer
-	fc.out.MovRegToReg("r13", "rsi") // r13 = start index
-	fc.out.MovRegToReg("r14", "rdx") // r14 = end index
-	fc.out.MovRegToReg("r8", "rcx")  // r8 = step
+		// Save arguments
+		fc.out.MovRegToReg("r12", "rdi") // r12 = original string pointer
+		fc.out.MovRegToReg("r13", "rsi") // r13 = start index
+		fc.out.MovRegToReg("r14", "rdx") // r14 = end index
+		fc.out.MovRegToReg("r8", "rcx")  // r8 = step
 
-	// Calculate result length based on step
-	// For step == 1: length = end - start
-	// For step > 1: length = ((end - start + step - 1) / step)
-	// For step < 0: length = ((start - end - step - 1) / (-step))
+		// Calculate result length based on step
+		// For step == 1: length = end - start
+		// For step > 1: length = ((end - start + step - 1) / step)
+		// For step < 0: length = ((start - end - step - 1) / (-step))
 
-	fc.out.XorRegWithReg("rax", "rax")
-	fc.out.CmpRegToReg("r8", "rax")
-	stepNegativeJumpPos := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpLess, 0) // If step < 0, jump to negative path
+		fc.out.XorRegWithReg("rax", "rax")
+		fc.out.CmpRegToReg("r8", "rax")
+		stepNegativeJumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpLess, 0) // If step < 0, jump to negative path
 
-	// Positive step path
-	fc.out.MovImmToReg("rax", "1")
-	fc.out.CmpRegToReg("r8", "rax")
-	stepOneJumpPos := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0) // If step == 1, use simple path
+		// Positive step path
+		fc.out.MovImmToReg("rax", "1")
+		fc.out.CmpRegToReg("r8", "rax")
+		stepOneJumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0) // If step == 1, use simple path
 
-	// Step > 1 path: length = ((end - start + step - 1) / step)
-	fc.out.MovRegToReg("r15", "r14")
-	fc.out.SubRegFromReg("r15", "r13") // r15 = end - start
-	fc.out.AddRegToReg("r15", "r8")    // r15 = end - start + step
-	fc.out.SubImmFromReg("r15", 1)     // r15 = end - start + step - 1
-	fc.out.MovRegToReg("rax", "r15")
-	fc.out.XorRegWithReg("rdx", "rdx")    // Clear rdx for division
-	fc.out.Emit([]byte{0x49, 0xF7, 0xF8}) // idiv r8
-	fc.out.MovRegToReg("r15", "rax")      // r15 = result length
+		// Step > 1 path: length = ((end - start + step - 1) / step)
+		fc.out.MovRegToReg("r15", "r14")
+		fc.out.SubRegFromReg("r15", "r13") // r15 = end - start
+		fc.out.AddRegToReg("r15", "r8")    // r15 = end - start + step
+		fc.out.SubImmFromReg("r15", 1)     // r15 = end - start + step - 1
+		fc.out.MovRegToReg("rax", "r15")
+		fc.out.XorRegWithReg("rdx", "rdx")    // Clear rdx for division
+		fc.out.Emit([]byte{0x49, 0xF7, 0xF8}) // idiv r8
+		fc.out.MovRegToReg("r15", "rax")      // r15 = result length
 
-	stepEndJumpPos := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0) // Jump to end
+		stepEndJumpPos := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0) // Jump to end
 
-	// Patch step == 1 jump to here
-	stepOnePos := fc.eb.text.Len()
-	stepOneOffset := int32(stepOnePos - (stepOneJumpPos + ConditionalJumpSize))
-	fc.patchJumpImmediate(stepOneJumpPos+2, stepOneOffset)
+		// Patch step == 1 jump to here
+		stepOnePos := fc.eb.text.Len()
+		stepOneOffset := int32(stepOnePos - (stepOneJumpPos + ConditionalJumpSize))
+		fc.patchJumpImmediate(stepOneJumpPos+2, stepOneOffset)
 
-	// Step == 1 simple path: length = end - start
-	fc.out.MovRegToReg("r15", "r14")
-	fc.out.SubRegFromReg("r15", "r13") // r15 = length
+		// Step == 1 simple path: length = end - start
+		fc.out.MovRegToReg("r15", "r14")
+		fc.out.SubRegFromReg("r15", "r13") // r15 = length
 
-	stepPosEndJumpPos := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0) // Jump to end
+		stepPosEndJumpPos := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0) // Jump to end
 
-	// Patch negative step jump to here
-	stepNegativePos := fc.eb.text.Len()
-	stepNegativeOffset := int32(stepNegativePos - (stepNegativeJumpPos + ConditionalJumpSize))
-	fc.patchJumpImmediate(stepNegativeJumpPos+2, stepNegativeOffset)
+		// Patch negative step jump to here
+		stepNegativePos := fc.eb.text.Len()
+		stepNegativeOffset := int32(stepNegativePos - (stepNegativeJumpPos + ConditionalJumpSize))
+		fc.patchJumpImmediate(stepNegativeJumpPos+2, stepNegativeOffset)
 
-	// Negative step path: length = ((start - end - step - 1) / (-step))
-	fc.out.MovRegToReg("r15", "r13")   // r15 = start
-	fc.out.SubRegFromReg("r15", "r14") // r15 = start - end
-	fc.out.SubRegFromReg("r15", "r8")  // r15 = start - end - step
-	fc.out.SubImmFromReg("r15", 1)     // r15 = start - end - step - 1
-	// Divide by -step, so negate r8, divide, then restore r8
-	fc.out.MovRegToReg("r10", "r8")       // Save r8
-	fc.out.Emit([]byte{0x49, 0xF7, 0xD8}) // neg r8 (r8 = -r8)
-	fc.out.MovRegToReg("rax", "r15")
-	fc.out.XorRegWithReg("rdx", "rdx")    // Clear rdx for division
-	fc.out.Emit([]byte{0x49, 0xF7, 0xF8}) // idiv r8
-	fc.out.MovRegToReg("r15", "rax")      // r15 = result length
-	fc.out.MovRegToReg("r8", "r10")       // Restore r8
+		// Negative step path: length = ((start - end - step - 1) / (-step))
+		fc.out.MovRegToReg("r15", "r13")   // r15 = start
+		fc.out.SubRegFromReg("r15", "r14") // r15 = start - end
+		fc.out.SubRegFromReg("r15", "r8")  // r15 = start - end - step
+		fc.out.SubImmFromReg("r15", 1)     // r15 = start - end - step - 1
+		// Divide by -step, so negate r8, divide, then restore r8
+		fc.out.MovRegToReg("r10", "r8")       // Save r8
+		fc.out.Emit([]byte{0x49, 0xF7, 0xD8}) // neg r8 (r8 = -r8)
+		fc.out.MovRegToReg("rax", "r15")
+		fc.out.XorRegWithReg("rdx", "rdx")    // Clear rdx for division
+		fc.out.Emit([]byte{0x49, 0xF7, 0xF8}) // idiv r8
+		fc.out.MovRegToReg("r15", "rax")      // r15 = result length
+		fc.out.MovRegToReg("r8", "r10")       // Restore r8
 
-	// Patch end jumps
-	stepEndPos := fc.eb.text.Len()
-	stepEndOffset := int32(stepEndPos - (stepEndJumpPos + UnconditionalJumpSize))
-	fc.patchJumpImmediate(stepEndJumpPos+1, stepEndOffset)
+		// Patch end jumps
+		stepEndPos := fc.eb.text.Len()
+		stepEndOffset := int32(stepEndPos - (stepEndJumpPos + UnconditionalJumpSize))
+		fc.patchJumpImmediate(stepEndJumpPos+1, stepEndOffset)
 
-	stepPosEndOffset := int32(stepEndPos - (stepPosEndJumpPos + UnconditionalJumpSize))
-	fc.patchJumpImmediate(stepPosEndJumpPos+1, stepPosEndOffset)
+		stepPosEndOffset := int32(stepEndPos - (stepPosEndJumpPos + UnconditionalJumpSize))
+		fc.patchJumpImmediate(stepPosEndJumpPos+1, stepPosEndOffset)
 
-	// Allocate memory for new string: 8 + (length * 16) bytes
-	fc.out.MovRegToReg("rax", "r15")
-	fc.out.ShlRegImm("rax", "4") // shl rax, 4 (multiply by 16)
-	fc.out.AddImmToReg("rax", 8) // add rax, 8
-	fc.out.MovRegToReg("rdi", "rax")
-	// Save r8 (step) before malloc since it's caller-saved
-	fc.out.PushReg("r8")
-	// Allocate from arena
-	fc.callArenaAlloc()
-	fc.out.MovRegToReg("rbx", "rax") // rbx = new string pointer
-	// Restore r8 (step)
-	fc.out.PopReg("r8")
+		// Allocate memory for new string: 8 + (length * 16) bytes
+		fc.out.MovRegToReg("rax", "r15")
+		fc.out.ShlRegImm("rax", "4") // shl rax, 4 (multiply by 16)
+		fc.out.AddImmToReg("rax", 8) // add rax, 8
+		fc.out.MovRegToReg("rdi", "rax")
+		// Save r8 (step) before malloc since it's caller-saved
+		fc.out.PushReg("r8")
+		// Allocate from arena
+		fc.callArenaAlloc()
+		fc.out.MovRegToReg("rbx", "rax") // rbx = new string pointer
+		// Restore r8 (step)
+		fc.out.PopReg("r8")
 
-	// Store count (length) as float64 in first 8 bytes
-	fc.out.Cvtsi2sd("xmm0", "r15") // xmm0 = length as float64
-	fc.out.MovXmmToMem("xmm0", "rbx", 0)
+		// Store count (length) as float64 in first 8 bytes
+		fc.out.Cvtsi2sd("xmm0", "r15") // xmm0 = length as float64
+		fc.out.MovXmmToMem("xmm0", "rbx", 0)
 
-	// Copy characters from original string
-	// Initialize loop counter (output index): rcx = 0
-	fc.out.XorRegWithReg("rcx", "rcx")
-	// Initialize source index: r9 = start
-	fc.out.MovRegToReg("r9", "r13")
+		// Copy characters from original string
+		// Initialize loop counter (output index): rcx = 0
+		fc.out.XorRegWithReg("rcx", "rcx")
+		// Initialize source index: r9 = start
+		fc.out.MovRegToReg("r9", "r13")
 
-	fc.eb.MarkLabel("_slice_copy_loop")
-	sliceLoopStart := fc.eb.text.Len() // Track actual loop start position
+		fc.eb.MarkLabel("_slice_copy_loop")
+		sliceLoopStart := fc.eb.text.Len() // Track actual loop start position
 
-	// Check if rcx >= length (exit loop if true)
-	fc.out.CmpRegToReg("rcx", "r15")
-	loopExitJumpPos := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpAboveOrEqual, 0) // Placeholder, will patch later
+		// Check if rcx >= length (exit loop if true)
+		fc.out.CmpRegToReg("rcx", "r15")
+		loopExitJumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpAboveOrEqual, 0) // Placeholder, will patch later
 
-	// Use source index from r9
-	fc.out.MovRegToReg("rax", "r9")
+		// Use source index from r9
+		fc.out.MovRegToReg("rax", "r9")
 
-	// Calculate source address: r11 = r12 + 8 + (source_idx * 16)
-	fc.out.ShlRegImm("rax", "4") // rax = source_idx * 16
-	fc.out.AddImmToReg("rax", 8) // rax = source_idx * 16 + 8
-	fc.out.MovRegToReg("r11", "r12")
-	fc.out.AddRegToReg("r11", "rax") // r11 = r12 + rax
+		// Calculate source address: r11 = r12 + 8 + (source_idx * 16)
+		fc.out.ShlRegImm("rax", "4") // rax = source_idx * 16
+		fc.out.AddImmToReg("rax", 8) // rax = source_idx * 16 + 8
+		fc.out.MovRegToReg("r11", "r12")
+		fc.out.AddRegToReg("r11", "rax") // r11 = r12 + rax
 
-	// Load key and value from source string
-	fc.out.MovMemToXmm("xmm0", "r11", 0) // xmm0 = [r11] (key)
-	fc.out.MovMemToXmm("xmm1", "r11", 8) // xmm1 = [r11 + 8] (value)
+		// Load key and value from source string
+		fc.out.MovMemToXmm("xmm0", "r11", 0) // xmm0 = [r11] (key)
+		fc.out.MovMemToXmm("xmm1", "r11", 8) // xmm1 = [r11 + 8] (value)
 
-	// Calculate destination address: rdx = 8 + (rcx * 16)
-	fc.out.MovRegToReg("rdx", "rcx")
-	fc.out.ShlRegImm("rdx", "4") // rdx = rcx * 16
-	fc.out.AddImmToReg("rdx", 8) // rdx = rcx * 16 + 8
+		// Calculate destination address: rdx = 8 + (rcx * 16)
+		fc.out.MovRegToReg("rdx", "rcx")
+		fc.out.ShlRegImm("rdx", "4") // rdx = rcx * 16
+		fc.out.AddImmToReg("rdx", 8) // rdx = rcx * 16 + 8
 
-	// Calculate full destination address: r11 = rbx + rdx
-	fc.out.MovRegToReg("r11", "rbx")
-	fc.out.AddRegToReg("r11", "rdx") // r11 = rbx + rdx
+		// Calculate full destination address: r11 = rbx + rdx
+		fc.out.MovRegToReg("r11", "rbx")
+		fc.out.AddRegToReg("r11", "rdx") // r11 = rbx + rdx
 
-	// Store key as rcx (new index), and value
-	fc.out.Cvtsi2sd("xmm0", "rcx")       // xmm0 = rcx as float64 (new key)
-	fc.out.MovXmmToMem("xmm0", "r11", 0) // [r11] = xmm0 (key)
-	fc.out.MovXmmToMem("xmm1", "r11", 8) // [r11 + 8] = xmm1 (value)
+		// Store key as rcx (new index), and value
+		fc.out.Cvtsi2sd("xmm0", "rcx")       // xmm0 = rcx as float64 (new key)
+		fc.out.MovXmmToMem("xmm0", "r11", 0) // [r11] = xmm0 (key)
+		fc.out.MovXmmToMem("xmm1", "r11", 8) // [r11 + 8] = xmm1 (value)
 
-	// Increment loop counter
-	fc.out.IncReg("rcx")
+		// Increment loop counter
+		fc.out.IncReg("rcx")
 
-	// Increment source index by step
-	fc.out.AddRegToReg("r9", "r8") // r9 = r9 + step
+		// Increment source index by step
+		fc.out.AddRegToReg("r9", "r8") // r9 = r9 + step
 
-	// Jump back to loop start
-	loopBackJumpPos := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0) // Placeholder, will patch later
+		// Jump back to loop start
+		loopBackJumpPos := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0) // Placeholder, will patch later
 
-	// Patch loop jumps
-	loopExitPos := fc.eb.text.Len()
+		// Patch loop jumps
+		loopExitPos := fc.eb.text.Len()
 
-	// Patch exit jump: JumpConditional emits 6 bytes (0x0f 0x83 + 4-byte offset)
-	// Offset is from end of jump instruction to loop exit
-	loopExitOffset := int32(loopExitPos - (loopExitJumpPos + ConditionalJumpSize))
-	fc.patchJumpImmediate(loopExitJumpPos+2, loopExitOffset) // +2 to skip 0x0f 0x83 opcode bytes
+		// Patch exit jump: JumpConditional emits 6 bytes (0x0f 0x83 + 4-byte offset)
+		// Offset is from end of jump instruction to loop exit
+		loopExitOffset := int32(loopExitPos - (loopExitJumpPos + ConditionalJumpSize))
+		fc.patchJumpImmediate(loopExitJumpPos+2, loopExitOffset) // +2 to skip 0x0f 0x83 opcode bytes
 
-	// Patch back jump: JumpUnconditional emits 5 bytes (0xe9 + 4-byte offset)
-	// Offset is from end of jump instruction back to loop start
-	loopBackOffset := int32(sliceLoopStart - (loopBackJumpPos + UnconditionalJumpSize))
-	fc.patchJumpImmediate(loopBackJumpPos+1, loopBackOffset) // +1 to skip 0xe9 opcode byte
+		// Patch back jump: JumpUnconditional emits 5 bytes (0xe9 + 4-byte offset)
+		// Offset is from end of jump instruction back to loop start
+		loopBackOffset := int32(sliceLoopStart - (loopBackJumpPos + UnconditionalJumpSize))
+		fc.patchJumpImmediate(loopBackJumpPos+1, loopBackOffset) // +1 to skip 0xe9 opcode byte
 
-	// Return new string pointer in rax
-	fc.out.MovRegToReg("rax", "rbx")
+		// Return new string pointer in rax
+		fc.out.MovRegToReg("rax", "rbx")
 
-	// Restore callee-saved registers
-	fc.out.PopReg("r15")
-	fc.out.PopReg("r14")
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
+		// Restore callee-saved registers
+		fc.out.PopReg("r15")
+		fc.out.PopReg("r14")
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
 
 		// Function epilogue
 		fc.out.PopReg("rbp")
