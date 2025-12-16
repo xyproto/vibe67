@@ -112,6 +112,8 @@ type C67Compiler struct {
 	tailCallsOptimized   int // Count of tail calls optimized
 	nonTailCalls         int // Count of non-tail recursive calls
 
+	mainCalledAtTopLevel bool // Track if main() is explicitly called in top-level code
+
 	metaArenaGrowthErrorJump      int
 	firstMetaArenaMallocErrorJump int
 
@@ -481,6 +483,128 @@ func (fc *C67Compiler) processCImports(program *Program) {
 	}
 }
 
+// detectMainCallInTopLevel checks if main() is called anywhere in top-level statements
+// (outside of lambda definitions). Returns true if main() is called, false otherwise.
+func (fc *C67Compiler) detectMainCallInTopLevel(statements []Statement) bool {
+	for _, stmt := range statements {
+		if fc.statementCallsMain(stmt) {
+			return true
+		}
+	}
+	return false
+}
+
+// statementCallsMain recursively checks if a statement calls main()
+func (fc *C67Compiler) statementCallsMain(stmt Statement) bool {
+	switch s := stmt.(type) {
+	case *ExpressionStmt:
+		return fc.expressionCallsMain(s.Expr)
+	case *AssignStmt:
+		// Don't check if the assignment is defining main itself
+		if s.Name == "main" {
+			return false
+		}
+		return fc.expressionCallsMain(s.Value)
+	case *MultipleAssignStmt:
+		return fc.expressionCallsMain(s.Value)
+	case *MapUpdateStmt:
+		return fc.expressionCallsMain(s.Index) || fc.expressionCallsMain(s.Value)
+	default:
+		// Other statement types (loops, arenas, etc.) don't need deep inspection for now
+		// since main() calls in those contexts are less common
+		return false
+	}
+}
+
+// expressionCallsMain recursively checks if an expression calls main()
+func (fc *C67Compiler) expressionCallsMain(expr Expression) bool {
+	if expr == nil {
+		return false
+	}
+
+	switch e := expr.(type) {
+	case *CallExpr:
+		// Direct main() call
+		if e.Function == "main" {
+			return true
+		}
+		// Check arguments for nested main() calls
+		for _, arg := range e.Args {
+			if fc.expressionCallsMain(arg) {
+				return true
+			}
+		}
+		return false
+
+	case *BinaryExpr:
+		return fc.expressionCallsMain(e.Left) || fc.expressionCallsMain(e.Right)
+
+	case *UnaryExpr:
+		return fc.expressionCallsMain(e.Operand)
+
+	case *MatchExpr:
+		// Check the condition being matched
+		if fc.expressionCallsMain(e.Condition) {
+			return true
+		}
+		// Check all match clauses
+		for _, clause := range e.Clauses {
+			if clause.Guard != nil && fc.expressionCallsMain(clause.Guard) {
+				return true
+			}
+			if clause.Result != nil && fc.expressionCallsMain(clause.Result) {
+				return true
+			}
+		}
+		if e.DefaultExpr != nil && fc.expressionCallsMain(e.DefaultExpr) {
+			return true
+		}
+		return false
+
+	case *ListExpr:
+		for _, elem := range e.Elements {
+			if fc.expressionCallsMain(elem) {
+				return true
+			}
+		}
+		return false
+
+	case *MapExpr:
+		for i := range e.Keys {
+			if fc.expressionCallsMain(e.Keys[i]) || fc.expressionCallsMain(e.Values[i]) {
+				return true
+			}
+		}
+		return false
+
+	case *LambdaExpr:
+		// Don't check inside lambda bodies - those are not top-level
+		return false
+
+	case *IndexExpr:
+		return fc.expressionCallsMain(e.List) || fc.expressionCallsMain(e.Index)
+
+	case *SliceExpr:
+		return fc.expressionCallsMain(e.List) || fc.expressionCallsMain(e.Start) || fc.expressionCallsMain(e.End)
+
+	case *LengthExpr:
+		return fc.expressionCallsMain(e.Operand)
+
+	case *BlockExpr:
+		// Check statements in block
+		for _, stmt := range e.Statements {
+			if fc.statementCallsMain(stmt) {
+				return true
+			}
+		}
+		return false
+
+	default:
+		// Literals and simple expressions don't call functions
+		return false
+	}
+}
+
 func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// Clear moved variables tracking for this compilation
 	fc.movedVars = make(map[string]bool)
@@ -488,6 +612,12 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 
 	// Always enable arenas - all list operations use arena allocation
 	fc.usesArenas = true
+
+	// Check if main() is called at top level (to decide whether to auto-call main)
+	fc.mainCalledAtTopLevel = fc.detectMainCallInTopLevel(program.Statements)
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "DEBUG: mainCalledAtTopLevel = %v\n", fc.mainCalledAtTopLevel)
+	}
 
 	// Transfer namespace information from program to compiler
 	if program.FunctionNamespaces != nil {
@@ -688,8 +818,24 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	if exists {
 		// main exists - check if it's a lambda/function or a direct value
 		if fc.lambdaVars["main"] {
-			// main is a lambda/function - call it with no arguments
-			fc.compileExpression(&CallExpr{Function: "main", Args: []Expression{}})
+			// main is a lambda/function
+			if VerboseMode {
+				fmt.Fprintf(os.Stderr, "DEBUG: main is a lambda, mainCalledAtTopLevel=%v\n", fc.mainCalledAtTopLevel)
+			}
+			// Only auto-call if main() was NOT explicitly called at top level
+			if !fc.mainCalledAtTopLevel {
+				// Auto-call main with no arguments
+				if VerboseMode {
+					fmt.Fprintf(os.Stderr, "DEBUG: Auto-calling main()\n")
+				}
+				fc.compileExpression(&CallExpr{Function: "main", Args: []Expression{}})
+			} else {
+				// main() was already called - use exit code 0
+				if VerboseMode {
+					fmt.Fprintf(os.Stderr, "DEBUG: Skipping auto-call of main() (already called at top level)\n")
+				}
+				fc.out.XorRegWithReg("xmm0", "xmm0")
+			}
 		} else {
 			// main is a direct value - just load it
 			fc.compileExpression(&IdentExpr{Name: "main"})

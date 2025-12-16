@@ -2673,10 +2673,35 @@ main = () -> { println("Starting"); 1 } // Returns 1
 ```
 
 **Behavior:**
-- If `main` is callable (function/lambda): called automatically, return value becomes exit code
+- If `main` is callable (function/lambda): called automatically at program end UNLESS `main()` is explicitly called anywhere in top-level code
+- Auto-call is skipped if any top-level statement (outside of lambda definitions) calls `main()`, regardless of context (direct call, inside match expression, etc.)
 - Return value is implicitly cast to int32 for the OS exit code
 - Empty blocks `{}` return true (1.0)
 - Numeric values are converted to int32
+
+**Examples:**
+```c67
+// Auto-called (no explicit main() call in top-level code)
+main = { println("Hello!") }
+// Output: Hello!
+
+// NOT auto-called (explicit main() call exists)
+main = { println("Hello!") }
+main()  // Explicit call
+// Output: Hello! (printed once, not twice)
+
+// NOT auto-called (main() called in match expression)
+main = { println("Hello!") }
+x = 42 { 0 => 0, ~> main() }  // main() in match
+// Output: Hello! (called once from match)
+
+// Auto-called (main() only called inside a lambda, not at top level)
+main = { println("Hello!") }
+wrapper = { main() }  // main() inside lambda doesn't count
+// Output: Hello! (auto-called, wrapper is not executed)
+```
+
+**Rule:** The compiler tracks whether `main()` appears as a call expression in any top-level statement. If it does, the automatic call at program end is suppressed.
 
 #### 2. Main Variable (Non-callable)
 

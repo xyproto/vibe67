@@ -361,6 +361,9 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	fc.movedVars = make(map[string]bool)                      // Reset moved variables tracking
 	fc.scopedMoved = []map[string]bool{make(map[string]bool)} // Reset scoped tracking
 
+	// Re-detect if main() is called at top level for second pass
+	fc.mainCalledAtTopLevel = fc.detectMainCallInTopLevel(program.Statements)
+
 	// Collect symbols again (two-pass compilation for second regeneration)
 	for _, stmt := range program.Statements {
 		if err := fc.collectSymbols(stmt); err != nil {
@@ -403,8 +406,15 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	if exists {
 		// main exists - check if it's a lambda/function or a direct value
 		if fc.lambdaVars["main"] {
-			// main is a lambda/function - call it with no arguments
-			fc.compileExpression(&CallExpr{Function: "main", Args: []Expression{}})
+			// main is a lambda/function
+			// Only auto-call if main() was NOT explicitly called at top level
+			if !fc.mainCalledAtTopLevel {
+				// Auto-call main with no arguments
+				fc.compileExpression(&CallExpr{Function: "main", Args: []Expression{}})
+			} else {
+				// main() was already called - use exit code 0
+				fc.out.XorRegWithReg("xmm0", "xmm0")
+			}
 		} else {
 			// main is a direct value - just load it
 			fc.compileExpression(&IdentExpr{Name: "main"})
