@@ -1,0 +1,24 @@
+// Ackermann function - Tests deep recursion and multiple recursive calls
+// This is a classic benchmark for testing recursion depth and memoization
+
+ack = (m, n) {
+    | m == 0 => n + 1
+    | n == 0 => ack(m - 1, 1)
+    ~> ack(m - 1, ack(m, n - 1))
+}
+
+println("=== Ackermann Function Benchmark ===")
+println("")
+println("Testing Ackermann function:")
+println(f"ack(0, 0) = {ack(0, 0)}")
+println(f"ack(0, 5) = {ack(0, 5)}")
+println(f"ack(1, 5) = {ack(1, 5)}")
+println(f"ack(2, 5) = {ack(2, 5)}")
+println(f"ack(3, 0) = {ack(3, 0)}")
+println(f"ack(3, 1) = {ack(3, 1)}")
+println(f"ack(3, 2) = {ack(3, 2)}")
+println(f"ack(3, 3) = {ack(3, 3)}")
+println(f"ack(3, 4) = {ack(3, 4)}")
+
+println("")
+println("Done!")

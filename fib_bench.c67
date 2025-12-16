@@ -1,0 +1,35 @@
+// Classic recursive Fibonacci - exponential time complexity O(2^n)
+fib_recursive = (n) {
+    | n < 2 => n
+    ~> fib_recursive(n - 1) + fib_recursive(n - 2)
+}
+
+// Tail-recursive helper for iterative Fibonacci
+fib_iter_helper = (n, a, b, i) {
+    | i > n => b
+    ~> fib_iter_helper(n, b, a + b, i + 1)
+}
+
+// Iterative Fibonacci - linear time complexity O(n)
+fib_iterative = (n) {
+    | n < 2 => n
+    ~> fib_iter_helper(n, 0, 1, 2)
+}
+
+println("=== Fibonacci Benchmark ===")
+println("")
+
+println("Recursive (slow for large N):")
+println(f"fib_recursive(30) = {fib_recursive(30)}")
+println(f"fib_recursive(35) = {fib_recursive(35)}")
+
+println("")
+println("Iterative (fast for any N):")
+println(f"fib_iterative(30) = {fib_iterative(30)}")
+println(f"fib_iterative(35) = {fib_iterative(35)}")
+println(f"fib_iterative(40) = {fib_iterative(40)}")
+println(f"fib_iterative(50) = {fib_iterative(50)}")
+println(f"fib_iterative(90) = {fib_iterative(90)}")
+
+println("")
+println("Done!")

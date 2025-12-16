@@ -1,0 +1,37 @@
+// Factorial - Classic recursion benchmark
+// Tests: recursion, pattern matching, arithmetic
+
+// Recursive factorial
+fact = (n) {
+    | n <= 1 => 1
+    ~> n * fact(n - 1)
+}
+
+// Tail-recursive factorial using helper
+fact_tail_helper = (n, acc) {
+    | n <= 1 => acc
+    ~> fact_tail_helper(n - 1, n * acc)
+}
+
+fact_tail = (n) {
+    fact_tail_helper(n, 1)
+}
+
+println("=== Factorial Benchmark ===")
+println("")
+
+println("Recursive factorial:")
+println(f"fact(5) = {fact(5)}")
+println(f"fact(10) = {fact(10)}")
+println(f"fact(15) = {fact(15)}")
+println(f"fact(20) = {fact(20)}")
+
+println("")
+println("Tail-recursive factorial:")
+println(f"fact_tail(5) = {fact_tail(5)}")
+println(f"fact_tail(10) = {fact_tail(10)}")
+println(f"fact_tail(15) = {fact_tail(15)}")
+println(f"fact_tail(20) = {fact_tail(20)}")
+
+println("")
+println("Done!")

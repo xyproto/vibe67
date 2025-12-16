@@ -1,0 +1,47 @@
+// Prime number counter - Tests loops and algorithms
+// Simplified to avoid list building which has known issues
+
+// Check if n is divisible by any number from 2 to sqrt(n)
+is_prime_helper = (n, d) {
+    | d * d > n => 1
+    | n % d == 0 => 0
+    ~> is_prime_helper(n, d + 1)
+}
+
+is_prime = (n) {
+    | n < 2 => 0
+    | n == 2 => 1
+    ~> is_prime_helper(n, 2)
+}
+
+// Count primes up to n
+count_primes_helper = (current, limit, count) {
+    | current > limit => count
+    | is_prime(current) == 1 => count_primes_helper(current + 1, limit, count + 1)
+    ~> count_primes_helper(current + 1, limit, count)
+}
+
+count_primes = (n) {
+    count_primes_helper(2, n, 0)
+}
+
+println("=== Prime Numbers Benchmark ===")
+println("")
+
+println("Testing prime checker:")
+println(f"is_prime(2) = {is_prime(2)}")
+println(f"is_prime(3) = {is_prime(3)}")
+println(f"is_prime(4) = {is_prime(4)}")
+println(f"is_prime(17) = {is_prime(17)}")
+println(f"is_prime(100) = {is_prime(100)}")
+
+println("")
+println("Counting primes:")
+println(f"Primes up to 10: {count_primes(10)} (should be 4)")
+println(f"Primes up to 20: {count_primes(20)} (should be 8)")
+println(f"Primes up to 30: {count_primes(30)} (should be 10)")
+println(f"Primes up to 50: {count_primes(50)} (should be 15)")
+println(f"Primes up to 100: {count_primes(100)} (should be 25)")
+
+println("")
+println("Done!")
