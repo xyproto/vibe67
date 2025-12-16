@@ -1423,24 +1423,21 @@ func (p *Parser) parseAssignment() *AssignStmt {
 		// Statement block -> wrap in zero-arg lambda
 		value = &LambdaExpr{Params: []string{}, VariadicParam: "", Body: v}
 	case *MatchExpr:
-		// Only wrap guardless match blocks in zero-arg lambda
-		// Match expressions with a condition variable (e.g., `x { 5 => 42 }`) should execute immediately
-		// Guardless matches that reference variables in guards should be wrapped
-		// Check if condition is a simple variable reference that matches the assigned variable
-		isConditionedMatch := false
-		if identExpr, ok := v.Condition.(*IdentExpr); ok {
-			// If condition is an identifier, this is a conditioned match like `x { 5 => 42 }`
-			// It should execute immediately, not be wrapped in a lambda
-			isConditionedMatch = true
-			_ = identExpr // avoid unused warning
-		}
-		if isConditionedMatch {
-			// Don't wrap - this is a value match that should execute immediately
-		} else {
-			// Guardless match block with only guards -> wrap in zero-arg lambda
-			// Example: handler = { | x > 0 => "pos" | x < 0 => "neg" }
-			value = &LambdaExpr{Params: []string{}, VariadicParam: "", Body: v}
-		}
+		// Match expressions should execute immediately at assignment time
+		// They should NOT be wrapped in lambdas
+		// 
+		// Examples that should execute immediately:
+		//   x = n { 0 => "zero" 1 => "one" }  // value match on variable n
+		//   y = { | n == 0 => "zero" | n == 1 => "one" }  // guard match
+		// 
+		// The old logic incorrectly wrapped guard matches in zero-arg lambdas,
+		// causing them to return function pointers instead of values.
+		// 
+		// Match expressions are always meant to be evaluated immediately.
+		// If the user wants a lambda that returns a match result, they write:
+		//   f = (x) { | x == 0 => "zero" }
+		// 
+		// Don't wrap MatchExpr in a lambda - let it execute immediately
 		// MapExpr is NOT wrapped - it's a literal value
 	}
 

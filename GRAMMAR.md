@@ -732,6 +732,7 @@ lambda_body     = [ "->" type_annotation ] ( block | expression [ match_block ] 
 //   { x: 10 }                         // Map literal (has `:` before any `=>`)
 //   { | x > 0 => "pos" }              // Guard match block (has `|` at line start)
 //   { temp = x * 2; temp }            // Statement block (no `:`, no `=>` or `~>`)
+//   { stmt1; stmt2; | guard => result } // Mixed block (statements + guards)
 //   x { 0 => "zero" ~> "other" }      // Value match (expression before `{`)
 //
 // Examples:

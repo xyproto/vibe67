@@ -1,0 +1,13 @@
+// Test: Can we mix statements and guards in one block?
+test = (x) {
+    println("Before guards")
+    result = x {
+        | x == 0 => "zero"
+        | x > 0 => "positive"
+        ~> "negative"
+    }
+    println("After guards")
+    result
+}
+
+println(test(5))

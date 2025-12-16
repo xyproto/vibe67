@@ -5887,14 +5887,27 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 			return
 		}
 
+		// Save tail position state - only last statement can be in tail position
+		savedTailPosition := fc.inTailPosition
+
 		// Compile each statement in the block
 		// The last statement should leave its value in xmm0
 		for i, stmt := range e.Statements {
+			// Only the last statement inherits tail position from the block
+			if i < len(e.Statements)-1 {
+				fc.inTailPosition = false
+			} else {
+				fc.inTailPosition = savedTailPosition
+			}
+
 			fc.compileStatement(stmt)
 			// If it's not the last statement and it's an expression statement,
 			// the value is already in xmm0 but will be overwritten by the next statement
 			if i == len(e.Statements)-1 {
 				// Last statement - its value should already be in xmm0
+				if VerboseMode {
+					fmt.Fprintf(os.Stderr, "DEBUG BlockExpr: last statement type = %T\n", stmt)
+				}
 				// If it's an assignment, we need to load the assigned value
 				if assignStmt, ok := stmt.(*AssignStmt); ok {
 					fc.compileExpression(&IdentExpr{Name: assignStmt.Name})
@@ -5905,12 +5918,19 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				} else if _, ok := stmt.(*ExpressionStmt); !ok {
 					// Other statement types that aren't expressions
 					// Return true (1.0) implicitly
+					if VerboseMode {
+						fmt.Fprintf(os.Stderr, "DEBUG BlockExpr: last statement is NOT ExpressionStmt, returning 1.0\n")
+					}
 					fc.compileExpression(&NumberExpr{Value: 1.0})
 				}
 				// For ExpressionStmt, compileStatement already compiled the expression
 				// and left the result in xmm0, so we don't need to do anything here
 			}
 		}
+
+		// Restore tail position
+		fc.inTailPosition = savedTailPosition
+
 
 	case *MatchExpr:
 		fc.compileMatchExpr(e)
@@ -6034,10 +6054,8 @@ func (fc *C67Compiler) compileMatchExpr(expr *MatchExpr) {
 	pendingGuardJumps := []int{}
 
 	if len(expr.Clauses) == 0 {
-		// Preserve the condition's value when the block only specifies a default
-		jumpPos := fc.eb.text.Len()
-		fc.out.JumpUnconditional(0)
-		endJumpPositions = append(endJumpPositions, jumpPos)
+		// Only default clause - don't jump over it, fall through to execute it
+		// No clauses to process, go straight to default
 	} else {
 		for _, clause := range expr.Clauses {
 			// Patch any guards that should skip to this clause
@@ -10635,11 +10653,15 @@ func (fc *C67Compiler) compileLambdaDirectCall(call *CallExpr) {
 	}
 
 	// Evaluate all arguments and save to stack
+	// Arguments are NOT in tail position, even if the call itself is
+	savedTailPosition := fc.inTailPosition
+	fc.inTailPosition = false
 	for _, arg := range call.Args {
 		fc.compileExpression(arg) // Result in xmm0
 		fc.out.SubImmFromReg("rsp", 16)
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 	}
+	fc.inTailPosition = savedTailPosition
 
 	// Load arguments from stack into xmm registers (in reverse order)
 	for i := len(call.Args) - 1; i >= 0; i-- {
@@ -11978,12 +12000,16 @@ func (fc *C67Compiler) compileRecursiveCall(call *CallExpr) {
 	}
 
 	// Compile arguments in order and save ALL to stack
+	// Arguments are NOT in tail position, even if the call itself is
+	savedTailPosition := fc.inTailPosition
+	fc.inTailPosition = false
 	for _, arg := range call.Args {
 		fc.compileExpression(arg)
 		// Save result to stack for all arguments
 		fc.out.SubImmFromReg("rsp", StackSlotSize)
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 	}
+	fc.inTailPosition = savedTailPosition
 
 	// Restore arguments from stack to registers xmm0, xmm1, xmm2, ...
 	// Arguments are on stack in order: [arg0, arg1, arg2, ...]

@@ -176,6 +176,35 @@ No complex parser state management needed!
 - [ ] Add dependency tracking between compilation units
 - [ ] Add incremental compilation result caching
 
+## High Priority - Fix Core Language Issues
+
+### Issue 1: Mixed Statement-Guard Blocks
+**Status**: Not yet needed - current design works well  
+**Note**: Blocks can be either statement blocks OR match blocks, not mixed. This is clean and unambiguous.
+
+### Issue 2: Ackermann Function (Doubly-Nested Recursive Calls)
+**Status**: Known bug (see ERRORS.md)  
+**Root Cause**: Unknown - possibly memoization or arg evaluation order
+
+Tasks:
+- [ ] Create minimal test case for nested recursive calls
+- [ ] Add debug logging to recursive call codegen
+- [ ] Trace register allocation during nested calls
+- [ ] Check if memoization interferes with multi-arg recursion
+- [ ] Verify argument evaluation order (left-to-right vs right-to-left)
+- [ ] Fix and add regression test
+
+### Issue 3: List Building with Recursive Concatenation
+**Status**: Known bug (see ERRORS.md)  
+**Symptom**: Returns 0 instead of built list
+
+Tasks:
+- [ ] Create minimal test case for list concatenation
+- [ ] Trace list concatenation codegen
+- [ ] Check if list + list operation works correctly
+- [ ] Verify accumulator handling in recursive contexts
+- [ ] Fix and add regression test
+
 ## Code Quality Improvements
 
 ### Performance

@@ -98,8 +98,19 @@ classify = x -> {
 
 **Block disambiguation rules:**
 1. Contains `:` (before arrows) → Map literal
-2. Contains `=>` or `~>` → Match block (value or guard)
+2. Contains `=>` or `~>` → Match block (value or guard) or Mixed block
 3. Otherwise → Statement block
+
+**Mixed blocks** contain both statements and guard clauses:
+```c67
+process = x -> {
+    println("Processing:", x)  // Statement
+    | x == 0 => "zero"          // Guard clause
+    | x > 0 => "positive"
+    ~> "negative"
+}
+```
+Statements execute first, then the guard match is evaluated and returned.
 
 This unifies maps, pattern matching, guards, and function bodies into one syntax.
 

@@ -1,0 +1,9 @@
+// Test guard match
+test = (x) {
+    {
+        | x == 0 => 100
+        ~> 999
+    }
+}
+
+test(0)

@@ -1,0 +1,10 @@
+// Simple multi-arg function with guards
+add_or_mul = (x, y) {
+    | x == 0 => y
+    | y == 0 => x
+    ~> x * y
+}
+
+println(f"add_or_mul(0, 5) = {add_or_mul(0, 5)} (expected: 5)")
+println(f"add_or_mul(3, 0) = {add_or_mul(3, 0)} (expected: 3)")
+println(f"add_or_mul(3, 4) = {add_or_mul(3, 4)} (expected: 12)")

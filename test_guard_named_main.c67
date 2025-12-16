@@ -1,0 +1,5 @@
+// Test if naming it main makes a difference
+main = {
+    | 1 == 1 => 100
+    ~> 999
+}

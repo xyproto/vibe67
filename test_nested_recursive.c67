@@ -1,0 +1,13 @@
+// Minimal test for doubly-nested recursive calls
+ack = (m, n) {
+    | m == 0 => n + 1
+    | n == 0 => ack(m - 1, 1)
+    ~> ack(m - 1, ack(m, n - 1))
+}
+
+println(f"ack(0,0) = {ack(0, 0)} (expected: 1)")
+println(f"ack(1,0) = {ack(1, 0)} (expected: 2)")
+println(f"ack(1,1) = {ack(1, 1)} (expected: 3)")
+println(f"ack(2,0) = {ack(2, 0)} (expected: 3)")
+println(f"ack(2,1) = {ack(2, 1)} (expected: 5)")
+println(f"ack(2,2) = {ack(2, 2)} (expected: 7)")
