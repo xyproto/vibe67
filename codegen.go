@@ -133,6 +133,40 @@ type C67Compiler struct {
 	globalVarsMutable map[string]bool    // Global variable name -> is mutable
 	dataSection       []byte             // .data section contents
 	forwardFunctions  map[string]bool    // Functions that can be forward-referenced (defined in program)
+
+	// Feature tracking for minimal runtime inclusion
+	usesStringConcat bool // Track if string concatenation is used
+	usesStringToCstr bool // Track if C string conversion is needed
+	usesPrintf       bool // Track if printf/println is used
+	usesArenaAlloc   bool // Track if arena allocation is explicitly used
+
+	// Runtime function emission flags (all true by default for full compatibility)
+	emitStringConcat    bool // _c67_string_concat
+	emitStringToCstr    bool // c67_string_to_cstr
+	emitCstrToString    bool // cstr_to_c67_string
+	emitStringSlice     bool // c67_slice_string
+	emitStringEq        bool // _c67_string_eq
+	emitStringPrint     bool // _c67_string_print
+	emitStringPrintln   bool // _c67_string_println
+	emitListConcat      bool // _c67_list_concat
+	emitListRepeat      bool // _c67_list_repeat
+	emitListCons        bool // _c67_list_cons
+	emitListHead        bool // _c67_list_head
+	emitListTail        bool // _c67_list_tail
+	emitListLength      bool // _c67_list_length
+	emitListIndex       bool // _c67_list_index
+	emitListUpdate      bool // _c67_list_update
+	emitArenaCreate     bool // c67_arena_create
+	emitArenaAlloc      bool // c67_arena_alloc
+	emitArenaDestroy    bool // c67_arena_destroy
+	emitArenaReset      bool // c67_arena_reset
+	emitArenaEnsure     bool // _c67_arena_ensure_capacity
+	emitCacheLookup     bool // c67_cache_lookup
+	emitCacheInsert     bool // c67_cache_insert
+	emitItoa            bool // _c67_itoa (number to string)
+	emitPrintSyscall    bool // _c67_print_syscall (Linux only)
+	emitPrintlnSyscall  bool // _c67_println_syscall (Linux only)
+	emitPrintfRuntime   bool // Full printf runtime with format strings
 }
 
 type FunctionSignature struct {
@@ -224,6 +258,34 @@ func NewC67Compiler(platform Platform, verbose bool) (*C67Compiler, error) {
 		globalVarsMutable:   make(map[string]bool),
 		dataSection:         []byte{},
 		moduleLevelVars:     make(map[string]bool),
+
+		// Initialize all runtime function emission flags to true (full compatibility mode)
+		emitStringConcat:   true,
+		emitStringToCstr:   true,
+		emitCstrToString:   true,
+		emitStringSlice:    true,
+		emitStringEq:       true,
+		emitStringPrint:    true,
+		emitStringPrintln:  true,
+		emitListConcat:     true,
+		emitListRepeat:     true,
+		emitListCons:       true,
+		emitListHead:       true,
+		emitListTail:       true,
+		emitListLength:     true,
+		emitListIndex:      true,
+		emitListUpdate:     true,
+		emitArenaCreate:    true,
+		emitArenaAlloc:     true,
+		emitArenaDestroy:   true,
+		emitArenaReset:     true,
+		emitArenaEnsure:    true,
+		emitCacheLookup:    true,
+		emitCacheInsert:    true,
+		emitItoa:           true,
+		emitPrintSyscall:   true,
+		emitPrintlnSyscall: true,
+		emitPrintfRuntime:  true,
 	}, nil
 }
 
@@ -6296,6 +6358,8 @@ func (fc *C67Compiler) compileCastExpr(expr *CastExpr) {
 		// Convert C67 string to C null-terminated string
 		// xmm0 contains pointer to C67 string map
 		// Call runtime function: c67_string_to_cstr(xmm0) -> rax
+		fc.trackFunctionCall("c67_string_to_cstr")
+		fc.trackFunctionCall("c67_string_to_cstr")
 		fc.out.CallSymbol("c67_string_to_cstr")
 		// Convert C string pointer (rax) back to float64 in xmm0
 		fc.out.SubImmFromReg("rsp", StackSlotSize)
@@ -7026,6 +7090,8 @@ func (fc *C67Compiler) compileUnsafeCast(dest string, cast *CastExpr) {
 				// Convert C67 string to C null-terminated string
 				// xmm0 contains pointer to C67 string map
 				// c67_string_to_cstr is an internal runtime function, not external
+				fc.trackFunctionCall("c67_string_to_cstr")
+				fc.trackFunctionCall("c67_string_to_cstr")
 				fc.out.CallSymbol("c67_string_to_cstr")
 				// Result is C string pointer in rax
 				if dest != "rax" {
@@ -7978,306 +8044,312 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.Ret()
 	} // end if _c67_string_concat used
 
-	// Generate c67_string_to_cstr(c67_string_ptr) -> cstr_ptr
-	// Converts a C67 string (map format) to a null-terminated C string
-	// Argument: xmm0 = C67 string pointer (as float64)
-	// Returns: rax = C string pointer
-	fc.eb.MarkLabel("c67_string_to_cstr")
+	// Generate c67_string_to_cstr only if used (for printf, f-strings, C FFI)
+	if fc.usedFunctions["c67_string_to_cstr"] || fc.usedFunctions["println"] || fc.usedFunctions["printf"] {
+		// Generate c67_string_to_cstr(c67_string_ptr) -> cstr_ptr
+		// Converts a C67 string (map format) to a null-terminated C string
+		// Argument: xmm0 = C67 string pointer (as float64)
+		// Returns: rax = C string pointer
+		fc.eb.MarkLabel("c67_string_to_cstr")
 
-	// Function prologue
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
+		// Function prologue
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
 
-	// Save callee-saved registers
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-	fc.out.PushReg("r14") // r14 = codepoint count
-	fc.out.PushReg("r15") // r15 = output byte position
+		// Save callee-saved registers
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r14") // r14 = codepoint count
+		fc.out.PushReg("r15") // r15 = output byte position
 
-	// Stack alignment FIX: call(8) + 6 pushes(48) = 56 bytes (MISALIGNED!)
-	// Sub 16 keeps stack aligned for malloc call
-	// Stack alignment FIX: call(8) + 6 pushes(48) = 56 bytes (MISALIGNED!)
-	// Sub 16 keeps stack aligned for malloc call
+		// Stack alignment FIX: call(8) + 6 pushes(48) = 56 bytes (MISALIGNED!)
+		// Sub 16 keeps stack aligned for malloc call
+		// Stack alignment FIX: call(8) + 6 pushes(48) = 56 bytes (MISALIGNED!)
+		// Sub 16 keeps stack aligned for malloc call
 
-	// Convert float64 pointer to integer pointer in r12
-	fc.out.SubImmFromReg("rsp", StackSlotSize)
-	fc.out.MovXmmToMem("xmm0", "rsp", 0)
-	fc.out.MovMemToReg("r12", "rsp", 0)
+		// Convert float64 pointer to integer pointer in r12
+		fc.out.SubImmFromReg("rsp", StackSlotSize)
+		fc.out.MovXmmToMem("xmm0", "rsp", 0)
+		fc.out.MovMemToReg("r12", "rsp", 0)
 
-	// Get string length from map: count = [r12+0]
-	fc.out.MovMemToXmm("xmm0", "r12", 0)
-	fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf0}) // cvttsd2si r14, xmm0 (r14 = codepoint count)
+		// Get string length from map: count = [r12+0]
+		fc.out.MovMemToXmm("xmm0", "r12", 0)
+		fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf0}) // cvttsd2si r14, xmm0 (r14 = codepoint count)
 
-	// DO NOT USE MALLOC! See MEMORY.md - C string conversion should use arena allocation
-	// TODO: Replace with arena allocation (or stack for small strings)
-	// Allocate memory: count * 4 + 1 for UTF-8 (max 4 bytes per codepoint + null)
-	// Calculate size in temporary register
-	fc.out.MovRegToReg("rax", "r14")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x02}) // shl rax, 2 (multiply by 4)
-	fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x01}) // add rax, 1
+		// DO NOT USE MALLOC! See MEMORY.md - C string conversion should use arena allocation
+		// TODO: Replace with arena allocation (or stack for small strings)
+		// Allocate memory: count * 4 + 1 for UTF-8 (max 4 bytes per codepoint + null)
+		// Calculate size in temporary register
+		fc.out.MovRegToReg("rax", "r14")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x02}) // shl rax, 2 (multiply by 4)
+		fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x01}) // add rax, 1
 
-	// Platform-specific calling convention for malloc
-	if fc.eb.target.OS() == OSWindows {
-		// Windows x64: first arg in rcx
-		fc.out.MovRegToReg("rcx", "rax")
-		// Allocate shadow space (32 bytes) for Windows calling convention
-		fc.out.SubImmFromReg("rsp", 32)
-	} else {
-		// SysV (Linux/Unix): first arg in rdi
-		fc.out.MovRegToReg("rdi", "rax")
-	}
+		// Platform-specific calling convention for malloc
+		if fc.eb.target.OS() == OSWindows {
+			// Windows x64: first arg in rcx
+			fc.out.MovRegToReg("rcx", "rax")
+			// Allocate shadow space (32 bytes) for Windows calling convention
+			fc.out.SubImmFromReg("rsp", 32)
+		} else {
+			// SysV (Linux/Unix): first arg in rdi
+			fc.out.MovRegToReg("rdi", "rax")
+		}
 
-	// Allocate from arena
-	fc.callArenaAlloc()
+		// Allocate from arena
+		fc.callArenaAlloc()
 
-	// Clean up shadow space on Windows
-	if fc.eb.target.OS() == OSWindows {
-		fc.out.AddImmToReg("rsp", 32)
-	}
+		// Clean up shadow space on Windows
+		if fc.eb.target.OS() == OSWindows {
+			fc.out.AddImmToReg("rsp", 32)
+		}
 
-	fc.out.MovRegToReg("r13", "rax") // r13 = C string buffer
+		fc.out.MovRegToReg("r13", "rax") // r13 = C string buffer
 
-	// Initialize: rbx = codepoint index, r12 = map ptr, r13 = output buffer, r14 = count, r15 = byte position
-	fc.out.XorRegWithReg("rbx", "rbx") // rbx = 0 (codepoint index)
-	fc.out.XorRegWithReg("r15", "r15") // r15 = 0 (output byte position)
+		// Initialize: rbx = codepoint index, r12 = map ptr, r13 = output buffer, r14 = count, r15 = byte position
+		fc.out.XorRegWithReg("rbx", "rbx") // rbx = 0 (codepoint index)
+		fc.out.XorRegWithReg("r15", "r15") // r15 = 0 (output byte position)
 
-	// Loop through map entries to extract and encode codepoints
-	fc.eb.MarkLabel("_cstr_convert_loop")
-	fc.out.Emit([]byte{0x4c, 0x39, 0xf3}) // cmp rbx, r14
-	loopEndJump := fc.eb.text.Len()
-	fc.out.Emit([]byte{0x0f, 0x84, 0x00, 0x00, 0x00, 0x00}) // je _loop_end (4-byte offset, will patch)
+		// Loop through map entries to extract and encode codepoints
+		fc.eb.MarkLabel("_cstr_convert_loop")
+		fc.out.Emit([]byte{0x4c, 0x39, 0xf3}) // cmp rbx, r14
+		loopEndJump := fc.eb.text.Len()
+		fc.out.Emit([]byte{0x0f, 0x84, 0x00, 0x00, 0x00, 0x00}) // je _loop_end (4-byte offset, will patch)
 
-	// Calculate map entry offset: 8 + (rbx * 16) for [count][key0][val0][key1][val1]...
-	fc.out.MovRegToReg("rax", "rbx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x04}) // shl rax, 4 (multiply by 16)
-	fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x08}) // add rax, 8
+		// Calculate map entry offset: 8 + (rbx * 16) for [count][key0][val0][key1][val1]...
+		fc.out.MovRegToReg("rax", "rbx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x04}) // shl rax, 4 (multiply by 16)
+		fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x08}) // add rax, 8
 
-	// Load codepoint value: xmm0 = [r12 + rax + 8] (value field)
-	fc.out.Emit([]byte{0xf2, 0x49, 0x0f, 0x10, 0x44, 0x04, 0x08}) // movsd xmm0, [r12 + rax + 8]
+		// Load codepoint value: xmm0 = [r12 + rax + 8] (value field)
+		fc.out.Emit([]byte{0xf2, 0x49, 0x0f, 0x10, 0x44, 0x04, 0x08}) // movsd xmm0, [r12 + rax + 8]
 
-	// Convert codepoint to integer in rdx
-	fc.out.Emit([]byte{0xf2, 0x48, 0x0f, 0x2c, 0xd0}) // cvttsd2si rdx, xmm0 (rdx = codepoint)
+		// Convert codepoint to integer in rdx
+		fc.out.Emit([]byte{0xf2, 0x48, 0x0f, 0x2c, 0xd0}) // cvttsd2si rdx, xmm0 (rdx = codepoint)
 
-	// UTF-8 encoding: check codepoint ranges and encode
-	// Case 1: codepoint <= 0x7F (1 byte: 0xxxxxxx)
-	fc.out.Emit([]byte{0x48, 0x81, 0xfa, 0x7f, 0x00, 0x00, 0x00}) // cmp rdx, 0x7F
-	case1Jump := fc.eb.text.Len()
-	fc.out.Emit([]byte{0x0f, 0x87, 0x00, 0x00, 0x00, 0x00}) // ja case2 (4-byte offset)
-	// 1-byte encoding
-	fc.out.Emit([]byte{0x43, 0x88, 0x54, 0x3d, 0x00}) // mov [r13 + r15], dl
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
-	continueJump1 := fc.eb.text.Len()
-	fc.out.Emit([]byte{0xe9, 0x00, 0x00, 0x00, 0x00}) // jmp loop_continue (4-byte offset)
+		// UTF-8 encoding: check codepoint ranges and encode
+		// Case 1: codepoint <= 0x7F (1 byte: 0xxxxxxx)
+		fc.out.Emit([]byte{0x48, 0x81, 0xfa, 0x7f, 0x00, 0x00, 0x00}) // cmp rdx, 0x7F
+		case1Jump := fc.eb.text.Len()
+		fc.out.Emit([]byte{0x0f, 0x87, 0x00, 0x00, 0x00, 0x00}) // ja case2 (4-byte offset)
+		// 1-byte encoding
+		fc.out.Emit([]byte{0x43, 0x88, 0x54, 0x3d, 0x00}) // mov [r13 + r15], dl
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		continueJump1 := fc.eb.text.Len()
+		fc.out.Emit([]byte{0xe9, 0x00, 0x00, 0x00, 0x00}) // jmp loop_continue (4-byte offset)
 
-	// Case 2: codepoint <= 0x7FF (2 bytes: 110xxxxx 10xxxxxx)
-	case2Start := fc.eb.text.Len()
-	fc.patchJumpImmediate(case1Jump+2, int32(case2Start-(case1Jump+6)))
-	fc.out.Emit([]byte{0x48, 0x81, 0xfa, 0xff, 0x07, 0x00, 0x00}) // cmp rdx, 0x7FF
-	case2Jump := fc.eb.text.Len()
-	fc.out.Emit([]byte{0x0f, 0x87, 0x00, 0x00, 0x00, 0x00}) // ja case3
-	// 2-byte encoding
-	fc.out.MovRegToReg("rax", "rdx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x06})       // shr rax, 6
-	fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0xc0})       // or rax, 0xC0
-	fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
-	fc.out.MovRegToReg("rax", "rdx")
-	fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
-	fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
-	fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
-	continueJump2 := fc.eb.text.Len()
-	fc.out.Emit([]byte{0xe9, 0x00, 0x00, 0x00, 0x00}) // jmp loop_continue
+		// Case 2: codepoint <= 0x7FF (2 bytes: 110xxxxx 10xxxxxx)
+		case2Start := fc.eb.text.Len()
+		fc.patchJumpImmediate(case1Jump+2, int32(case2Start-(case1Jump+6)))
+		fc.out.Emit([]byte{0x48, 0x81, 0xfa, 0xff, 0x07, 0x00, 0x00}) // cmp rdx, 0x7FF
+		case2Jump := fc.eb.text.Len()
+		fc.out.Emit([]byte{0x0f, 0x87, 0x00, 0x00, 0x00, 0x00}) // ja case3
+		// 2-byte encoding
+		fc.out.MovRegToReg("rax", "rdx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x06})       // shr rax, 6
+		fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0xc0})       // or rax, 0xC0
+		fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		fc.out.MovRegToReg("rax", "rdx")
+		fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
+		fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
+		fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		continueJump2 := fc.eb.text.Len()
+		fc.out.Emit([]byte{0xe9, 0x00, 0x00, 0x00, 0x00}) // jmp loop_continue
 
-	// Case 3: codepoint <= 0xFFFF (3 bytes: 1110xxxx 10xxxxxx 10xxxxxx)
-	case3Start := fc.eb.text.Len()
-	fc.patchJumpImmediate(case2Jump+2, int32(case3Start-(case2Jump+6)))
-	fc.out.Emit([]byte{0x48, 0x81, 0xfa, 0xff, 0xff, 0x00, 0x00}) // cmp rdx, 0xFFFF
-	case3Jump := fc.eb.text.Len()
-	fc.out.Emit([]byte{0x0f, 0x87, 0x00, 0x00, 0x00, 0x00}) // ja case4
-	// 3-byte encoding
-	fc.out.MovRegToReg("rax", "rdx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x0c})       // shr rax, 12
-	fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0xe0})       // or rax, 0xE0
-	fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
-	fc.out.MovRegToReg("rax", "rdx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x06})       // shr rax, 6
-	fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
-	fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
-	fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
-	fc.out.MovRegToReg("rax", "rdx")
-	fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
-	fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
-	fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
-	continueJump3 := fc.eb.text.Len()
-	fc.out.Emit([]byte{0xe9, 0x00, 0x00, 0x00, 0x00}) // jmp loop_continue
+		// Case 3: codepoint <= 0xFFFF (3 bytes: 1110xxxx 10xxxxxx 10xxxxxx)
+		case3Start := fc.eb.text.Len()
+		fc.patchJumpImmediate(case2Jump+2, int32(case3Start-(case2Jump+6)))
+		fc.out.Emit([]byte{0x48, 0x81, 0xfa, 0xff, 0xff, 0x00, 0x00}) // cmp rdx, 0xFFFF
+		case3Jump := fc.eb.text.Len()
+		fc.out.Emit([]byte{0x0f, 0x87, 0x00, 0x00, 0x00, 0x00}) // ja case4
+		// 3-byte encoding
+		fc.out.MovRegToReg("rax", "rdx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x0c})       // shr rax, 12
+		fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0xe0})       // or rax, 0xE0
+		fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		fc.out.MovRegToReg("rax", "rdx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x06})       // shr rax, 6
+		fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
+		fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
+		fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		fc.out.MovRegToReg("rax", "rdx")
+		fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
+		fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
+		fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		continueJump3 := fc.eb.text.Len()
+		fc.out.Emit([]byte{0xe9, 0x00, 0x00, 0x00, 0x00}) // jmp loop_continue
 
-	// Case 4: codepoint > 0xFFFF (4 bytes: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
-	case4Start := fc.eb.text.Len()
-	fc.patchJumpImmediate(case3Jump+2, int32(case4Start-(case3Jump+6)))
-	// 4-byte encoding
-	fc.out.MovRegToReg("rax", "rdx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x12})       // shr rax, 18
-	fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0xf0})       // or rax, 0xF0
-	fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
-	fc.out.MovRegToReg("rax", "rdx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x0c})       // shr rax, 12
-	fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
-	fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
-	fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
-	fc.out.MovRegToReg("rax", "rdx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x06})       // shr rax, 6
-	fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
-	fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
-	fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
-	fc.out.MovRegToReg("rax", "rdx")
-	fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
-	fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
-	fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
-	fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		// Case 4: codepoint > 0xFFFF (4 bytes: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx)
+		case4Start := fc.eb.text.Len()
+		fc.patchJumpImmediate(case3Jump+2, int32(case4Start-(case3Jump+6)))
+		// 4-byte encoding
+		fc.out.MovRegToReg("rax", "rdx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x12})       // shr rax, 18
+		fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0xf0})       // or rax, 0xF0
+		fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		fc.out.MovRegToReg("rax", "rdx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x0c})       // shr rax, 12
+		fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
+		fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
+		fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		fc.out.MovRegToReg("rax", "rdx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe8, 0x06})       // shr rax, 6
+		fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
+		fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
+		fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
+		fc.out.MovRegToReg("rax", "rdx")
+		fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0x3f})       // and rax, 0x3F
+		fc.out.Emit([]byte{0x48, 0x83, 0xc8, 0x80})       // or rax, 0x80
+		fc.out.Emit([]byte{0x43, 0x88, 0x44, 0x3d, 0x00}) // mov [r13 + r15], al
+		fc.out.Emit([]byte{0x49, 0xff, 0xc7})             // inc r15
 
-	// Loop continue: increment codepoint index and jump back
-	loopContinue := fc.eb.text.Len()
-	fc.patchJumpImmediate(continueJump1+1, int32(loopContinue-(continueJump1+5)))
-	fc.patchJumpImmediate(continueJump2+1, int32(loopContinue-(continueJump2+5)))
-	fc.patchJumpImmediate(continueJump3+1, int32(loopContinue-(continueJump3+5)))
-	fc.out.Emit([]byte{0x48, 0xff, 0xc3}) // inc rbx
-	loopJumpBack := fc.eb.text.Len()
-	backOffset := int32(fc.eb.LabelOffset("_cstr_convert_loop") - (loopJumpBack + 5))
-	fc.out.Emit([]byte{0xe9, byte(backOffset), byte(backOffset >> 8), byte(backOffset >> 16), byte(backOffset >> 24)}) // jmp _cstr_convert_loop
+		// Loop continue: increment codepoint index and jump back
+		loopContinue := fc.eb.text.Len()
+		fc.patchJumpImmediate(continueJump1+1, int32(loopContinue-(continueJump1+5)))
+		fc.patchJumpImmediate(continueJump2+1, int32(loopContinue-(continueJump2+5)))
+		fc.patchJumpImmediate(continueJump3+1, int32(loopContinue-(continueJump3+5)))
+		fc.out.Emit([]byte{0x48, 0xff, 0xc3}) // inc rbx
+		loopJumpBack := fc.eb.text.Len()
+		backOffset := int32(fc.eb.LabelOffset("_cstr_convert_loop") - (loopJumpBack + 5))
+		fc.out.Emit([]byte{0xe9, byte(backOffset), byte(backOffset >> 8), byte(backOffset >> 16), byte(backOffset >> 24)}) // jmp _cstr_convert_loop
 
-	// Loop end: add null terminator
-	loopEnd := fc.eb.text.Len()
-	fc.patchJumpImmediate(loopEndJump+2, int32(loopEnd-(loopEndJump+6)))
-	fc.out.Emit([]byte{0x43, 0xc6, 0x44, 0x3d, 0x00, 0x00}) // mov byte [r13 + r15], 0
+		// Loop end: add null terminator
+		loopEnd := fc.eb.text.Len()
+		fc.patchJumpImmediate(loopEndJump+2, int32(loopEnd-(loopEndJump+6)))
+		fc.out.Emit([]byte{0x43, 0xc6, 0x44, 0x3d, 0x00, 0x00}) // mov byte [r13 + r15], 0
 
-	// Return C string pointer in rax
-	fc.out.MovRegToReg("rax", "r13")
+		// Return C string pointer in rax
+		fc.out.MovRegToReg("rax", "r13")
 
-	// Restore stack alignment
-	fc.out.AddImmToReg("rsp", StackSlotSize)
+		// Restore stack alignment
+		fc.out.AddImmToReg("rsp", StackSlotSize)
 
-	// Restore callee-saved registers
-	fc.out.PopReg("r15")
-	fc.out.PopReg("r14")
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
+		// Restore callee-saved registers
+		fc.out.PopReg("r15")
+		fc.out.PopReg("r14")
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
 
-	// Function epilogue
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
+		// Function epilogue
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+	} // end if c67_string_to_cstr used
 
-	// Generate cstr_to_c67_string(cstr_ptr) -> c67_string_ptr
-	// Converts a null-terminated C string to a C67 string (map format)
-	// Argument: rdi = C string pointer
-	// Returns: xmm0 = C67 string pointer (as float64)
-	fc.eb.MarkLabel("cstr_to_c67_string")
+	// Generate cstr_to_c67_string only if used (for C FFI string returns)
+	if fc.usedFunctions["cstr_to_c67_string"] {
+		// Generate cstr_to_c67_string(cstr_ptr) -> c67_string_ptr
+		// Converts a null-terminated C string to a C67 string (map format)
+		// Argument: rdi = C string pointer
+		// Returns: xmm0 = C67 string pointer (as float64)
+		fc.eb.MarkLabel("cstr_to_c67_string")
 
-	// Function prologue
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
+		// Function prologue
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
 
-	// Save callee-saved registers
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-	fc.out.PushReg("r14")
+		// Save callee-saved registers
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r14")
 
-	// Stack is now 16-byte aligned (call pushed 8, then 5 pushes = 48 bytes total)
-	// No additional alignment needed
+		// Stack is now 16-byte aligned (call pushed 8, then 5 pushes = 48 bytes total)
+		// No additional alignment needed
 
-	// Save C string pointer
-	fc.out.MovRegToReg("r12", "rdi") // r12 = C string pointer
+		// Save C string pointer
+		fc.out.MovRegToReg("r12", "rdi") // r12 = C string pointer
 
-	// Calculate string length using strlen(r12)
-	fc.out.MovRegToReg("rdi", "r12") // Set argument for strlen
-	fc.trackFunctionCall("strlen")
-	fc.eb.GenerateCallInstruction("strlen")
-	fc.out.MovRegToReg("r14", "rax") // r14 = string length
+		// Calculate string length using strlen(r12)
+		fc.out.MovRegToReg("rdi", "r12") // Set argument for strlen
+		fc.trackFunctionCall("strlen")
+		fc.eb.GenerateCallInstruction("strlen")
+		fc.out.MovRegToReg("r14", "rax") // r14 = string length
 
-	// Allocate C67 string map: 8 + (length * 16) bytes
-	// count (8 bytes) + (key, value) pairs (16 bytes each)
-	fc.out.MovRegToReg("rdi", "r14")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe7, 0x04}) // shl rdi, 4 (multiply by 16)
-	fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x08}) // add rdi, 8
-	// Allocate from arena
-	fc.callArenaAlloc()
-	fc.out.MovRegToReg("r13", "rax") // r13 = C67 string map pointer
+		// Allocate C67 string map: 8 + (length * 16) bytes
+		// count (8 bytes) + (key, value) pairs (16 bytes each)
+		fc.out.MovRegToReg("rdi", "r14")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe7, 0x04}) // shl rdi, 4 (multiply by 16)
+		fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x08}) // add rdi, 8
+		// Allocate from arena
+		fc.callArenaAlloc()
+		fc.out.MovRegToReg("r13", "rax") // r13 = C67 string map pointer
 
-	// Store count in map[0]
-	fc.out.MovRegToReg("rax", "r14")
-	fc.out.Cvtsi2sd("xmm0", "rax")
-	fc.out.MovXmmToMem("xmm0", "r13", 0)
+		// Store count in map[0]
+		fc.out.MovRegToReg("rax", "r14")
+		fc.out.Cvtsi2sd("xmm0", "rax")
+		fc.out.MovXmmToMem("xmm0", "r13", 0)
 
-	// Fill map with character data
-	fc.out.XorRegWithReg("rbx", "rbx") // rbx = index
+		// Fill map with character data
+		fc.out.XorRegWithReg("rbx", "rbx") // rbx = index
 
-	// Loop: for each character
-	cstrLoopStart := fc.eb.text.Len()
-	fc.eb.MarkLabel("_cstr_to_c67_loop")
+		// Loop: for each character
+		cstrLoopStart := fc.eb.text.Len()
+		fc.eb.MarkLabel("_cstr_to_c67_loop")
 
-	// Compare index with length
-	fc.out.Emit([]byte{0x4c, 0x39, 0xf3}) // cmp rbx, r14
-	cstrExitJumpPos := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0) // je to exit (will patch later)
+		// Compare index with length
+		fc.out.Emit([]byte{0x4c, 0x39, 0xf3}) // cmp rbx, r14
+		cstrExitJumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0) // je to exit (will patch later)
 
-	// Load character from C string: al = [r12 + rbx]
-	fc.out.Emit([]byte{0x41, 0x8a, 0x04, 0x1c}) // mov al, [r12 + rbx]
+		// Load character from C string: al = [r12 + rbx]
+		fc.out.Emit([]byte{0x41, 0x8a, 0x04, 0x1c}) // mov al, [r12 + rbx]
 
-	// Convert character to float64
-	fc.out.Emit([]byte{0x48, 0x0f, 0xb6, 0xc0}) // movzx rax, al
-	fc.out.Cvtsi2sd("xmm0", "rax")
+		// Convert character to float64
+		fc.out.Emit([]byte{0x48, 0x0f, 0xb6, 0xc0}) // movzx rax, al
+		fc.out.Cvtsi2sd("xmm0", "rax")
 
-	// Convert index to float64 for key
-	fc.out.MovRegToReg("rdx", "rbx")
-	fc.out.Cvtsi2sd("xmm1", "rdx")
+		// Convert index to float64 for key
+		fc.out.MovRegToReg("rdx", "rbx")
+		fc.out.Cvtsi2sd("xmm1", "rdx")
 
-	// Calculate offset for entry: 8 + (rbx * 16)
-	fc.out.MovRegToReg("rax", "rbx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x04}) // shl rax, 4
-	fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x08}) // add rax, 8
+		// Calculate offset for entry: 8 + (rbx * 16)
+		fc.out.MovRegToReg("rax", "rbx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x04}) // shl rax, 4
+		fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x08}) // add rax, 8
 
-	// Add offset to base pointer: rax = r13 + rax
-	fc.out.Emit([]byte{0x4c, 0x01, 0xe8}) // add rax, r13
+		// Add offset to base pointer: rax = r13 + rax
+		fc.out.Emit([]byte{0x4c, 0x01, 0xe8}) // add rax, r13
 
-	// Store key (index): [rax] = xmm1
-	fc.out.Emit([]byte{0xf2, 0x0f, 0x11, 0x08}) // movsd [rax], xmm1
+		// Store key (index): [rax] = xmm1
+		fc.out.Emit([]byte{0xf2, 0x0f, 0x11, 0x08}) // movsd [rax], xmm1
 
-	// Store value (character): [rax + 8] = xmm0
-	fc.out.Emit([]byte{0xf2, 0x0f, 0x11, 0x40, 0x08}) // movsd [rax + 8], xmm0
+		// Store value (character): [rax + 8] = xmm0
+		fc.out.Emit([]byte{0xf2, 0x0f, 0x11, 0x40, 0x08}) // movsd [rax + 8], xmm0
 
-	// Increment index
-	fc.out.Emit([]byte{0x48, 0xff, 0xc3}) // inc rbx
+		// Increment index
+		fc.out.Emit([]byte{0x48, 0xff, 0xc3}) // inc rbx
 
-	// Jump back to loop start
-	cstrLoopEnd := fc.eb.text.Len()
-	cstrOffset := int32(cstrLoopStart - (cstrLoopEnd + 2))
-	fc.out.Emit([]byte{0xeb, byte(cstrOffset)}) // jmp rel8
+		// Jump back to loop start
+		cstrLoopEnd := fc.eb.text.Len()
+		cstrOffset := int32(cstrLoopStart - (cstrLoopEnd + 2))
+		fc.out.Emit([]byte{0xeb, byte(cstrOffset)}) // jmp rel8
 
-	// Patch the exit jump
-	cstrExitPos := fc.eb.text.Len()
-	fc.patchJumpImmediate(cstrExitJumpPos+2, int32(cstrExitPos-(cstrExitJumpPos+6)))
+		// Patch the exit jump
+		cstrExitPos := fc.eb.text.Len()
+		fc.patchJumpImmediate(cstrExitJumpPos+2, int32(cstrExitPos-(cstrExitJumpPos+6)))
 
-	// Return C67 string pointer in xmm0
-	fc.out.MovRegToXmm("xmm0", "r13")
+		// Return C67 string pointer in xmm0
+		fc.out.MovRegToXmm("xmm0", "r13")
 
-	// Restore callee-saved registers (no stack adjustment needed)
-	fc.out.PopReg("r14")
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
+		// Restore callee-saved registers (no stack adjustment needed)
+		fc.out.PopReg("r14")
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
 
-	// Function epilogue
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
+		// Function epilogue
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+	} // end if cstr_to_c67_string used
 
 	// Generate c67_slice_string(str_ptr, start, end, step) -> new_str_ptr
 	// Arguments: rdi = string_ptr, rsi = start_index (int64), rdx = end_index (int64), rcx = step (int64)
@@ -12332,6 +12404,8 @@ func (fc *C67Compiler) compileCFunctionCall(libName string, funcName string, arg
 						fc.out.MovRegToMem("rax", "rsp", 0)
 						fc.out.MovMemToReg("rdi", "rsp", 0)
 						fc.out.AddImmToReg("rsp", StackSlotSize)
+						fc.trackFunctionCall("c67_string_to_cstr")
+						fc.trackFunctionCall("c67_string_to_cstr")
 						fc.out.CallSymbol("c67_string_to_cstr")
 						// Result in rax (C string pointer)
 					}
@@ -13174,6 +13248,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 	case "println":
 		// println uses syscalls on Linux, printf on Windows
 		// Supports multiple arguments, separated by spaces
+		fc.trackFunctionCall("println")
 
 		if len(call.Args) == 0 {
 			// Just print a newline
@@ -13457,6 +13532,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		return
 
 	case "printf":
+		fc.trackFunctionCall("printf")
 		if len(call.Args) == 0 {
 			compilerError("printf() requires at least a format string")
 		}
@@ -13628,6 +13704,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				// %s: C67 string -> C string conversion
 				// xmm0 contains pointer to C67 string map [count][key0][val0][key1][val1]...
 				// Call helper function to convert to null-terminated C string
+				fc.trackFunctionCall("c67_string_to_cstr")
 				fc.out.CallSymbol("c67_string_to_cstr")
 				// Result in rax is C string pointer
 				fc.out.MovRegToReg(intRegs[intArgCount], "rax")
@@ -15986,6 +16063,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 		fc.out.MovMemToReg("rdi", "rsp", 0)
 		fc.out.AddImmToReg("rsp", StackSlotSize)
+		fc.trackFunctionCall("c67_string_to_cstr")
 		fc.out.CallSymbol("c67_string_to_cstr")
 
 		// Call strtod(str, NULL) to parse the string
@@ -16457,6 +16535,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.AddImmToReg("rsp", StackSlotSize)
 
 		// Call c67_string_to_cstr (result in rax)
+		fc.trackFunctionCall("c67_string_to_cstr")
 		fc.out.CallSymbol("c67_string_to_cstr")
 
 		// Now rax = C string pointer
@@ -16499,6 +16578,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.AddImmToReg("rsp", StackSlotSize)
 
 		// Convert to C string
+		fc.trackFunctionCall("c67_string_to_cstr")
 		fc.out.CallSymbol("c67_string_to_cstr")
 
 		// Pop handle to rdi
@@ -16663,6 +16743,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 		fc.out.MovMemToReg("rdi", "rsp", 0)
 		fc.out.AddImmToReg("rsp", StackSlotSize)
+		fc.trackFunctionCall("c67_string_to_cstr")
 		fc.out.CallSymbol("c67_string_to_cstr")
 
 		// Allocate stack frame: 32 bytes (fd, size, buffer, result)
@@ -16782,6 +16863,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 		fc.out.MovMemToReg("rdi", "rsp", 0)
 		fc.out.AddImmToReg("rsp", StackSlotSize)
+		fc.trackFunctionCall("c67_string_to_cstr")
 		fc.out.CallSymbol("c67_string_to_cstr")
 		fc.out.PushReg("rax") // Save content C string
 
@@ -16791,6 +16873,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 		fc.out.MovMemToReg("rdi", "rsp", 0)
 		fc.out.AddImmToReg("rsp", StackSlotSize)
+		fc.trackFunctionCall("c67_string_to_cstr")
 		fc.out.CallSymbol("c67_string_to_cstr")
 
 		// Open file: fopen(path, "w")
