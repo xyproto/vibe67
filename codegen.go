@@ -7866,116 +7866,116 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 		fc.eb.MarkLabel("_c67_string_concat")
 
-	// Function prologue
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
+		// Function prologue
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
 
-	// Save callee-saved registers
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-	fc.out.PushReg("r14")
-	fc.out.PushReg("r15")
+		// Save callee-saved registers
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r14")
+		fc.out.PushReg("r15")
 
-	// Align stack to 16 bytes for malloc call
-	// After call (8) + push rbp (8) + push 5 regs (40) = 56 bytes
-	// We need to subtract 8 more to get 16-byte alignment
-	fc.out.SubImmFromReg("rsp", StackSlotSize)
+		// Align stack to 16 bytes for malloc call
+		// After call (8) + push rbp (8) + push 5 regs (40) = 56 bytes
+		// We need to subtract 8 more to get 16-byte alignment
+		fc.out.SubImmFromReg("rsp", StackSlotSize)
 
-	// Save arguments
-	fc.out.MovRegToReg("r12", "rdi") // r12 = left_ptr
-	fc.out.MovRegToReg("r13", "rsi") // r13 = right_ptr
+		// Save arguments
+		fc.out.MovRegToReg("r12", "rdi") // r12 = left_ptr
+		fc.out.MovRegToReg("r13", "rsi") // r13 = right_ptr
 
-	// Get left string length
-	fc.out.MovMemToXmm("xmm0", "r12", 0) // load count as float64
-	// Convert float64 to integer using cvttsd2si
-	fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf0}) // cvttsd2si r14, xmm0
+		// Get left string length
+		fc.out.MovMemToXmm("xmm0", "r12", 0) // load count as float64
+		// Convert float64 to integer using cvttsd2si
+		fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf0}) // cvttsd2si r14, xmm0
 
-	// Get right string length
-	fc.out.MovMemToXmm("xmm0", "r13", 0) // load count as float64
-	// Convert float64 to integer
-	fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf8}) // cvttsd2si r15, xmm0
+		// Get right string length
+		fc.out.MovMemToXmm("xmm0", "r13", 0) // load count as float64
+		// Convert float64 to integer
+		fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf8}) // cvttsd2si r15, xmm0
 
-	// Calculate total length: rbx = r14 + r15
-	fc.out.MovRegToReg("rbx", "r14")
-	fc.out.Emit([]byte{0x4c, 0x01, 0xfb}) // add rbx, r15
+		// Calculate total length: rbx = r14 + r15
+		fc.out.MovRegToReg("rbx", "r14")
+		fc.out.Emit([]byte{0x4c, 0x01, 0xfb}) // add rbx, r15
 
-	// Calculate allocation size: rax = 8 + rbx * 16
-	fc.out.MovRegToReg("rax", "rbx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x04}) // shl rax, 4 (multiply by 16)
-	fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x08}) // add rax, 8
+		// Calculate allocation size: rax = 8 + rbx * 16
+		fc.out.MovRegToReg("rax", "rbx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x04}) // shl rax, 4 (multiply by 16)
+		fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x08}) // add rax, 8
 
-	// Align to 16 bytes for safety
-	fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x0f}) // add rax, 15
-	fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0xf0}) // and rax, ~15
+		// Align to 16 bytes for safety
+		fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x0f}) // add rax, 15
+		fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0xf0}) // and rax, ~15
 
-	// Use arena allocation instead of malloc
-	// rax contains the size needed
-	fc.out.MovRegToReg("rdi", "rax") // rdi = size
-	fc.callArenaAlloc()              // Allocate from current arena
-	fc.out.MovRegToReg("r10", "rax") // r10 = result pointer
+		// Use arena allocation instead of malloc
+		// rax contains the size needed
+		fc.out.MovRegToReg("rdi", "rax") // rdi = size
+		fc.callArenaAlloc()              // Allocate from current arena
+		fc.out.MovRegToReg("r10", "rax") // r10 = result pointer
 
-	// Write total count to result
-	fc.out.Emit([]byte{0xf2, 0x48, 0x0f, 0x2a, 0xc3}) // cvtsi2sd xmm0, rbx
-	fc.out.MovXmmToMem("xmm0", "r10", 0)
+		// Write total count to result
+		fc.out.Emit([]byte{0xf2, 0x48, 0x0f, 0x2a, 0xc3}) // cvtsi2sd xmm0, rbx
+		fc.out.MovXmmToMem("xmm0", "r10", 0)
 
-	// Copy left string entries
-	// memcpy(r10 + 8, r12 + 8, r14 * 16)
-	fc.out.Emit([]byte{0x4d, 0x89, 0xf1})             // mov r9, r14 (counter)
-	fc.out.Emit([]byte{0x49, 0x8d, 0x74, 0x24, 0x08}) // lea rsi, [r12 + 8]
-	fc.out.Emit([]byte{0x49, 0x8d, 0x7a, 0x08})       // lea rdi, [r10 + 8]
+		// Copy left string entries
+		// memcpy(r10 + 8, r12 + 8, r14 * 16)
+		fc.out.Emit([]byte{0x4d, 0x89, 0xf1})             // mov r9, r14 (counter)
+		fc.out.Emit([]byte{0x49, 0x8d, 0x74, 0x24, 0x08}) // lea rsi, [r12 + 8]
+		fc.out.Emit([]byte{0x49, 0x8d, 0x7a, 0x08})       // lea rdi, [r10 + 8]
 
-	// Loop to copy left entries
-	fc.eb.MarkLabel("_concat_copy_left_loop")
-	fc.out.Emit([]byte{0x4d, 0x85, 0xc9}) // test r9, r9
-	// jz to skip copying if zero length - skip entire loop body (22 + 8 + 3 + 2 = 35 bytes)
-	fc.out.Emit([]byte{0x74, 0x23}) // jz +35 bytes (skip the entire loop)
+		// Loop to copy left entries
+		fc.eb.MarkLabel("_concat_copy_left_loop")
+		fc.out.Emit([]byte{0x4d, 0x85, 0xc9}) // test r9, r9
+		// jz to skip copying if zero length - skip entire loop body (22 + 8 + 3 + 2 = 35 bytes)
+		fc.out.Emit([]byte{0x74, 0x23}) // jz +35 bytes (skip the entire loop)
 
-	fc.out.MovMemToXmm("xmm0", "rsi", 0)        // load key
-	fc.out.MovXmmToMem("xmm0", "rdi", 0)        // store key
-	fc.out.MovMemToXmm("xmm0", "rsi", 8)        // load value
-	fc.out.MovXmmToMem("xmm0", "rdi", 8)        // store value
-	fc.out.Emit([]byte{0x48, 0x83, 0xc6, 0x10}) // add rsi, 16
-	fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x10}) // add rdi, 16
-	fc.out.Emit([]byte{0x49, 0xff, 0xc9})       // dec r9
-	fc.out.Emit([]byte{0xeb, 0xd8})             // jmp back to test (-40 bytes)
+		fc.out.MovMemToXmm("xmm0", "rsi", 0)        // load key
+		fc.out.MovXmmToMem("xmm0", "rdi", 0)        // store key
+		fc.out.MovMemToXmm("xmm0", "rsi", 8)        // load value
+		fc.out.MovXmmToMem("xmm0", "rdi", 8)        // store value
+		fc.out.Emit([]byte{0x48, 0x83, 0xc6, 0x10}) // add rsi, 16
+		fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x10}) // add rdi, 16
+		fc.out.Emit([]byte{0x49, 0xff, 0xc9})       // dec r9
+		fc.out.Emit([]byte{0xeb, 0xd8})             // jmp back to test (-40 bytes)
 
-	// Now copy right string entries with offset keys
-	// r15 = right_len (counter), r14 = offset for keys
-	fc.out.Emit([]byte{0x49, 0x8d, 0x75, 0x08}) // lea rsi, [r13 + 8]
-	// rdi already points to correct position
+		// Now copy right string entries with offset keys
+		// r15 = right_len (counter), r14 = offset for keys
+		fc.out.Emit([]byte{0x49, 0x8d, 0x75, 0x08}) // lea rsi, [r13 + 8]
+		// rdi already points to correct position
 
-	fc.eb.MarkLabel("_concat_copy_right_loop")
-	fc.out.Emit([]byte{0x4d, 0x85, 0xff}) // test r15, r15
-	fc.out.Emit([]byte{0x74, 0x2c})       // jz +44 bytes (skip entire second loop)
+		fc.eb.MarkLabel("_concat_copy_right_loop")
+		fc.out.Emit([]byte{0x4d, 0x85, 0xff}) // test r15, r15
+		fc.out.Emit([]byte{0x74, 0x2c})       // jz +44 bytes (skip entire second loop)
 
-	fc.out.MovMemToXmm("xmm0", "rsi", 0)              // load key
-	fc.out.Emit([]byte{0xf2, 0x49, 0x0f, 0x2a, 0xce}) // cvtsi2sd xmm1, r14 (offset)
-	fc.out.Emit([]byte{0xf2, 0x0f, 0x58, 0xc1})       // addsd xmm0, xmm1 (key += offset)
-	fc.out.MovXmmToMem("xmm0", "rdi", 0)              // store adjusted key
-	fc.out.MovMemToXmm("xmm0", "rsi", 8)              // load value
-	fc.out.MovXmmToMem("xmm0", "rdi", 8)              // store value
-	fc.out.Emit([]byte{0x48, 0x83, 0xc6, 0x10})       // add rsi, 16
-	fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x10})       // add rdi, 16
-	fc.out.Emit([]byte{0x49, 0xff, 0xcf})             // dec r15
-	fc.out.Emit([]byte{0xeb, 0xcf})                   // jmp back to test (-49 bytes)
+		fc.out.MovMemToXmm("xmm0", "rsi", 0)              // load key
+		fc.out.Emit([]byte{0xf2, 0x49, 0x0f, 0x2a, 0xce}) // cvtsi2sd xmm1, r14 (offset)
+		fc.out.Emit([]byte{0xf2, 0x0f, 0x58, 0xc1})       // addsd xmm0, xmm1 (key += offset)
+		fc.out.MovXmmToMem("xmm0", "rdi", 0)              // store adjusted key
+		fc.out.MovMemToXmm("xmm0", "rsi", 8)              // load value
+		fc.out.MovXmmToMem("xmm0", "rdi", 8)              // store value
+		fc.out.Emit([]byte{0x48, 0x83, 0xc6, 0x10})       // add rsi, 16
+		fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x10})       // add rdi, 16
+		fc.out.Emit([]byte{0x49, 0xff, 0xcf})             // dec r15
+		fc.out.Emit([]byte{0xeb, 0xcf})                   // jmp back to test (-49 bytes)
 
-	// Return result pointer in rax
-	fc.out.MovRegToReg("rax", "r10")
+		// Return result pointer in rax
+		fc.out.MovRegToReg("rax", "r10")
 
-	// Restore stack alignment
-	fc.out.AddImmToReg("rsp", StackSlotSize)
+		// Restore stack alignment
+		fc.out.AddImmToReg("rsp", StackSlotSize)
 
-	// Restore callee-saved registers
-	fc.out.PopReg("r15")
-	fc.out.PopReg("r14")
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
+		// Restore callee-saved registers
+		fc.out.PopReg("r15")
+		fc.out.PopReg("r14")
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
 
-	// Function epilogue
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
+		// Function epilogue
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
 	} // end if _c67_string_concat used
 
 	// Generate c67_string_to_cstr(c67_string_ptr) -> cstr_ptr
