@@ -3,27 +3,25 @@
 ## High Priority - Executable Size Optimization (for 64k demos)
 
 ### Current Status
-- Minimal program (x := 42): 45KB
-- Code segment: 36KB
+- Minimal program (x := 42): 21KB (was 45KB - 53% reduction achieved!)
+- Code segment: 12KB (was 36KB - dynamic sizing based on actual code)
 - Data segment: ~1KB
 - Function naming harmonized: all runtime functions now use `_c67_` prefix
 - Removed duplicate emit* flags: using only usedFunctions map for tracking
+- Arena initialization: only when actually used (usesArenas flag)
+- Printf runtime: only when printf/print_syscall are used
 
-### Size Reduction Tasks
-- [ ] Make runtime functions conditionally included (only when used)
-  - [ ] String operations (_c67_string_print, _c67_string_println, _c67_string_eq, _c67_slice_string)
-  - [ ] List functions (_c67_list_cons, _c67_list_head, _c67_list_tail, _c67_list_length, _c67_list_index, _c67_list_update, _c67_list_concat, _c67_list_repeat)
-  - [ ] Arena allocator functions (_c67_arena_create, _c67_arena_alloc, _c67_arena_destroy, _c67_arena_reset, _c67_arena_ensure_capacity)
-  - [ ] Cache functions (_c67_cache_lookup, _c67_cache_insert)
-  - [ ] Printf runtime (full format string parser)
-  - [ ] Itoa (_c67_itoa - number to string conversion)
-  - [ ] Print syscalls (_c67_print_syscall, _c67_println_syscall - Linux only)
-- [ ] Remove or minimize ELF headers overhead
+### Completed Optimizations
+- Dynamic text section sizing (codeSize + 1 page safety margin)
+- Conditional arena initialization based on usesArenas flag
+- Conditional printf runtime generation based on usedFunctions
+
+### Remaining Size Reduction Tasks
+- [ ] Further optimize runtime functions (already conditionally included)
 - [ ] Implement dead code elimination pass
 - [ ] Strip unnecessary alignment padding
 - [ ] Optimize common patterns (e.g., initialization code)
-- [ ] Add `-tiny` flag for demo-optimized builds
-- [ ] Target: <8KB for minimal "Hello World"
+- [ ] Target: <8KB for minimal programs
 
 ## High Priority - Language Features from Design Decisions
 
