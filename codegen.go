@@ -132,6 +132,7 @@ type C67Compiler struct {
 	globalVars        map[string]int     // Global variable name -> .data offset
 	globalVarsMutable map[string]bool    // Global variable name -> is mutable
 	dataSection       []byte             // .data section contents
+	forwardFunctions  map[string]bool    // Functions that can be forward-referenced (defined in program)
 }
 
 type FunctionSignature struct {
@@ -605,6 +606,62 @@ func (fc *C67Compiler) expressionCallsMain(expr Expression) bool {
 	}
 }
 
+// collectAllFunctions does a pre-pass to collect all function definitions
+// This enables forward references - functions can be called before they're defined
+func (fc *C67Compiler) collectAllFunctions(program *Program) {
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "-> Pre-pass: Collecting all function definitions for forward references\n")
+	}
+
+	// Walk through all statements and find assignments that define functions
+	for _, stmt := range program.Statements {
+		if assign, ok := stmt.(*AssignStmt); ok {
+			// Check if the value is a lambda (function definition)
+			if _, isLambda := assign.Value.(*LambdaExpr); isLambda {
+				// Mark this function as forward-referenceable
+				if VerboseMode {
+					fmt.Fprintf(os.Stderr, "   Marked function for forward reference: %s\n", assign.Name)
+				}
+				
+				if fc.forwardFunctions == nil {
+					fc.forwardFunctions = make(map[string]bool)
+				}
+				fc.forwardFunctions[assign.Name] = true
+			}
+		}
+	}
+}
+
+// reorderStatementsForForwardRefs reorders statements to put function definitions first
+// This allows functions to be called before they appear in the source (forward references)
+func (fc *C67Compiler) reorderStatementsForForwardRefs(statements []Statement) []Statement {
+	var functionDefs []Statement
+	var otherStmts []Statement
+	
+	for _, stmt := range statements {
+		if assign, ok := stmt.(*AssignStmt); ok {
+			// Check if this is a function definition
+			if _, isLambda := assign.Value.(*LambdaExpr); isLambda {
+				functionDefs = append(functionDefs, stmt)
+				continue
+			}
+		}
+		// Not a function definition
+		otherStmts = append(otherStmts, stmt)
+	}
+	
+	// Return functions first, then other statements
+	result := make([]Statement, 0, len(statements))
+	result = append(result, functionDefs...)
+	result = append(result, otherStmts...)
+	
+	if VerboseMode && len(functionDefs) > 0 {
+		fmt.Fprintf(os.Stderr, "-> Reordered %d function definitions to the top\n", len(functionDefs))
+	}
+	
+	return result
+}
+
 func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// Clear moved variables tracking for this compilation
 	fc.movedVars = make(map[string]bool)
@@ -633,6 +690,14 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// Pre-pass: Collect C imports to set up library handles and extract constants
 	// This MUST happen before architecture-specific compilation
 	fc.processCImports(program)
+
+	// Pre-pass: Collect all function definitions to enable forward references
+	// This allows functions to be called before they're defined in the source
+	fc.collectAllFunctions(program)
+	
+	// Reorder statements to put function definitions first
+	// This ensures all functions are defined before being called
+	program.Statements = fc.reorderStatementsForForwardRefs(program.Statements)
 
 	// Use ARM64 code generator if target is ARM64
 	if fc.eb.target.Arch() == ArchARM64 {
@@ -12546,8 +12611,22 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 	// Check if this is a stored function (variable containing function pointer)
 	// This handles first-class functions (functions passed as values/parameters)
 	// Note: known lambdas are handled above via direct call
+	// Forward references: treat as direct calls by label (will be resolved later)
 	if !isBuiltinOp {
-		if _, isVariable := fc.variables[call.Function]; isVariable {
+		_, isVariable := fc.variables[call.Function]
+		_, isForwardRef := fc.forwardFunctions[call.Function]
+		
+		if isForwardRef && !isVariable {
+			// Forward reference - function not yet defined, but will be
+			// Use direct call by label (like compileLambdaDirectCall)
+			if VerboseMode {
+				fmt.Fprintf(os.Stderr, "DEBUG compileCall: forward reference - direct call to label '%s'\n", call.Function)
+			}
+			fc.compileLambdaDirectCall(call)
+			return
+		}
+		
+		if isVariable {
 			if VerboseMode {
 				fmt.Fprintf(os.Stderr, "DEBUG compileCall: taking compileStoredFunctionCall path\n")
 			}
@@ -18918,13 +18997,8 @@ func CompileC67WithOptions(inputPath string, outputPath string, platform Platfor
 	// }
 
 	// Final check: verify all functions are defined (after all dependency resolution)
-	// Check for FORWARD REFERENCES - functions must be defined before use
-	forwardRefErrors := checkForwardReferences(program)
-	if len(forwardRefErrors) > 0 {
-		return fmt.Errorf("forward reference error:\n%s", strings.Join(forwardRefErrors, "\n"))
-	}
-
-	// Also check for completely undefined functions
+	// NOTE: We allow forward references (functions called before defined) as long as they
+	// ARE defined somewhere. The compiler handles this with indirect calls through variables.
 	finalUnknownFuncs := getUnknownFunctions(program)
 	if len(finalUnknownFuncs) > 0 {
 		// Sort for consistent error messages
