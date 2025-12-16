@@ -286,6 +286,9 @@ const (
 // Input: rdi = size to allocate
 // Output: rax = pointer to allocated memory
 func (fc *C67Compiler) callArenaAlloc() {
+	// Mark that this program uses arenas
+	fc.usesArenas = true
+
 	// Use the existing c67_arena_alloc runtime function
 	// It expects: rdi = arena_ptr, rsi = size
 	// Returns: rax = allocated pointer

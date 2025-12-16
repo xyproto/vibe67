@@ -679,7 +679,8 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	fc.movedVars = make(map[string]bool)
 	fc.scopedMoved = []map[string]bool{make(map[string]bool)}
 
-	// Always enable arenas - all list operations use arena allocation
+	// Arenas will be enabled on-demand when needed (string concat, list operations, etc.)
+	// TODO: Currently always enabled to ensure compatibility
 	fc.usesArenas = true
 
 	// Check if main() is called at top level (to decide whether to auto-call main)
@@ -737,9 +738,8 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	fc.eb.Define("_bounds_too_large_msg", "ERROR: Array index out of bounds (index >= length)\n\x00")
 	fc.eb.Define("_malloc_failed_msg", "ERROR: Memory allocation failed (out of memory)\n\x00")
 
-	// Define arena metadata in .data section
-	// Only store POINTERS here, actual arena buffers are malloc'd
-	// Meta-arena: array of pointers to arena structs
+	// Define arena metadata symbols early (they're small, but only referenced if arenas are used)
+	// These need to be defined before code generation in case arena allocation is used
 	fc.eb.DefineWritable("_c67_arena_meta", "\x00\x00\x00\x00\x00\x00\x00\x00")     // Pointer to arena array
 	fc.eb.DefineWritable("_c67_arena_meta_cap", "\x00\x00\x00\x00\x00\x00\x00\x00") // Capacity (number of slots)
 	fc.eb.DefineWritable("_c67_arena_meta_len", "\x00\x00\x00\x00\x00\x00\x00\x00") // Length (number of active arenas)
@@ -830,8 +830,11 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	}
 
 	// currentArena is already set to 1 in NewC67Compiler (representing meta-arena[0])
-	// Arena initialization is needed for variadic function lists
-	fc.initializeMetaArenaAndGlobalArena()
+	// Arena initialization is needed only if we actually use arenas
+	// (e.g., for string concat, list operations, etc.)
+	if fc.usesArenas {
+		fc.initializeMetaArenaAndGlobalArena()
+	}
 
 	// Function prologue - set up stack frame for main code
 	fc.out.PushReg("rbp")
@@ -4752,8 +4755,8 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				fc.out.SubImmFromReg("rsp", StackSlotSize)
 
 				// Call the helper function
-				// Note: Don't track internal function calls - they use CallSymbol (0x00000000 placeholder)
-				// not GenerateCallInstruction (0x12345678 placeholder), so they shouldn't be in callOrder
+				// Track this so we know to emit it
+				fc.trackFunctionCall("_c67_string_eq")
 				fc.out.CallSymbol("_c67_string_eq")
 
 				// Restore stack alignment
@@ -8492,1047 +8495,1054 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.Ret()
 	} // end if _c67_slice_string used
 
-	// Generate _c67_list_concat(left_ptr, right_ptr) -> new_ptr
+	// Generate _c67_list_concat only if list operations are used
+	// This function is called when concatenating lists at runtime
 	// Arguments: rdi = left_ptr, rsi = right_ptr
 	// Returns: rax = pointer to new concatenated list
 	// List format: [length (8 bytes)][elem0 (8 bytes)][elem1 (8 bytes)]...
+	if fc.usedFunctions["_c67_list_concat"] {
+		fc.eb.MarkLabel("_c67_list_concat")
 
-	fc.eb.MarkLabel("_c67_list_concat")
+		// Function prologue
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
 
-	// Function prologue
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
+		// Save callee-saved registers
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r14")
+		fc.out.PushReg("r15")
 
-	// Save callee-saved registers
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-	fc.out.PushReg("r14")
-	fc.out.PushReg("r15")
+		// Align stack to 16 bytes for malloc call
+		fc.out.SubImmFromReg("rsp", StackSlotSize)
 
-	// Align stack to 16 bytes for malloc call
-	fc.out.SubImmFromReg("rsp", StackSlotSize)
+		// Save arguments
+		fc.out.MovRegToReg("r12", "rdi") // r12 = left_ptr
+		fc.out.MovRegToReg("r13", "rsi") // r13 = right_ptr
 
-	// Save arguments
-	fc.out.MovRegToReg("r12", "rdi") // r12 = left_ptr
-	fc.out.MovRegToReg("r13", "rsi") // r13 = right_ptr
+		// Get left list length
+		fc.out.MovMemToXmm("xmm0", "r12", 0)              // load length as float64
+		fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf0}) // cvttsd2si r14, xmm0
 
-	// Get left list length
-	fc.out.MovMemToXmm("xmm0", "r12", 0)              // load length as float64
-	fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf0}) // cvttsd2si r14, xmm0
+		// Get right list length
+		fc.out.MovMemToXmm("xmm0", "r13", 0)              // load length as float64
+		fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf8}) // cvttsd2si r15, xmm0
 
-	// Get right list length
-	fc.out.MovMemToXmm("xmm0", "r13", 0)              // load length as float64
-	fc.out.Emit([]byte{0xf2, 0x4c, 0x0f, 0x2c, 0xf8}) // cvttsd2si r15, xmm0
+		// Calculate total length: rbx = r14 + r15
+		fc.out.MovRegToReg("rbx", "r14")
+		fc.out.Emit([]byte{0x4c, 0x01, 0xfb}) // add rbx, r15
 
-	// Calculate total length: rbx = r14 + r15
-	fc.out.MovRegToReg("rbx", "r14")
-	fc.out.Emit([]byte{0x4c, 0x01, 0xfb}) // add rbx, r15
+		// Calculate allocation size: rax = 8 + rbx * 8
+		fc.out.MovRegToReg("rax", "rbx")
+		fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x03}) // shl rax, 3 (multiply by 8)
+		fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x08}) // add rax, 8
 
-	// Calculate allocation size: rax = 8 + rbx * 8
-	fc.out.MovRegToReg("rax", "rbx")
-	fc.out.Emit([]byte{0x48, 0xc1, 0xe0, 0x03}) // shl rax, 3 (multiply by 8)
-	fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x08}) // add rax, 8
+		// Align to 16 bytes for safety
+		fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x0f}) // add rax, 15
+		fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0xf0}) // and rax, ~15
 
-	// Align to 16 bytes for safety
-	fc.out.Emit([]byte{0x48, 0x83, 0xc0, 0x0f}) // add rax, 15
-	fc.out.Emit([]byte{0x48, 0x83, 0xe0, 0xf0}) // and rax, ~15
+		// Call malloc(rax)
+		fc.out.MovRegToReg("rdi", "rax")
+		// Allocate from arena
+		fc.callArenaAlloc()
+		fc.out.MovRegToReg("r10", "rax") // r10 = result pointer
 
-	// Call malloc(rax)
-	fc.out.MovRegToReg("rdi", "rax")
-	// Allocate from arena
-	fc.callArenaAlloc()
-	fc.out.MovRegToReg("r10", "rax") // r10 = result pointer
+		// Write total length to result
+		fc.out.Emit([]byte{0xf2, 0x48, 0x0f, 0x2a, 0xc3}) // cvtsi2sd xmm0, rbx
+		fc.out.MovXmmToMem("xmm0", "r10", 0)
 
-	// Write total length to result
-	fc.out.Emit([]byte{0xf2, 0x48, 0x0f, 0x2a, 0xc3}) // cvtsi2sd xmm0, rbx
-	fc.out.MovXmmToMem("xmm0", "r10", 0)
+		// Copy left list elements
+		// memcpy(r10 + 8, r12 + 8, r14 * 8)
+		fc.out.Emit([]byte{0x4d, 0x89, 0xf1})             // mov r9, r14 (counter)
+		fc.out.Emit([]byte{0x49, 0x8d, 0x74, 0x24, 0x08}) // lea rsi, [r12 + 8]
+		fc.out.Emit([]byte{0x49, 0x8d, 0x7a, 0x08})       // lea rdi, [r10 + 8]
 
-	// Copy left list elements
-	// memcpy(r10 + 8, r12 + 8, r14 * 8)
-	fc.out.Emit([]byte{0x4d, 0x89, 0xf1})             // mov r9, r14 (counter)
-	fc.out.Emit([]byte{0x49, 0x8d, 0x74, 0x24, 0x08}) // lea rsi, [r12 + 8]
-	fc.out.Emit([]byte{0x49, 0x8d, 0x7a, 0x08})       // lea rdi, [r10 + 8]
+		// Loop to copy left elements
+		fc.eb.MarkLabel("_list_concat_copy_left_loop")
+		fc.out.Emit([]byte{0x4d, 0x85, 0xc9}) // test r9, r9
+		fc.out.Emit([]byte{0x74, 0x17})       // jz +23 bytes (skip loop body)
 
-	// Loop to copy left elements
-	fc.eb.MarkLabel("_list_concat_copy_left_loop")
-	fc.out.Emit([]byte{0x4d, 0x85, 0xc9}) // test r9, r9
-	fc.out.Emit([]byte{0x74, 0x17})       // jz +23 bytes (skip loop body)
+		fc.out.MovMemToXmm("xmm0", "rsi", 0)        // load element (4 bytes)
+		fc.out.MovXmmToMem("xmm0", "rdi", 0)        // store element (4 bytes)
+		fc.out.Emit([]byte{0x48, 0x83, 0xc6, 0x08}) // add rsi, 8 (4 bytes)
+		fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x08}) // add rdi, 8 (4 bytes)
+		fc.out.Emit([]byte{0x49, 0xff, 0xc9})       // dec r9 (3 bytes)
+		fc.out.Emit([]byte{0xeb, 0xe4})             // jmp back -28 bytes (2 bytes)
 
-	fc.out.MovMemToXmm("xmm0", "rsi", 0)        // load element (4 bytes)
-	fc.out.MovXmmToMem("xmm0", "rdi", 0)        // store element (4 bytes)
-	fc.out.Emit([]byte{0x48, 0x83, 0xc6, 0x08}) // add rsi, 8 (4 bytes)
-	fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x08}) // add rdi, 8 (4 bytes)
-	fc.out.Emit([]byte{0x49, 0xff, 0xc9})       // dec r9 (3 bytes)
-	fc.out.Emit([]byte{0xeb, 0xe4})             // jmp back -28 bytes (2 bytes)
+		// Copy right list elements
+		// memcpy(r10 + 8 + r14*8, r13 + 8, r15 * 8)
+		fc.out.Emit([]byte{0x49, 0x8d, 0x75, 0x08}) // lea rsi, [r13 + 8]
+		// rdi already points to correct position
 
-	// Copy right list elements
-	// memcpy(r10 + 8 + r14*8, r13 + 8, r15 * 8)
-	fc.out.Emit([]byte{0x49, 0x8d, 0x75, 0x08}) // lea rsi, [r13 + 8]
-	// rdi already points to correct position
+		fc.eb.MarkLabel("_list_concat_copy_right_loop")
+		fc.out.Emit([]byte{0x4d, 0x85, 0xff}) // test r15, r15
+		fc.out.Emit([]byte{0x74, 0x17})       // jz +23 bytes (skip loop body)
 
-	fc.eb.MarkLabel("_list_concat_copy_right_loop")
-	fc.out.Emit([]byte{0x4d, 0x85, 0xff}) // test r15, r15
-	fc.out.Emit([]byte{0x74, 0x17})       // jz +23 bytes (skip loop body)
+		fc.out.MovMemToXmm("xmm0", "rsi", 0)        // load element (4 bytes)
+		fc.out.MovXmmToMem("xmm0", "rdi", 0)        // store element (4 bytes)
+		fc.out.Emit([]byte{0x48, 0x83, 0xc6, 0x08}) // add rsi, 8 (4 bytes)
+		fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x08}) // add rdi, 8 (4 bytes)
+		fc.out.Emit([]byte{0x49, 0xff, 0xcf})       // dec r15 (3 bytes)
+		fc.out.Emit([]byte{0xeb, 0xe4})             // jmp back -28 bytes (2 bytes)
 
-	fc.out.MovMemToXmm("xmm0", "rsi", 0)        // load element (4 bytes)
-	fc.out.MovXmmToMem("xmm0", "rdi", 0)        // store element (4 bytes)
-	fc.out.Emit([]byte{0x48, 0x83, 0xc6, 0x08}) // add rsi, 8 (4 bytes)
-	fc.out.Emit([]byte{0x48, 0x83, 0xc7, 0x08}) // add rdi, 8 (4 bytes)
-	fc.out.Emit([]byte{0x49, 0xff, 0xcf})       // dec r15 (3 bytes)
-	fc.out.Emit([]byte{0xeb, 0xe4})             // jmp back -28 bytes (2 bytes)
+		// Return result pointer in rax
+		fc.out.MovRegToReg("rax", "r10")
 
-	// Return result pointer in rax
-	fc.out.MovRegToReg("rax", "r10")
+		// Restore stack alignment
+		fc.out.AddImmToReg("rsp", StackSlotSize)
 
-	// Restore stack alignment
-	fc.out.AddImmToReg("rsp", StackSlotSize)
+		// Restore callee-saved registers
+		fc.out.PopReg("r15")
+		fc.out.PopReg("r14")
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
 
-	// Restore callee-saved registers
-	fc.out.PopReg("r15")
-	fc.out.PopReg("r14")
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
+		// Function epilogue
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+	} // end if _c67_list_concat used
 
-	// Function epilogue
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
-
-	// Generate _c67_list_repeat(list_ptr, count) -> new_ptr
+	// Generate _c67_list_repeat only if list repeat operations are used
 	// Arguments: rdi = list_ptr, rdx = count (integer)
 	// Returns: rax = pointer to new repeated list (heap-allocated)
 	// Simple implementation: just call list_concat repeatedly
+	if fc.usedFunctions["_c67_list_repeat"] {
+		fc.eb.MarkLabel("_c67_list_repeat")
 
-	fc.eb.MarkLabel("_c67_list_repeat")
+		// Function prologue
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
 
-	// Function prologue
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
+		// Save arguments
+		fc.out.MovRegToReg("r12", "rdi") // r12 = original list_ptr
+		fc.out.MovRegToReg("r13", "rdx") // r13 = count
 
-	// Save arguments
-	fc.out.MovRegToReg("r12", "rdi") // r12 = original list_ptr
-	fc.out.MovRegToReg("r13", "rdx") // r13 = count
+		// If count <= 0, return empty list
+		fc.out.TestRegReg("r13", "r13")
+		emptyJumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpLessOrEqual, 0)
 
-	// If count <= 0, return empty list
-	fc.out.TestRegReg("r13", "r13")
-	emptyJumpPos := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpLessOrEqual, 0)
+		// If count == 1, return original list (already heap-allocated from literal)
+		// Actually no, we need to copy it to ensure it's mutable
+		// Start with result = original list
+		fc.out.MovRegToReg("rbx", "r12") // rbx = result (start with first copy)
 
-	// If count == 1, return original list (already heap-allocated from literal)
-	// Actually no, we need to copy it to ensure it's mutable
-	// Start with result = original list
-	fc.out.MovRegToReg("rbx", "r12") // rbx = result (start with first copy)
+		// Dec count since we already have one copy
+		fc.out.Emit([]byte{0x49, 0xff, 0xcd}) // dec r13
 
-	// Dec count since we already have one copy
-	fc.out.Emit([]byte{0x49, 0xff, 0xcd}) // dec r13
+		// Loop: concat result with original list (count-1) times
+		loopStart := fc.eb.text.Len()
+		fc.out.TestRegReg("r13", "r13")
+		loopEndJumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0)
 
-	// Loop: concat result with original list (count-1) times
-	loopStart := fc.eb.text.Len()
-	fc.out.TestRegReg("r13", "r13")
-	loopEndJumpPos := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0)
+		// Call _c67_list_concat(result, original)
+		fc.out.MovRegToReg("rdi", "rbx") // first arg = result so far
+		fc.out.MovRegToReg("rsi", "r12") // second arg = original list
+		fc.out.SubImmFromReg("rsp", StackSlotSize)
+		fc.out.CallSymbol("_c67_list_concat")
+		fc.out.AddImmToReg("rsp", StackSlotSize)
+		fc.out.MovRegToReg("rbx", "rax") // update result
 
-	// Call _c67_list_concat(result, original)
-	fc.out.MovRegToReg("rdi", "rbx") // first arg = result so far
-	fc.out.MovRegToReg("rsi", "r12") // second arg = original list
-	fc.out.SubImmFromReg("rsp", StackSlotSize)
-	fc.out.CallSymbol("_c67_list_concat")
-	fc.out.AddImmToReg("rsp", StackSlotSize)
-	fc.out.MovRegToReg("rbx", "rax") // update result
+		fc.out.Emit([]byte{0x49, 0xff, 0xcd}) // dec r13
+		backJumpPos := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0)
 
-	fc.out.Emit([]byte{0x49, 0xff, 0xcd}) // dec r13
-	backJumpPos := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0)
+		// Patch loop jump
+		repeatLoopEnd := fc.eb.text.Len()
+		offset1 := int32(repeatLoopEnd - (loopEndJumpPos + ConditionalJumpSize))
+		fc.patchJumpImmediate(loopEndJumpPos+2, offset1)
+		offset2 := int32(loopStart - (backJumpPos + UnconditionalJumpSize))
+		fc.patchJumpImmediate(backJumpPos+1, offset2)
 
-	// Patch loop jump
-	repeatLoopEnd := fc.eb.text.Len()
-	offset1 := int32(repeatLoopEnd - (loopEndJumpPos + ConditionalJumpSize))
-	fc.patchJumpImmediate(loopEndJumpPos+2, offset1)
-	offset2 := int32(loopStart - (backJumpPos + UnconditionalJumpSize))
-	fc.patchJumpImmediate(backJumpPos+1, offset2)
+		// Return result
+		fc.out.MovRegToReg("rax", "rbx")
+		doneJumpPos := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0)
 
-	// Return result
-	fc.out.MovRegToReg("rax", "rbx")
-	doneJumpPos := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0)
+		// Empty list case: return an empty list
+		emptyLabel := fc.eb.text.Len()
+		fc.out.XorRegWithReg("rax", "rax") // return NULL for now
 
-	// Empty list case: return an empty list
-	emptyLabel := fc.eb.text.Len()
-	fc.out.XorRegWithReg("rax", "rax") // return NULL for now
+		// Patch empty jump
+		offset3 := int32(emptyLabel - (emptyJumpPos + ConditionalJumpSize))
+		fc.patchJumpImmediate(emptyJumpPos+2, offset3)
 
-	// Patch empty jump
-	offset3 := int32(emptyLabel - (emptyJumpPos + ConditionalJumpSize))
-	fc.patchJumpImmediate(emptyJumpPos+2, offset3)
+		// Done
+		doneLabel := fc.eb.text.Len()
+		offset4 := int32(doneLabel - (doneJumpPos + UnconditionalJumpSize))
+		fc.patchJumpImmediate(doneJumpPos+1, offset4)
 
-	// Done
-	doneLabel := fc.eb.text.Len()
-	offset4 := int32(doneLabel - (doneJumpPos + UnconditionalJumpSize))
-	fc.patchJumpImmediate(doneJumpPos+1, offset4)
+		// Restore registers
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+	} // end if _c67_list_repeat used
 
-	// Restore registers
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
-
-	// Generate _c67_string_eq(left_ptr, right_ptr) -> 1.0 or 0.0
+	// Generate _c67_string_eq only if string equality checks are used
 	// Arguments: rdi = left_ptr, rsi = right_ptr
 	// Returns: xmm0 = 1.0 if equal, 0.0 if not
 	// String format: [count (8 bytes)][key0 (8)][val0 (8)][key1 (8)][val1 (8)]...
-
-	fc.eb.MarkLabel("_c67_string_eq")
-
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-
-	// rdi = left_ptr, rsi = right_ptr
-	// Check if both are null (empty strings)
-	fc.out.MovRegToReg("rax", "rdi")
-	fc.out.OrRegToReg("rax", "rsi")
-	fc.out.TestRegReg("rax", "rax")
-	eqNullJumpPos := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0) // If both null, they're equal
-
-	// Check if only one is null
-	fc.out.TestRegReg("rdi", "rdi")
-	neqJumpPos1 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0) // left is null but right isn't
-
-	fc.out.TestRegReg("rsi", "rsi")
-	neqJumpPos2 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0) // right is null but left isn't
-
-	// Both non-null, load counts
-	fc.out.MovMemToXmm("xmm0", "rdi", 0) // left count
-	fc.out.MovMemToXmm("xmm1", "rsi", 0) // right count
-
-	// Convert counts to integers for comparison
-	fc.out.Cvttsd2si("r12", "xmm0") // left count in r12
-	fc.out.Cvttsd2si("r13", "xmm1") // right count in r13
-
-	// Compare counts
-	fc.out.CmpRegToReg("r12", "r13")
-	neqJumpPos3 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpNotEqual, 0) // If counts differ, not equal
-
-	// Counts are equal, compare each character
-	// rbx = index counter
-	fc.out.XorRegWithReg("rbx", "rbx")
-
-	loopStart2 := fc.eb.text.Len()
-
-	// Check if we've compared all characters
-	fc.out.CmpRegToReg("rbx", "r12")
-	endLoopJumpPos := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreaterOrEqual, 0)
-
-	// Calculate offset: 8 + rbx * 16 (count is 8 bytes, each key-value pair is 16 bytes)
-	// Actually, format is [count][key0][val0][key1][val1]...
-	// So to get value at index i: offset = 8 + i*16 + 8 = 16 + i*16
-	fc.out.MovRegToReg("rax", "rbx")
-	fc.out.ShlRegImm("rax", "4")  // multiply by 16
-	fc.out.AddImmToReg("rax", 16) // skip count (8) and key (8)
-
-	// Load characters
-	fc.out.Comment("Load left[rbx] and right[rbx]")
-	fc.out.MovRegToReg("r8", "rdi")
-	fc.out.AddRegToReg("r8", "rax")
-	fc.out.MovMemToXmm("xmm2", "r8", 0)
-
-	fc.out.MovRegToReg("r9", "rsi")
-	fc.out.AddRegToReg("r9", "rax")
-	fc.out.MovMemToXmm("xmm3", "r9", 0)
-
-	// Compare characters
-	fc.out.Ucomisd("xmm2", "xmm3")
-	neqJumpPos4 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpNotEqual, 0)
-
-	// Increment index and continue
-	fc.out.AddImmToReg("rbx", 1)
-	loopJumpPos2 := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0) // jump back to loop start
-
-	// Patch loop jump
-	offset5 := int32(loopStart2 - (loopJumpPos2 + UnconditionalJumpSize))
-	fc.patchJumpImmediate(loopJumpPos2+1, offset5)
-
-	// All characters matched - return 1.0
-	endLoopLabel := fc.eb.text.Len()
-	eqNullLabel := fc.eb.text.Len() // Same position as endLoopLabel
-	fc.out.MovImmToReg("rax", "1")
-	fc.out.Cvtsi2sd("xmm0", "rax")
-	doneJumpPos2 := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0)
-
-	// Not equal - return 0.0
-	neqLabel := fc.eb.text.Len()
-	fc.out.XorRegWithReg("rax", "rax")
-	fc.out.Cvtsi2sd("xmm0", "rax")
-
-	// Done label
-	doneLabel2 := fc.eb.text.Len()
-
-	// Patch all jumps
-	// Patch eqNull jump to eqNullLabel
-	offset6 := int32(eqNullLabel - (eqNullJumpPos + ConditionalJumpSize))
-	fc.patchJumpImmediate(eqNullJumpPos+2, offset6)
-
-	// Patch neq jumps to neqLabel
-	offset7 := int32(neqLabel - (neqJumpPos1 + 6))
-	fc.patchJumpImmediate(neqJumpPos1+2, offset7)
-
-	offset8 := int32(neqLabel - (neqJumpPos2 + 6))
-	fc.patchJumpImmediate(neqJumpPos2+2, offset8)
-
-	offset9 := int32(neqLabel - (neqJumpPos3 + 6))
-	fc.patchJumpImmediate(neqJumpPos3+2, offset9)
-
-	offset10 := int32(neqLabel - (neqJumpPos4 + 6))
-	fc.patchJumpImmediate(neqJumpPos4+2, offset10)
-
-	// Patch endLoop jump to endLoopLabel
-	offset11 := int32(endLoopLabel - (endLoopJumpPos + ConditionalJumpSize))
-	fc.patchJumpImmediate(endLoopJumpPos+2, offset11)
-
-	// Patch done jump to doneLabel2
-	offset12 := int32(doneLabel2 - (doneJumpPos2 + UnconditionalJumpSize))
-	fc.patchJumpImmediate(doneJumpPos2+1, offset12)
-
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
-
-	// Generate upper_string(c67_string_ptr) -> uppercase_c67_string_ptr
-	// Converts a C67 string to uppercase
-	// Argument: rdi = C67 string pointer (as integer)
-	// Returns: xmm0 = uppercase C67 string pointer (as float64)
-	fc.eb.MarkLabel("upper_string")
-
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-	fc.out.PushReg("r14")
-	fc.out.PushReg("r15")
-
-	fc.out.MovRegToReg("r12", "rdi") // r12 = input string
-
-	// Get string length
-	fc.out.MovMemToXmm("xmm0", "r12", 0)
-	fc.out.Cvttsd2si("r14", "xmm0") // r14 = count
-
-	// Allocate new string map
-	fc.out.MovRegToReg("rax", "r14")
-	fc.out.ShlRegImm("rax", "4") // rax = count * 16
-	fc.out.AddImmToReg("rax", 8)
-	fc.out.MovRegToReg("rdi", "rax")
-	// Allocate from arena
-	fc.callArenaAlloc()
-	fc.out.MovRegToReg("r13", "rax") // r13 = output string
-
-	// Copy count
-	fc.out.MovRegToReg("rax", "r14")
-	fc.out.Cvtsi2sd("xmm0", "rax")
-	fc.out.MovXmmToMem("xmm0", "r13", 0)
-
-	// Loop through characters
-	fc.out.XorRegWithReg("rbx", "rbx") // rbx = loop counter
-	upperLoopStart := fc.eb.text.Len()
-	fc.out.CmpRegToReg("rbx", "r14")
-	upperLoopEnd := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreaterOrEqual, 0)
-
-	// Calculate offset: rax = 8 + rbx*16
-	fc.out.MovRegToReg("rax", "rbx")
-	fc.out.ShlRegImm("rax", "4") // rax = rbx * 16
-	fc.out.AddImmToReg("rax", 8) // rax = 8 + rbx * 16
-
-	// Calculate source address: r15 = r12 + rax
-	fc.out.MovRegToReg("r15", "r12")
-	fc.out.AddRegToReg("r15", "rax")
-
-	// Calculate dest address: r10 = r13 + rax
-	fc.out.MovRegToReg("r10", "r13")
-	fc.out.AddRegToReg("r10", "rax")
-
-	// Copy key (index)
-	fc.out.MovMemToXmm("xmm0", "r15", 0)
-	fc.out.MovXmmToMem("xmm0", "r10", 0)
-
-	// Load character value and convert
-	fc.out.MovMemToXmm("xmm0", "r15", 8)
-	fc.out.Cvttsd2si("rax", "xmm0") // Use rax for the character value
-
-	// Convert to uppercase: if (c >= 'a' && c <= 'z') c -= 32
-	fc.out.CmpRegToImm("rax", int64('a'))
-	notLowerJump := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpLess, 0)
-	fc.out.CmpRegToImm("rax", int64('z'))
-	notLowerJump2 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreater, 0)
-	fc.out.SubImmFromReg("rax", 32)
-
-	// Store uppercase character
-	notLowerPos := fc.eb.text.Len()
-	fc.out.Cvtsi2sd("xmm0", "rax")
-	fc.out.MovXmmToMem("xmm0", "r10", 8)
-
-	fc.out.IncReg("rbx")
-	jumpBack := int32(upperLoopStart - (fc.eb.text.Len() + 5))
-	fc.out.JumpUnconditional(jumpBack)
-
-	upperDone := fc.eb.text.Len()
-	fc.patchJumpImmediate(upperLoopEnd+2, int32(upperDone-(upperLoopEnd+6)))
-	fc.patchJumpImmediate(notLowerJump+2, int32(notLowerPos-(notLowerJump+6)))
-	fc.patchJumpImmediate(notLowerJump2+2, int32(notLowerPos-(notLowerJump2+6)))
-
-	fc.out.MovRegToXmm("xmm0", "r13")
-	fc.out.PopReg("r15")
-	fc.out.PopReg("r14")
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
-
-	// Generate lower_string(c67_string_ptr) -> lowercase_c67_string_ptr
-	// Converts a C67 string to lowercase
-	// Argument: rdi = C67 string pointer (as integer)
-	// Returns: xmm0 = lowercase C67 string pointer (as float64)
-	fc.eb.MarkLabel("lower_string")
-
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-	fc.out.PushReg("r14")
-	fc.out.PushReg("r15")
-
-	fc.out.MovRegToReg("r12", "rdi") // r12 = input string
-
-	// Get string length
-	fc.out.MovMemToXmm("xmm0", "r12", 0)
-	fc.out.Cvttsd2si("r14", "xmm0") // r14 = count
-
-	// Allocate new string map
-	fc.out.MovRegToReg("rax", "r14")
-	fc.out.ShlRegImm("rax", "4") // rax = count * 16
-	fc.out.AddImmToReg("rax", 8)
-	fc.out.MovRegToReg("rdi", "rax")
-	// Allocate from arena
-	fc.callArenaAlloc()
-	fc.out.MovRegToReg("r13", "rax") // r13 = output string
-
-	// Copy count
-	fc.out.MovRegToReg("rax", "r14")
-	fc.out.Cvtsi2sd("xmm0", "rax")
-	fc.out.MovXmmToMem("xmm0", "r13", 0)
-
-	// Loop through characters
-	fc.out.XorRegWithReg("rbx", "rbx") // rbx = loop counter
-	lowerLoopStart := fc.eb.text.Len()
-	fc.out.CmpRegToReg("rbx", "r14")
-	lowerLoopEnd := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreaterOrEqual, 0)
-
-	// Calculate offset: rax = 8 + rbx*16
-	fc.out.MovRegToReg("rax", "rbx")
-	fc.out.ShlRegImm("rax", "4") // rax = rbx * 16
-	fc.out.AddImmToReg("rax", 8) // rax = 8 + rbx * 16
-
-	// Calculate source address: r15 = r12 + rax
-	fc.out.MovRegToReg("r15", "r12")
-	fc.out.AddRegToReg("r15", "rax")
-
-	// Calculate dest address: r10 = r13 + rax
-	fc.out.MovRegToReg("r10", "r13")
-	fc.out.AddRegToReg("r10", "rax")
-
-	// Copy key (index)
-	fc.out.MovMemToXmm("xmm0", "r15", 0)
-	fc.out.MovXmmToMem("xmm0", "r10", 0)
-
-	// Load character value and convert
-	fc.out.MovMemToXmm("xmm0", "r15", 8)
-	fc.out.Cvttsd2si("rax", "xmm0") // Use rax for the character value
-
-	// Convert to lowercase: if (c >= 'A' && c <= 'Z') c += 32
-	fc.out.CmpRegToImm("rax", int64('A'))
-	notUpperJump := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpLess, 0)
-	fc.out.CmpRegToImm("rax", int64('Z'))
-	notUpperJump2 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreater, 0)
-	fc.out.AddImmToReg("rax", 32)
-
-	// Store lowercase character
-	notUpperPos := fc.eb.text.Len()
-	fc.out.Cvtsi2sd("xmm0", "rax")
-	fc.out.MovXmmToMem("xmm0", "r10", 8)
-
-	fc.out.IncReg("rbx")
-	jumpBack = int32(lowerLoopStart - (fc.eb.text.Len() + 5))
-	fc.out.JumpUnconditional(jumpBack)
-
-	lowerDone := fc.eb.text.Len()
-	fc.patchJumpImmediate(lowerLoopEnd+2, int32(lowerDone-(lowerLoopEnd+6)))
-	fc.patchJumpImmediate(notUpperJump+2, int32(notUpperPos-(notUpperJump+6)))
-	fc.patchJumpImmediate(notUpperJump2+2, int32(notUpperPos-(notUpperJump2+6)))
-
-	fc.out.MovRegToXmm("xmm0", "r13")
-	fc.out.PopReg("r15")
-	fc.out.PopReg("r14")
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
-
-	// Generate trim_string(c67_string_ptr) -> trimmed_c67_string_ptr
-	// Removes leading and trailing whitespace
-	// Argument: rdi = C67 string pointer (as integer)
-	// Returns: xmm0 = trimmed C67 string pointer (as float64)
-	fc.eb.MarkLabel("trim_string")
-
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-	fc.out.PushReg("r14")
-	fc.out.PushReg("r15")
-
-	fc.out.MovRegToReg("r12", "rdi") // r12 = input string
-
-	// Get string length
-	fc.out.MovMemToXmm("xmm0", "r12", 0)
-	fc.out.Cvttsd2si("r14", "xmm0") // r14 = original count
-
-	// Find start (skip leading whitespace)
-	fc.out.XorRegWithReg("rbx", "rbx") // rbx = start index
-	trimStartLoop := fc.eb.text.Len()
-	fc.out.Emit([]byte{0x4c, 0x39, 0xf3}) // cmp rbx, r14
-	trimStartDone := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreaterOrEqual, 0)
-
-	// Load character at rbx
-	fc.out.MovRegToReg("rax", "rbx")
-	fc.out.ShlRegImm("rax", "4") // rax = rbx * 16
-	fc.out.AddImmToReg("rax", 8) // rax = 8 + rbx * 16
-	fc.out.MovRegToReg("r8", "r12")
-	fc.out.AddRegToReg("r8", "rax")     // r8 = r12 + offset
-	fc.out.MovMemToXmm("xmm0", "r8", 8) // Load value
-	fc.out.Cvttsd2si("r10", "xmm0")
-
-	// Check if whitespace (space=32, tab=9, newline=10, cr=13)
-	fc.out.CmpRegToImm("r10", 32)
-	notWhitespace1 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpNotEqual, 0)
-	fc.out.IncReg("rbx")
-	jumpStartLoop := int32(trimStartLoop - (fc.eb.text.Len() + 2))
-	fc.out.Emit([]byte{0xeb, byte(jumpStartLoop)})
-
-	notWS1Pos := fc.eb.text.Len()
-	fc.out.CmpRegToImm("r10", 9)
-	notWhitespace2 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpNotEqual, 0)
-	fc.out.IncReg("rbx")
-	jumpStartLoop2 := int32(trimStartLoop - (fc.eb.text.Len() + 2))
-	fc.out.Emit([]byte{0xeb, byte(jumpStartLoop2)})
-
-	notWS2Pos := fc.eb.text.Len()
-	fc.out.CmpRegToImm("r10", 10)
-	notWhitespace3 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpNotEqual, 0)
-	fc.out.IncReg("rbx")
-	jumpStartLoop3 := int32(trimStartLoop - (fc.eb.text.Len() + 2))
-	fc.out.Emit([]byte{0xeb, byte(jumpStartLoop3)})
-
-	notWS3Pos := fc.eb.text.Len()
-	fc.out.CmpRegToImm("r10", 13)
-	trimStartFound := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpNotEqual, 0)
-	fc.out.IncReg("rbx")
-	jumpStartLoop4 := int32(trimStartLoop - (fc.eb.text.Len() + 2))
-	fc.out.Emit([]byte{0xeb, byte(jumpStartLoop4)})
-
-	// Start found - rbx = start index
-	trimFoundStart := fc.eb.text.Len()
-	fc.patchJumpImmediate(trimStartDone+2, int32(trimFoundStart-(trimStartDone+6)))
-	fc.patchJumpImmediate(notWhitespace1+2, int32(notWS1Pos-(notWhitespace1+6)))
-	fc.patchJumpImmediate(notWhitespace2+2, int32(notWS2Pos-(notWhitespace2+6)))
-	fc.patchJumpImmediate(notWhitespace3+2, int32(notWS3Pos-(notWhitespace3+6)))
-	fc.patchJumpImmediate(trimStartFound+2, int32(trimFoundStart-(trimStartFound+6)))
-
-	// Find end (skip trailing whitespace) - work backwards from r14-1
-	fc.out.MovRegToReg("r15", "r14") // r15 = end index (exclusive)
-	// Handle empty or all-whitespace case
-	fc.out.Emit([]byte{0x4c, 0x39, 0xfb}) // cmp rbx, r15
-	emptyResult := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreaterOrEqual, 0)
-
-	trimEndLoop := fc.eb.text.Len()
-	fc.out.Emit([]byte{0x49, 0x83, 0xff, 0x00}) // cmp r15, 0
-	trimEndDone := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpLessOrEqual, 0)
-	fc.out.Emit([]byte{0x49, 0x83, 0xef, 0x01}) // dec r15
-
-	// Load character at r15
-	fc.out.MovRegToReg("rax", "r15")
-	fc.out.ShlRegImm("rax", "4") // rax = r15 * 16
-	fc.out.AddImmToReg("rax", 8) // rax = 8 + r15 * 16
-	fc.out.MovRegToReg("r8", "r12")
-	fc.out.AddRegToReg("r8", "rax")     // r8 = r12 + offset
-	fc.out.MovMemToXmm("xmm0", "r8", 8) // Load value
-	fc.out.Cvttsd2si("r10", "xmm0")
-
-	// Check if whitespace
-	fc.out.CmpRegToImm("r10", 32)
-	trimWSJump1 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0)
-	fc.out.CmpRegToImm("r10", 9)
-	trimWSJump2 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0)
-	fc.out.CmpRegToImm("r10", 10)
-	trimWSJump3 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0)
-	fc.out.CmpRegToImm("r10", 13)
-	trimWSJump4 := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpEqual, 0)
-
-	// Not whitespace - found end
-	fc.out.IncReg("r15") // Make exclusive
-	trimFoundEnd := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0)
-
-	// Was whitespace - continue loop
-	trimWSTarget := fc.eb.text.Len()
-	jumpEndLoop := int32(trimEndLoop - (fc.eb.text.Len() + 2))
-	fc.out.Emit([]byte{0xeb, byte(jumpEndLoop)})
-
-	// Patch jumps
-	trimRealEnd := fc.eb.text.Len()
-	fc.patchJumpImmediate(trimEndDone+2, int32(trimRealEnd-(trimEndDone+6)))
-	fc.patchJumpImmediate(trimWSJump1+2, int32(trimWSTarget-(trimWSJump1+6)))
-	fc.patchJumpImmediate(trimWSJump2+2, int32(trimWSTarget-(trimWSJump2+6)))
-	fc.patchJumpImmediate(trimWSJump3+2, int32(trimWSTarget-(trimWSJump3+6)))
-	fc.patchJumpImmediate(trimWSJump4+2, int32(trimWSTarget-(trimWSJump4+6)))
-	fc.patchJumpImmediate(trimFoundEnd+1, int32(trimRealEnd-(trimFoundEnd+5)))
-
-	// Now rbx = start, r15 = end (exclusive), create substring
-	// new_len = r15 - rbx
-	fc.out.MovRegToReg("r14", "r15")
-	fc.out.SubRegFromReg("r14", "rbx")
-
-	// Allocate new string
-	fc.out.MovRegToReg("rdi", "r14")
-	fc.out.ShlRegImm("rdi", "4") // rdi = r14 * 16
-	fc.out.AddImmToReg("rdi", 8) // rdi = r14 * 16 + 8
-	// Allocate from arena
-	fc.callArenaAlloc()
-	fc.out.MovRegToReg("r13", "rax")
-
-	// Copy count
-	fc.out.MovRegToReg("rax", "r14")
-	fc.out.Cvtsi2sd("xmm0", "rax")
-	fc.out.MovXmmToMem("xmm0", "r13", 0)
-
-	// Copy characters from rbx to r15
-	fc.out.XorRegWithReg("rcx", "rcx") // rcx = output index
-	trimCopyLoop := fc.eb.text.Len()
-	fc.out.Emit([]byte{0x4c, 0x39, 0xf1}) // cmp rcx, r14
-	trimCopyDone := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreaterOrEqual, 0)
-
-	// Calculate source offset (rbx + rcx)
-	fc.out.MovRegToReg("rax", "rbx")
-	fc.out.AddRegToReg("rax", "rcx") // rax = rbx + rcx (source index)
-	fc.out.ShlRegImm("rax", "4")     // rax = (rbx + rcx) * 16
-	fc.out.AddImmToReg("rax", 8)     // rax = (rbx + rcx) * 16 + 8
-
-	// Calculate dest offset (rcx)
-	fc.out.MovRegToReg("rdx", "rcx")
-	fc.out.ShlRegImm("rdx", "4") // rdx = rcx * 16
-	fc.out.AddImmToReg("rdx", 8) // rdx = rcx * 16 + 8
-
-	// Calculate source and dest addresses
-	fc.out.MovRegToReg("r8", "r12")
-	fc.out.AddRegToReg("r8", "rax") // r8 = source base + offset
-	fc.out.MovRegToReg("r9", "r13")
-	fc.out.AddRegToReg("r9", "rdx") // r9 = dest base + offset
-
-	// Copy key
-	fc.out.Cvtsi2sd("xmm0", "rcx")
-	fc.out.MovXmmToMem("xmm0", "r9", 0)
-
-	// Copy value
-	fc.out.MovMemToXmm("xmm0", "r8", 8)
-	fc.out.MovXmmToMem("xmm0", "r9", 8)
-
-	fc.out.IncReg("rcx")
-	jumpCopyLoop := int32(trimCopyLoop - (fc.eb.text.Len() + 2))
-	fc.out.Emit([]byte{0xeb, byte(jumpCopyLoop)})
-
-	// Handle empty result case
-	emptyPos := fc.eb.text.Len()
-	fc.patchJumpImmediate(emptyResult+2, int32(emptyPos-(emptyResult+6)))
-
-	// Allocate empty string
-	fc.out.MovImmToReg("rdi", "8")
-	// Allocate from arena
-	fc.callArenaAlloc()
-	fc.out.MovRegToReg("r13", "rax")
-	fc.out.XorRegWithReg("rax", "rax")
-	fc.out.Cvtsi2sd("xmm0", "rax")
-	fc.out.MovXmmToMem("xmm0", "r13", 0)
-
-	// Done
-	trimAllDone := fc.eb.text.Len()
-	fc.patchJumpImmediate(trimCopyDone+2, int32(trimAllDone-(trimCopyDone+6)))
-
-	fc.out.MovRegToXmm("xmm0", "r13")
-	fc.out.PopReg("r15")
-	fc.out.PopReg("r14")
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
-
-	// Generate _c67_arena_create(capacity) -> arena_ptr
-	// Creates a new arena with the specified capacity
-	// Argument: rdi = capacity (int64)
-	// Returns: rax = arena pointer
-	// Arena structure: [buffer_ptr (8)][capacity (8)][offset (8)][alignment (8)] = 32 bytes header
-	fc.eb.MarkLabel("_c67_arena_create")
-
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-
-	// Save capacity argument
-	fc.out.MovRegToReg("r12", "rdi") // r12 = capacity
-
-	// Allocate arena structure using mmap (4096 bytes = 1 page)
-	fc.out.PushReg("r12")             // Save capacity
-	fc.out.MovImmToReg("rdi", "0")    // addr = NULL
-	fc.out.MovImmToReg("rsi", "4096") // length = 4096
-	fc.out.MovImmToReg("rdx", "3")    // prot = PROT_READ | PROT_WRITE
-	fc.out.MovImmToReg("r10", "34")   // flags = MAP_PRIVATE | MAP_ANONYMOUS
-	fc.out.MovImmToReg("r8", "-1")    // fd = -1
-	fc.out.MovImmToReg("r9", "0")     // offset = 0
-	fc.out.MovImmToReg("rax", "9")    // syscall number for mmap
-	fc.out.Syscall()
-	fc.out.PopReg("r12") // Restore capacity
-
-	// Check if mmap failed (returns -1 or negative on error)
-	fc.out.CmpRegToImm("rax", 0)
-	structMallocFailedJump := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpLess, 0) // jl to error (negative result)
-
-	fc.out.MovRegToReg("rbx", "rax") // rbx = arena struct pointer
-
-	// Allocate arena buffer using mmap
-	fc.out.MovImmToReg("rdi", "0")   // addr = NULL
-	fc.out.MovRegToReg("rsi", "r12") // length = capacity
-	fc.out.MovImmToReg("rdx", "3")   // prot = PROT_READ | PROT_WRITE
-	fc.out.MovImmToReg("r10", "34")  // flags = MAP_PRIVATE | MAP_ANONYMOUS
-	fc.out.MovImmToReg("r8", "-1")   // fd = -1
-	fc.out.MovImmToReg("r9", "0")    // offset = 0
-	fc.out.MovImmToReg("rax", "9")   // syscall number for mmap
-	fc.out.Syscall()
-
-	// Check if mmap failed
-	fc.out.CmpRegToImm("rax", 0)
-	bufferMallocFailedJump := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpLess, 0) // jl to error
-
-	// Fill arena structure
-	fc.out.MovRegToMem("rax", "rbx", 0) // [rbx+0] = buffer_ptr
-	fc.out.MovRegToMem("r12", "rbx", 8) // [rbx+8] = capacity
-	fc.out.MovImmToMem(0, "rbx", 16)    // [rbx+16] = offset (0)
-	fc.out.MovImmToMem(8, "rbx", 24)    // [rbx+24] = alignment (8)
-
-	// Return arena pointer in rax
-	fc.out.MovRegToReg("rax", "rbx")
-
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
-
-	// Error path: malloc failed
-	createErrorLabel := fc.eb.text.Len()
-	fc.patchJumpImmediate(structMallocFailedJump+2, int32(createErrorLabel-(structMallocFailedJump+6)))
-	fc.patchJumpImmediate(bufferMallocFailedJump+2, int32(createErrorLabel-(bufferMallocFailedJump+6)))
-
-	// Print error message and exit
-	fc.out.LeaSymbolToReg("rdi", "_c67_str_arena_alloc_error")
-	fc.trackFunctionCall("printf")
-	fc.eb.GenerateCallInstruction("printf")
-	fc.out.MovImmToReg("rdi", "1")
-	fc.trackFunctionCall("exit")
-	fc.eb.GenerateCallInstruction("exit")
-
-	// Generate _c67_arena_alloc(arena_ptr, size) -> allocation_ptr
-	// Allocates memory from the arena using bump allocation with auto-growing
-	// If arena is full, reallocs buffer to 2x size
-	// Arguments: rdi = arena_ptr, rsi = size (int64)
-	// Returns: rax = allocated memory pointer
-	fc.eb.MarkLabel("_c67_arena_alloc")
-
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
-	fc.out.PushReg("rbx")
-	fc.out.PushReg("r12")
-	fc.out.PushReg("r13")
-	fc.out.PushReg("r14") // Extra push for 16-byte stack alignment (5 total pushes = 40 bytes)
-
-	fc.out.MovRegToReg("rbx", "rdi") // rbx = arena_ptr (preserve across calls)
-	fc.out.MovRegToReg("r12", "rsi") // r12 = size (preserve across calls)
-
-	// Check if arena pointer is NULL
-	fc.out.TestRegReg("rbx", "rbx")
-	arenaNotNullJump := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpNotEqual, 0) // jne arena_not_null
-
-	// Arena is NULL - print error and return NULL
-	fc.out.LeaSymbolToReg("rdi", "_arena_null_error")
-	fc.trackFunctionCall("printf")
-	fc.eb.GenerateCallInstruction("printf")
-	fc.out.XorRegWithReg("rax", "rax") // return NULL
-	fc.out.PopReg("r14")
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
-
-	// arena_not_null:
-	arenaNotNullLabel := fc.eb.text.Len()
-	fc.patchJumpImmediate(arenaNotNullJump+2, int32(arenaNotNullLabel-(arenaNotNullJump+6)))
-
-	// DEBUG: Print arena pointer value
-	if false { // Disabled for now - causes stack alignment issues
-		fc.out.MovRegToReg("rsi", "rbx") // arena ptr in rsi for printf
-		fc.out.LeaSymbolToReg("rdi", "_str_debug_arena_value")
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
-		// rbx is callee-saved, so it's preserved across the call
-	}
-
-	// Load arena fields
-	fc.out.MovMemToReg("r8", "rbx", 0)   // r8 = buffer_ptr
-	fc.out.MovMemToReg("r9", "rbx", 8)   // r9 = capacity
-	fc.out.MovMemToReg("r10", "rbx", 16) // r10 = current offset
-	fc.out.MovMemToReg("r11", "rbx", 24) // r11 = alignment
-
-	// Align offset: aligned_offset = (offset + alignment - 1) & ~(alignment - 1)
-	fc.out.MovRegToReg("rax", "r10")      // rax = offset
-	fc.out.AddRegToReg("rax", "r11")      // rax = offset + alignment
-	fc.out.SubImmFromReg("rax", 1)        // rax = offset + alignment - 1
-	fc.out.MovRegToReg("rcx", "r11")      // rcx = alignment
-	fc.out.SubImmFromReg("rcx", 1)        // rcx = alignment - 1
-	fc.out.Emit([]byte{0x48, 0xf7, 0xd1}) // not rcx
-	fc.out.Emit([]byte{0x48, 0x21, 0xc8}) // and rax, rcx (aligned_offset in rax)
-	fc.out.MovRegToReg("r13", "rax")      // r13 = aligned_offset
-
-	// Check if we have enough space: if (aligned_offset + size > capacity) grow
-	fc.out.MovRegToReg("rdx", "r13") // rdx = aligned_offset
-	fc.out.AddRegToReg("rdx", "r12") // rdx = aligned_offset + size
-	fc.out.CmpRegToReg("rdx", "r9")  // compare with capacity
-	arenaGrowJump := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreater, 0) // jg to grow path
-
-	// Fast path: enough space, no need to grow
-	fc.eb.MarkLabel("_arena_alloc_fast")
-	fc.out.MovRegToReg("rax", "r8")  // rax = buffer_ptr
-	fc.out.AddRegToReg("rax", "r13") // rax = buffer_ptr + aligned_offset
-
-	// Update arena offset
-	fc.out.MovRegToReg("rdx", "r13")     // rdx = aligned_offset
-	fc.out.AddRegToReg("rdx", "r12")     // rdx = aligned_offset + size
-	fc.out.MovRegToMem("rdx", "rbx", 16) // [arena_ptr+16] = new offset
-
-	arenaDoneJump := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0) // jmp to done
-
-	// Grow path: realloc buffer with 1.3x growth
-	arenaGrowLabel := fc.eb.text.Len()
-	fc.patchJumpImmediate(arenaGrowJump+2, int32(arenaGrowLabel-(arenaGrowJump+6)))
-	fc.eb.MarkLabel("_arena_alloc_grow")
-
-	// Calculate new capacity: max(capacity * 1.3, aligned_offset + size)
-	// capacity * 1.3 = (capacity * 13) / 10
-	fc.out.MovRegToReg("rdi", "r9")             // rdi = capacity
-	fc.out.MovImmToReg("rax", "13")             // rax = 13
-	fc.out.Emit([]byte{0x48, 0x0f, 0xaf, 0xf8}) // imul rdi, rax (rdi *= 13)
-	fc.out.MovImmToReg("rax", "10")             // rax = 10
-	fc.out.XorRegWithReg("rdx", "rdx")          // rdx = 0 (for div)
-	fc.out.MovRegToReg("rcx", "rdi")            // rcx = capacity * 13 (save)
-	fc.out.MovRegToReg("rax", "rcx")            // rax = capacity * 13
-	fc.out.MovImmToReg("rcx", "10")             // rcx = 10
-	fc.out.Emit([]byte{0x48, 0xf7, 0xf1})       // div rcx (rax = capacity * 13 / 10)
-	fc.out.MovRegToReg("rdi", "rax")            // rdi = capacity * 1.3
-
-	// Check if we need even more space
-	fc.out.MovRegToReg("rsi", "r13") // rsi = aligned_offset
-	fc.out.AddRegToReg("rsi", "r12") // rsi = aligned_offset + size
-	fc.out.CmpRegToReg("rdi", "rsi") // compare 1.3*capacity with needed
-	skipMaxJump := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreaterOrEqual, 0) // jge skip_max
-	fc.out.MovRegToReg("rdi", "rsi")              // rdi = max(1.3*capacity, needed)
-	skipMaxLabel := fc.eb.text.Len()
-	fc.patchJumpImmediate(skipMaxJump+2, int32(skipMaxLabel-(skipMaxJump+6)))
-
-	// rdi now contains new_capacity
-	fc.out.MovRegToReg("r9", "rdi") // r9 = new_capacity (update)
-
-	// Check if new capacity exceeds max (1GB)
-	fc.out.MovImmToReg("rax", "1073741824") // 1GB max
-	fc.out.CmpRegToReg("r9", "rax")
-	arenaMaxExceeded := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreater, 0) // jg to error if > 1GB
-
-	// Grow the arena buffer
-	var arenaErrorJump int
-	if fc.eb.target.OS() == OSLinux {
-		// Use mremap syscall on Linux
-		// syscall 25: mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...)
-		// MREMAP_MAYMOVE = 1
-		fc.out.MovRegToReg("rdi", "r8")     // rdi = old buffer_ptr
-		fc.out.MovMemToReg("rsi", "rbx", 8) // rsi = old capacity from arena
-		fc.out.MovRegToReg("rdx", "r9")     // rdx = new_capacity
-		fc.out.MovImmToReg("r10", "1")      // r10 = MREMAP_MAYMOVE
-		fc.out.MovImmToReg("rax", "25")     // rax = syscall number for mremap
+	if fc.usedFunctions["_c67_string_eq"] {
+		fc.eb.MarkLabel("_c67_string_eq")
+
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+
+		// rdi = left_ptr, rsi = right_ptr
+		// Check if both are null (empty strings)
+		fc.out.MovRegToReg("rax", "rdi")
+		fc.out.OrRegToReg("rax", "rsi")
+		fc.out.TestRegReg("rax", "rax")
+		eqNullJumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0) // If both null, they're equal
+
+		// Check if only one is null
+		fc.out.TestRegReg("rdi", "rdi")
+		neqJumpPos1 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0) // left is null but right isn't
+
+		fc.out.TestRegReg("rsi", "rsi")
+		neqJumpPos2 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0) // right is null but left isn't
+
+		// Both non-null, load counts
+		fc.out.MovMemToXmm("xmm0", "rdi", 0) // left count
+		fc.out.MovMemToXmm("xmm1", "rsi", 0) // right count
+
+		// Convert counts to integers for comparison
+		fc.out.Cvttsd2si("r12", "xmm0") // left count in r12
+		fc.out.Cvttsd2si("r13", "xmm1") // right count in r13
+
+		// Compare counts
+		fc.out.CmpRegToReg("r12", "r13")
+		neqJumpPos3 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpNotEqual, 0) // If counts differ, not equal
+
+		// Counts are equal, compare each character
+		// rbx = index counter
+		fc.out.XorRegWithReg("rbx", "rbx")
+
+		loopStart2 := fc.eb.text.Len()
+
+		// Check if we've compared all characters
+		fc.out.CmpRegToReg("rbx", "r12")
+		endLoopJumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreaterOrEqual, 0)
+
+		// Calculate offset: 8 + rbx * 16 (count is 8 bytes, each key-value pair is 16 bytes)
+		// Actually, format is [count][key0][val0][key1][val1]...
+		// So to get value at index i: offset = 8 + i*16 + 8 = 16 + i*16
+		fc.out.MovRegToReg("rax", "rbx")
+		fc.out.ShlRegImm("rax", "4")  // multiply by 16
+		fc.out.AddImmToReg("rax", 16) // skip count (8) and key (8)
+
+		// Load characters
+		fc.out.Comment("Load left[rbx] and right[rbx]")
+		fc.out.MovRegToReg("r8", "rdi")
+		fc.out.AddRegToReg("r8", "rax")
+		fc.out.MovMemToXmm("xmm2", "r8", 0)
+
+		fc.out.MovRegToReg("r9", "rsi")
+		fc.out.AddRegToReg("r9", "rax")
+		fc.out.MovMemToXmm("xmm3", "r9", 0)
+
+		// Compare characters
+		fc.out.Ucomisd("xmm2", "xmm3")
+		neqJumpPos4 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpNotEqual, 0)
+
+		// Increment index and continue
+		fc.out.AddImmToReg("rbx", 1)
+		loopJumpPos2 := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0) // jump back to loop start
+
+		// Patch loop jump
+		offset5 := int32(loopStart2 - (loopJumpPos2 + UnconditionalJumpSize))
+		fc.patchJumpImmediate(loopJumpPos2+1, offset5)
+
+		// All characters matched - return 1.0
+		endLoopLabel := fc.eb.text.Len()
+		eqNullLabel := fc.eb.text.Len() // Same position as endLoopLabel
+		fc.out.MovImmToReg("rax", "1")
+		fc.out.Cvtsi2sd("xmm0", "rax")
+		doneJumpPos2 := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0)
+
+		// Not equal - return 0.0
+		neqLabel := fc.eb.text.Len()
+		fc.out.XorRegWithReg("rax", "rax")
+		fc.out.Cvtsi2sd("xmm0", "rax")
+
+		// Done label
+		doneLabel2 := fc.eb.text.Len()
+
+		// Patch all jumps
+		// Patch eqNull jump to eqNullLabel
+		offset6 := int32(eqNullLabel - (eqNullJumpPos + ConditionalJumpSize))
+		fc.patchJumpImmediate(eqNullJumpPos+2, offset6)
+
+		// Patch neq jumps to neqLabel
+		offset7 := int32(neqLabel - (neqJumpPos1 + 6))
+		fc.patchJumpImmediate(neqJumpPos1+2, offset7)
+
+		offset8 := int32(neqLabel - (neqJumpPos2 + 6))
+		fc.patchJumpImmediate(neqJumpPos2+2, offset8)
+
+		offset9 := int32(neqLabel - (neqJumpPos3 + 6))
+		fc.patchJumpImmediate(neqJumpPos3+2, offset9)
+
+		offset10 := int32(neqLabel - (neqJumpPos4 + 6))
+		fc.patchJumpImmediate(neqJumpPos4+2, offset10)
+
+		// Patch endLoop jump to endLoopLabel
+		offset11 := int32(endLoopLabel - (endLoopJumpPos + ConditionalJumpSize))
+		fc.patchJumpImmediate(endLoopJumpPos+2, offset11)
+
+		// Patch done jump to doneLabel2
+		offset12 := int32(doneLabel2 - (doneJumpPos2 + UnconditionalJumpSize))
+		fc.patchJumpImmediate(doneJumpPos2+1, offset12)
+
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+
+		// Generate upper_string(c67_string_ptr) -> uppercase_c67_string_ptr
+		// Converts a C67 string to uppercase
+		// Argument: rdi = C67 string pointer (as integer)
+		// Returns: xmm0 = uppercase C67 string pointer (as float64)
+		fc.eb.MarkLabel("upper_string")
+
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r14")
+		fc.out.PushReg("r15")
+
+		fc.out.MovRegToReg("r12", "rdi") // r12 = input string
+
+		// Get string length
+		fc.out.MovMemToXmm("xmm0", "r12", 0)
+		fc.out.Cvttsd2si("r14", "xmm0") // r14 = count
+
+		// Allocate new string map
+		fc.out.MovRegToReg("rax", "r14")
+		fc.out.ShlRegImm("rax", "4") // rax = count * 16
+		fc.out.AddImmToReg("rax", 8)
+		fc.out.MovRegToReg("rdi", "rax")
+		// Allocate from arena
+		fc.callArenaAlloc()
+		fc.out.MovRegToReg("r13", "rax") // r13 = output string
+
+		// Copy count
+		fc.out.MovRegToReg("rax", "r14")
+		fc.out.Cvtsi2sd("xmm0", "rax")
+		fc.out.MovXmmToMem("xmm0", "r13", 0)
+
+		// Loop through characters
+		fc.out.XorRegWithReg("rbx", "rbx") // rbx = loop counter
+		upperLoopStart := fc.eb.text.Len()
+		fc.out.CmpRegToReg("rbx", "r14")
+		upperLoopEnd := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreaterOrEqual, 0)
+
+		// Calculate offset: rax = 8 + rbx*16
+		fc.out.MovRegToReg("rax", "rbx")
+		fc.out.ShlRegImm("rax", "4") // rax = rbx * 16
+		fc.out.AddImmToReg("rax", 8) // rax = 8 + rbx * 16
+
+		// Calculate source address: r15 = r12 + rax
+		fc.out.MovRegToReg("r15", "r12")
+		fc.out.AddRegToReg("r15", "rax")
+
+		// Calculate dest address: r10 = r13 + rax
+		fc.out.MovRegToReg("r10", "r13")
+		fc.out.AddRegToReg("r10", "rax")
+
+		// Copy key (index)
+		fc.out.MovMemToXmm("xmm0", "r15", 0)
+		fc.out.MovXmmToMem("xmm0", "r10", 0)
+
+		// Load character value and convert
+		fc.out.MovMemToXmm("xmm0", "r15", 8)
+		fc.out.Cvttsd2si("rax", "xmm0") // Use rax for the character value
+
+		// Convert to uppercase: if (c >= 'a' && c <= 'z') c -= 32
+		fc.out.CmpRegToImm("rax", int64('a'))
+		notLowerJump := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpLess, 0)
+		fc.out.CmpRegToImm("rax", int64('z'))
+		notLowerJump2 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreater, 0)
+		fc.out.SubImmFromReg("rax", 32)
+
+		// Store uppercase character
+		notLowerPos := fc.eb.text.Len()
+		fc.out.Cvtsi2sd("xmm0", "rax")
+		fc.out.MovXmmToMem("xmm0", "r10", 8)
+
+		fc.out.IncReg("rbx")
+		jumpBack := int32(upperLoopStart - (fc.eb.text.Len() + 5))
+		fc.out.JumpUnconditional(jumpBack)
+
+		upperDone := fc.eb.text.Len()
+		fc.patchJumpImmediate(upperLoopEnd+2, int32(upperDone-(upperLoopEnd+6)))
+		fc.patchJumpImmediate(notLowerJump+2, int32(notLowerPos-(notLowerJump+6)))
+		fc.patchJumpImmediate(notLowerJump2+2, int32(notLowerPos-(notLowerJump2+6)))
+
+		fc.out.MovRegToXmm("xmm0", "r13")
+		fc.out.PopReg("r15")
+		fc.out.PopReg("r14")
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+
+		// Generate lower_string(c67_string_ptr) -> lowercase_c67_string_ptr
+		// Converts a C67 string to lowercase
+		// Argument: rdi = C67 string pointer (as integer)
+		// Returns: xmm0 = lowercase C67 string pointer (as float64)
+		fc.eb.MarkLabel("lower_string")
+
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r14")
+		fc.out.PushReg("r15")
+
+		fc.out.MovRegToReg("r12", "rdi") // r12 = input string
+
+		// Get string length
+		fc.out.MovMemToXmm("xmm0", "r12", 0)
+		fc.out.Cvttsd2si("r14", "xmm0") // r14 = count
+
+		// Allocate new string map
+		fc.out.MovRegToReg("rax", "r14")
+		fc.out.ShlRegImm("rax", "4") // rax = count * 16
+		fc.out.AddImmToReg("rax", 8)
+		fc.out.MovRegToReg("rdi", "rax")
+		// Allocate from arena
+		fc.callArenaAlloc()
+		fc.out.MovRegToReg("r13", "rax") // r13 = output string
+
+		// Copy count
+		fc.out.MovRegToReg("rax", "r14")
+		fc.out.Cvtsi2sd("xmm0", "rax")
+		fc.out.MovXmmToMem("xmm0", "r13", 0)
+
+		// Loop through characters
+		fc.out.XorRegWithReg("rbx", "rbx") // rbx = loop counter
+		lowerLoopStart := fc.eb.text.Len()
+		fc.out.CmpRegToReg("rbx", "r14")
+		lowerLoopEnd := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreaterOrEqual, 0)
+
+		// Calculate offset: rax = 8 + rbx*16
+		fc.out.MovRegToReg("rax", "rbx")
+		fc.out.ShlRegImm("rax", "4") // rax = rbx * 16
+		fc.out.AddImmToReg("rax", 8) // rax = 8 + rbx * 16
+
+		// Calculate source address: r15 = r12 + rax
+		fc.out.MovRegToReg("r15", "r12")
+		fc.out.AddRegToReg("r15", "rax")
+
+		// Calculate dest address: r10 = r13 + rax
+		fc.out.MovRegToReg("r10", "r13")
+		fc.out.AddRegToReg("r10", "rax")
+
+		// Copy key (index)
+		fc.out.MovMemToXmm("xmm0", "r15", 0)
+		fc.out.MovXmmToMem("xmm0", "r10", 0)
+
+		// Load character value and convert
+		fc.out.MovMemToXmm("xmm0", "r15", 8)
+		fc.out.Cvttsd2si("rax", "xmm0") // Use rax for the character value
+
+		// Convert to lowercase: if (c >= 'A' && c <= 'Z') c += 32
+		fc.out.CmpRegToImm("rax", int64('A'))
+		notUpperJump := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpLess, 0)
+		fc.out.CmpRegToImm("rax", int64('Z'))
+		notUpperJump2 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreater, 0)
+		fc.out.AddImmToReg("rax", 32)
+
+		// Store lowercase character
+		notUpperPos := fc.eb.text.Len()
+		fc.out.Cvtsi2sd("xmm0", "rax")
+		fc.out.MovXmmToMem("xmm0", "r10", 8)
+
+		fc.out.IncReg("rbx")
+		jumpBack = int32(lowerLoopStart - (fc.eb.text.Len() + 5))
+		fc.out.JumpUnconditional(jumpBack)
+
+		lowerDone := fc.eb.text.Len()
+		fc.patchJumpImmediate(lowerLoopEnd+2, int32(lowerDone-(lowerLoopEnd+6)))
+		fc.patchJumpImmediate(notUpperJump+2, int32(notUpperPos-(notUpperJump+6)))
+		fc.patchJumpImmediate(notUpperJump2+2, int32(notUpperPos-(notUpperJump2+6)))
+
+		fc.out.MovRegToXmm("xmm0", "r13")
+		fc.out.PopReg("r15")
+		fc.out.PopReg("r14")
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+
+		// Generate trim_string(c67_string_ptr) -> trimmed_c67_string_ptr
+		// Removes leading and trailing whitespace
+		// Argument: rdi = C67 string pointer (as integer)
+		// Returns: xmm0 = trimmed C67 string pointer (as float64)
+		fc.eb.MarkLabel("trim_string")
+
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r14")
+		fc.out.PushReg("r15")
+
+		fc.out.MovRegToReg("r12", "rdi") // r12 = input string
+
+		// Get string length
+		fc.out.MovMemToXmm("xmm0", "r12", 0)
+		fc.out.Cvttsd2si("r14", "xmm0") // r14 = original count
+
+		// Find start (skip leading whitespace)
+		fc.out.XorRegWithReg("rbx", "rbx") // rbx = start index
+		trimStartLoop := fc.eb.text.Len()
+		fc.out.Emit([]byte{0x4c, 0x39, 0xf3}) // cmp rbx, r14
+		trimStartDone := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreaterOrEqual, 0)
+
+		// Load character at rbx
+		fc.out.MovRegToReg("rax", "rbx")
+		fc.out.ShlRegImm("rax", "4") // rax = rbx * 16
+		fc.out.AddImmToReg("rax", 8) // rax = 8 + rbx * 16
+		fc.out.MovRegToReg("r8", "r12")
+		fc.out.AddRegToReg("r8", "rax")     // r8 = r12 + offset
+		fc.out.MovMemToXmm("xmm0", "r8", 8) // Load value
+		fc.out.Cvttsd2si("r10", "xmm0")
+
+		// Check if whitespace (space=32, tab=9, newline=10, cr=13)
+		fc.out.CmpRegToImm("r10", 32)
+		notWhitespace1 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpNotEqual, 0)
+		fc.out.IncReg("rbx")
+		jumpStartLoop := int32(trimStartLoop - (fc.eb.text.Len() + 2))
+		fc.out.Emit([]byte{0xeb, byte(jumpStartLoop)})
+
+		notWS1Pos := fc.eb.text.Len()
+		fc.out.CmpRegToImm("r10", 9)
+		notWhitespace2 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpNotEqual, 0)
+		fc.out.IncReg("rbx")
+		jumpStartLoop2 := int32(trimStartLoop - (fc.eb.text.Len() + 2))
+		fc.out.Emit([]byte{0xeb, byte(jumpStartLoop2)})
+
+		notWS2Pos := fc.eb.text.Len()
+		fc.out.CmpRegToImm("r10", 10)
+		notWhitespace3 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpNotEqual, 0)
+		fc.out.IncReg("rbx")
+		jumpStartLoop3 := int32(trimStartLoop - (fc.eb.text.Len() + 2))
+		fc.out.Emit([]byte{0xeb, byte(jumpStartLoop3)})
+
+		notWS3Pos := fc.eb.text.Len()
+		fc.out.CmpRegToImm("r10", 13)
+		trimStartFound := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpNotEqual, 0)
+		fc.out.IncReg("rbx")
+		jumpStartLoop4 := int32(trimStartLoop - (fc.eb.text.Len() + 2))
+		fc.out.Emit([]byte{0xeb, byte(jumpStartLoop4)})
+
+		// Start found - rbx = start index
+		trimFoundStart := fc.eb.text.Len()
+		fc.patchJumpImmediate(trimStartDone+2, int32(trimFoundStart-(trimStartDone+6)))
+		fc.patchJumpImmediate(notWhitespace1+2, int32(notWS1Pos-(notWhitespace1+6)))
+		fc.patchJumpImmediate(notWhitespace2+2, int32(notWS2Pos-(notWhitespace2+6)))
+		fc.patchJumpImmediate(notWhitespace3+2, int32(notWS3Pos-(notWhitespace3+6)))
+		fc.patchJumpImmediate(trimStartFound+2, int32(trimFoundStart-(trimStartFound+6)))
+
+		// Find end (skip trailing whitespace) - work backwards from r14-1
+		fc.out.MovRegToReg("r15", "r14") // r15 = end index (exclusive)
+		// Handle empty or all-whitespace case
+		fc.out.Emit([]byte{0x4c, 0x39, 0xfb}) // cmp rbx, r15
+		emptyResult := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreaterOrEqual, 0)
+
+		trimEndLoop := fc.eb.text.Len()
+		fc.out.Emit([]byte{0x49, 0x83, 0xff, 0x00}) // cmp r15, 0
+		trimEndDone := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpLessOrEqual, 0)
+		fc.out.Emit([]byte{0x49, 0x83, 0xef, 0x01}) // dec r15
+
+		// Load character at r15
+		fc.out.MovRegToReg("rax", "r15")
+		fc.out.ShlRegImm("rax", "4") // rax = r15 * 16
+		fc.out.AddImmToReg("rax", 8) // rax = 8 + r15 * 16
+		fc.out.MovRegToReg("r8", "r12")
+		fc.out.AddRegToReg("r8", "rax")     // r8 = r12 + offset
+		fc.out.MovMemToXmm("xmm0", "r8", 8) // Load value
+		fc.out.Cvttsd2si("r10", "xmm0")
+
+		// Check if whitespace
+		fc.out.CmpRegToImm("r10", 32)
+		trimWSJump1 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0)
+		fc.out.CmpRegToImm("r10", 9)
+		trimWSJump2 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0)
+		fc.out.CmpRegToImm("r10", 10)
+		trimWSJump3 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0)
+		fc.out.CmpRegToImm("r10", 13)
+		trimWSJump4 := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpEqual, 0)
+
+		// Not whitespace - found end
+		fc.out.IncReg("r15") // Make exclusive
+		trimFoundEnd := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0)
+
+		// Was whitespace - continue loop
+		trimWSTarget := fc.eb.text.Len()
+		jumpEndLoop := int32(trimEndLoop - (fc.eb.text.Len() + 2))
+		fc.out.Emit([]byte{0xeb, byte(jumpEndLoop)})
+
+		// Patch jumps
+		trimRealEnd := fc.eb.text.Len()
+		fc.patchJumpImmediate(trimEndDone+2, int32(trimRealEnd-(trimEndDone+6)))
+		fc.patchJumpImmediate(trimWSJump1+2, int32(trimWSTarget-(trimWSJump1+6)))
+		fc.patchJumpImmediate(trimWSJump2+2, int32(trimWSTarget-(trimWSJump2+6)))
+		fc.patchJumpImmediate(trimWSJump3+2, int32(trimWSTarget-(trimWSJump3+6)))
+		fc.patchJumpImmediate(trimWSJump4+2, int32(trimWSTarget-(trimWSJump4+6)))
+		fc.patchJumpImmediate(trimFoundEnd+1, int32(trimRealEnd-(trimFoundEnd+5)))
+
+		// Now rbx = start, r15 = end (exclusive), create substring
+		// new_len = r15 - rbx
+		fc.out.MovRegToReg("r14", "r15")
+		fc.out.SubRegFromReg("r14", "rbx")
+
+		// Allocate new string
+		fc.out.MovRegToReg("rdi", "r14")
+		fc.out.ShlRegImm("rdi", "4") // rdi = r14 * 16
+		fc.out.AddImmToReg("rdi", 8) // rdi = r14 * 16 + 8
+		// Allocate from arena
+		fc.callArenaAlloc()
+		fc.out.MovRegToReg("r13", "rax")
+
+		// Copy count
+		fc.out.MovRegToReg("rax", "r14")
+		fc.out.Cvtsi2sd("xmm0", "rax")
+		fc.out.MovXmmToMem("xmm0", "r13", 0)
+
+		// Copy characters from rbx to r15
+		fc.out.XorRegWithReg("rcx", "rcx") // rcx = output index
+		trimCopyLoop := fc.eb.text.Len()
+		fc.out.Emit([]byte{0x4c, 0x39, 0xf1}) // cmp rcx, r14
+		trimCopyDone := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreaterOrEqual, 0)
+
+		// Calculate source offset (rbx + rcx)
+		fc.out.MovRegToReg("rax", "rbx")
+		fc.out.AddRegToReg("rax", "rcx") // rax = rbx + rcx (source index)
+		fc.out.ShlRegImm("rax", "4")     // rax = (rbx + rcx) * 16
+		fc.out.AddImmToReg("rax", 8)     // rax = (rbx + rcx) * 16 + 8
+
+		// Calculate dest offset (rcx)
+		fc.out.MovRegToReg("rdx", "rcx")
+		fc.out.ShlRegImm("rdx", "4") // rdx = rcx * 16
+		fc.out.AddImmToReg("rdx", 8) // rdx = rcx * 16 + 8
+
+		// Calculate source and dest addresses
+		fc.out.MovRegToReg("r8", "r12")
+		fc.out.AddRegToReg("r8", "rax") // r8 = source base + offset
+		fc.out.MovRegToReg("r9", "r13")
+		fc.out.AddRegToReg("r9", "rdx") // r9 = dest base + offset
+
+		// Copy key
+		fc.out.Cvtsi2sd("xmm0", "rcx")
+		fc.out.MovXmmToMem("xmm0", "r9", 0)
+
+		// Copy value
+		fc.out.MovMemToXmm("xmm0", "r8", 8)
+		fc.out.MovXmmToMem("xmm0", "r9", 8)
+
+		fc.out.IncReg("rcx")
+		jumpCopyLoop := int32(trimCopyLoop - (fc.eb.text.Len() + 2))
+		fc.out.Emit([]byte{0xeb, byte(jumpCopyLoop)})
+
+		// Handle empty result case
+		emptyPos := fc.eb.text.Len()
+		fc.patchJumpImmediate(emptyResult+2, int32(emptyPos-(emptyResult+6)))
+
+		// Allocate empty string
+		fc.out.MovImmToReg("rdi", "8")
+		// Allocate from arena
+		fc.callArenaAlloc()
+		fc.out.MovRegToReg("r13", "rax")
+		fc.out.XorRegWithReg("rax", "rax")
+		fc.out.Cvtsi2sd("xmm0", "rax")
+		fc.out.MovXmmToMem("xmm0", "r13", 0)
+
+		// Done
+		trimAllDone := fc.eb.text.Len()
+		fc.patchJumpImmediate(trimCopyDone+2, int32(trimAllDone-(trimCopyDone+6)))
+
+		fc.out.MovRegToXmm("xmm0", "r13")
+		fc.out.PopReg("r15")
+		fc.out.PopReg("r14")
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+	} // end if _c67_string_eq used
+
+	// Generate arena functions only if arenas are actually used
+	if fc.usesArenas {
+		// Generate _c67_arena_create(capacity) -> arena_ptr
+		// Creates a new arena with the specified capacity
+		// Argument: rdi = capacity (int64)
+		// Returns: rax = arena pointer
+		// Arena structure: [buffer_ptr (8)][capacity (8)][offset (8)][alignment (8)] = 32 bytes header
+		fc.eb.MarkLabel("_c67_arena_create")
+
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+
+		// Save capacity argument
+		fc.out.MovRegToReg("r12", "rdi") // r12 = capacity
+
+		// Allocate arena structure using mmap (4096 bytes = 1 page)
+		fc.out.PushReg("r12")             // Save capacity
+		fc.out.MovImmToReg("rdi", "0")    // addr = NULL
+		fc.out.MovImmToReg("rsi", "4096") // length = 4096
+		fc.out.MovImmToReg("rdx", "3")    // prot = PROT_READ | PROT_WRITE
+		fc.out.MovImmToReg("r10", "34")   // flags = MAP_PRIVATE | MAP_ANONYMOUS
+		fc.out.MovImmToReg("r8", "-1")    // fd = -1
+		fc.out.MovImmToReg("r9", "0")     // offset = 0
+		fc.out.MovImmToReg("rax", "9")    // syscall number for mmap
+		fc.out.Syscall()
+		fc.out.PopReg("r12") // Restore capacity
+
+		// Check if mmap failed (returns -1 or negative on error)
+		fc.out.CmpRegToImm("rax", 0)
+		structMallocFailedJump := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpLess, 0) // jl to error (negative result)
+
+		fc.out.MovRegToReg("rbx", "rax") // rbx = arena struct pointer
+
+		// Allocate arena buffer using mmap
+		fc.out.MovImmToReg("rdi", "0")   // addr = NULL
+		fc.out.MovRegToReg("rsi", "r12") // length = capacity
+		fc.out.MovImmToReg("rdx", "3")   // prot = PROT_READ | PROT_WRITE
+		fc.out.MovImmToReg("r10", "34")  // flags = MAP_PRIVATE | MAP_ANONYMOUS
+		fc.out.MovImmToReg("r8", "-1")   // fd = -1
+		fc.out.MovImmToReg("r9", "0")    // offset = 0
+		fc.out.MovImmToReg("rax", "9")   // syscall number for mmap
 		fc.out.Syscall()
 
-		// Check if mremap failed (returns MAP_FAILED = -1 or negative on error)
-		fc.out.CmpRegToImm("rax", -1)
-		arenaErrorJump = fc.eb.text.Len()
-		fc.out.JumpConditional(JumpEqual, 0) // je to error (mremap failed)
-	} else {
-		// Use realloc on Windows/macOS
-		fc.out.MovRegToReg("rdi", "r8") // rdi = old buffer_ptr
-		fc.out.MovRegToReg("rsi", "r9") // rsi = new_capacity
-		shadowSpace := fc.allocateShadowSpace()
-		fc.trackFunctionCall("realloc")
-		fc.eb.GenerateCallInstruction("realloc")
-		fc.deallocateShadowSpace(shadowSpace)
+		// Check if mmap failed
+		fc.out.CmpRegToImm("rax", 0)
+		bufferMallocFailedJump := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpLess, 0) // jl to error
 
-		// Check if realloc failed (returns NULL)
-		fc.out.TestRegReg("rax", "rax")
-		arenaErrorJump = fc.eb.text.Len()
-		fc.out.JumpConditional(JumpEqual, 0) // je to error (realloc failed)
-	}
+		// Fill arena structure
+		fc.out.MovRegToMem("rax", "rbx", 0) // [rbx+0] = buffer_ptr
+		fc.out.MovRegToMem("r12", "rbx", 8) // [rbx+8] = capacity
+		fc.out.MovImmToMem(0, "rbx", 16)    // [rbx+16] = offset (0)
+		fc.out.MovImmToMem(8, "rbx", 24)    // [rbx+24] = alignment (8)
 
-	// Realloc succeeded: update arena structure
-	fc.out.MovRegToMem("rax", "rbx", 0) // [arena_ptr+0] = new buffer_ptr
-	fc.out.MovRegToMem("r9", "rbx", 8)  // [arena_ptr+8] = new capacity
-	fc.out.MovRegToReg("r8", "rax")     // r8 = new buffer_ptr
+		// Return arena pointer in rax
+		fc.out.MovRegToReg("rax", "rbx")
 
-	// Now allocate from the grown arena
-	fc.out.MovRegToReg("rax", "r8")      // rax = buffer_ptr
-	fc.out.AddRegToReg("rax", "r13")     // rax = buffer_ptr + aligned_offset
-	fc.out.MovRegToReg("rdx", "r13")     // rdx = aligned_offset
-	fc.out.AddRegToReg("rdx", "r12")     // rdx = aligned_offset + size
-	fc.out.MovRegToMem("rdx", "rbx", 16) // [arena_ptr+16] = new offset
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
 
-	arenaDoneJump2 := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0) // jmp to done
+		// Error path: malloc failed
+		createErrorLabel := fc.eb.text.Len()
+		fc.patchJumpImmediate(structMallocFailedJump+2, int32(createErrorLabel-(structMallocFailedJump+6)))
+		fc.patchJumpImmediate(bufferMallocFailedJump+2, int32(createErrorLabel-(bufferMallocFailedJump+6)))
 
-	// Error path: realloc failed or max size exceeded
-	arenaErrorLabel := fc.eb.text.Len()
-	fc.patchJumpImmediate(arenaErrorJump+2, int32(arenaErrorLabel-(arenaErrorJump+6)))
-	fc.patchJumpImmediate(arenaMaxExceeded+2, int32(arenaErrorLabel-(arenaMaxExceeded+6)))
-	fc.eb.MarkLabel("_arena_alloc_error")
+		// Print error message and exit
+		fc.out.LeaSymbolToReg("rdi", "_c67_str_arena_alloc_error")
+		fc.trackFunctionCall("printf")
+		fc.eb.GenerateCallInstruction("printf")
+		fc.out.MovImmToReg("rdi", "1")
+		fc.trackFunctionCall("exit")
+		fc.eb.GenerateCallInstruction("exit")
 
-	// Print error message to stderr and exit(1)
-	// Write to stderr (fd=2): "Error: Arena allocation failed (out of memory)\n"
-	errorMsg := "Error: Arena allocation failed (out of memory or exceeded 1GB limit)\n"
-	errorLabel := fmt.Sprintf("_arena_error_msg_%d", fc.stringCounter)
-	fc.stringCounter++
-	fc.eb.Define(errorLabel, errorMsg)
+		// Generate _c67_arena_alloc(arena_ptr, size) -> allocation_ptr
+		// Allocates memory from the arena using bump allocation with auto-growing
+		// If arena is full, reallocs buffer to 2x size
+		// Arguments: rdi = arena_ptr, rsi = size (int64)
+		// Returns: rax = allocated memory pointer
+		fc.eb.MarkLabel("_c67_arena_alloc")
 
-	fc.out.MovImmToReg("rdi", "2") // stderr
-	fc.out.LeaSymbolToReg("rsi", errorLabel)
-	fc.out.MovImmToReg("rdx", fmt.Sprintf("%d", len(errorMsg)))
-	fc.out.MovImmToReg("rax", "1") // write syscall
-	fc.out.Syscall()
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
+		fc.out.PushReg("rbx")
+		fc.out.PushReg("r12")
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r14") // Extra push for 16-byte stack alignment (5 total pushes = 40 bytes)
 
-	fc.out.MovImmToReg("rdi", "1")  // exit code 1
-	fc.out.MovImmToReg("rax", "60") // exit syscall
-	fc.out.Syscall()
+		fc.out.MovRegToReg("rbx", "rdi") // rbx = arena_ptr (preserve across calls)
+		fc.out.MovRegToReg("r12", "rsi") // r12 = size (preserve across calls)
 
-	// Done label
-	arenaDoneLabel := fc.eb.text.Len()
-	fc.patchJumpImmediate(arenaDoneJump+1, int32(arenaDoneLabel-(arenaDoneJump+5)))
-	fc.patchJumpImmediate(arenaDoneJump2+1, int32(arenaDoneLabel-(arenaDoneJump2+5)))
-	fc.eb.MarkLabel("_arena_alloc_done")
+		// Check if arena pointer is NULL
+		fc.out.TestRegReg("rbx", "rbx")
+		arenaNotNullJump := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpNotEqual, 0) // jne arena_not_null
 
-	// rax already contains the allocated pointer - don't overwrite it!
+		// Arena is NULL - print error and return NULL
+		fc.out.LeaSymbolToReg("rdi", "_arena_null_error")
+		fc.trackFunctionCall("printf")
+		fc.eb.GenerateCallInstruction("printf")
+		fc.out.XorRegWithReg("rax", "rax") // return NULL
+		fc.out.PopReg("r14")
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
 
-	fc.out.PopReg("r14") // Pop extra register for stack alignment
-	fc.out.PopReg("r13")
-	fc.out.PopReg("r12")
-	fc.out.PopReg("rbx")
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
+		// arena_not_null:
+		arenaNotNullLabel := fc.eb.text.Len()
+		fc.patchJumpImmediate(arenaNotNullJump+2, int32(arenaNotNullLabel-(arenaNotNullJump+6)))
 
-	// Generate _c67_arena_destroy(arena_ptr)
-	// Frees all memory associated with the arena
-	// Argument: rdi = arena_ptr
-	fc.eb.MarkLabel("_c67_arena_destroy")
+		// DEBUG: Print arena pointer value
+		if false { // Disabled for now - causes stack alignment issues
+			fc.out.MovRegToReg("rsi", "rbx") // arena ptr in rsi for printf
+			fc.out.LeaSymbolToReg("rdi", "_str_debug_arena_value")
+			fc.trackFunctionCall("printf")
+			fc.eb.GenerateCallInstruction("printf")
+			// rbx is callee-saved, so it's preserved across the call
+		}
 
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
-	fc.out.PushReg("rbx")
+		// Load arena fields
+		fc.out.MovMemToReg("r8", "rbx", 0)   // r8 = buffer_ptr
+		fc.out.MovMemToReg("r9", "rbx", 8)   // r9 = capacity
+		fc.out.MovMemToReg("r10", "rbx", 16) // r10 = current offset
+		fc.out.MovMemToReg("r11", "rbx", 24) // r11 = alignment
 
-	fc.out.MovRegToReg("rbx", "rdi") // rbx = arena_ptr
+		// Align offset: aligned_offset = (offset + alignment - 1) & ~(alignment - 1)
+		fc.out.MovRegToReg("rax", "r10")      // rax = offset
+		fc.out.AddRegToReg("rax", "r11")      // rax = offset + alignment
+		fc.out.SubImmFromReg("rax", 1)        // rax = offset + alignment - 1
+		fc.out.MovRegToReg("rcx", "r11")      // rcx = alignment
+		fc.out.SubImmFromReg("rcx", 1)        // rcx = alignment - 1
+		fc.out.Emit([]byte{0x48, 0xf7, 0xd1}) // not rcx
+		fc.out.Emit([]byte{0x48, 0x21, 0xc8}) // and rax, rcx (aligned_offset in rax)
+		fc.out.MovRegToReg("r13", "rax")      // r13 = aligned_offset
 
-	// Munmap buffer: munmap(ptr, size) via syscall 11
-	fc.out.MovMemToReg("rdi", "rbx", 0) // rdi = buffer_ptr
-	fc.out.MovMemToReg("rsi", "rbx", 8) // rsi = capacity
-	fc.out.MovImmToReg("rax", "11")     // rax = syscall number for munmap
-	fc.out.Syscall()
+		// Check if we have enough space: if (aligned_offset + size > capacity) grow
+		fc.out.MovRegToReg("rdx", "r13") // rdx = aligned_offset
+		fc.out.AddRegToReg("rdx", "r12") // rdx = aligned_offset + size
+		fc.out.CmpRegToReg("rdx", "r9")  // compare with capacity
+		arenaGrowJump := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreater, 0) // jg to grow path
 
-	// Munmap arena structure: munmap(ptr, 32) via syscall 11
-	fc.out.MovRegToReg("rdi", "rbx")  // rdi = arena_ptr
-	fc.out.MovImmToReg("rsi", "4096") // rsi = page size (was 32, but mmap'd full page)
-	fc.out.MovImmToReg("rax", "11")   // rax = syscall number for munmap
-	fc.out.Syscall()
+		// Fast path: enough space, no need to grow
+		fc.eb.MarkLabel("_arena_alloc_fast")
+		fc.out.MovRegToReg("rax", "r8")  // rax = buffer_ptr
+		fc.out.AddRegToReg("rax", "r13") // rax = buffer_ptr + aligned_offset
 
-	fc.out.PopReg("rbx")
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
+		// Update arena offset
+		fc.out.MovRegToReg("rdx", "r13")     // rdx = aligned_offset
+		fc.out.AddRegToReg("rdx", "r12")     // rdx = aligned_offset + size
+		fc.out.MovRegToMem("rdx", "rbx", 16) // [arena_ptr+16] = new offset
 
-	// Generate _c67_arena_reset(arena_ptr)
-	// Resets the arena offset to 0, effectively freeing all allocations
-	// Argument: rdi = arena_ptr
-	fc.eb.MarkLabel("_c67_arena_reset")
+		arenaDoneJump := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0) // jmp to done
 
-	fc.out.PushReg("rbp")
-	fc.out.MovRegToReg("rbp", "rsp")
+		// Grow path: realloc buffer with 1.3x growth
+		arenaGrowLabel := fc.eb.text.Len()
+		fc.patchJumpImmediate(arenaGrowJump+2, int32(arenaGrowLabel-(arenaGrowJump+6)))
+		fc.eb.MarkLabel("_arena_alloc_grow")
 
-	// Reset offset to 0
-	fc.out.MovImmToMem(0, "rdi", 16) // [arena_ptr+16] = 0
+		// Calculate new capacity: max(capacity * 1.3, aligned_offset + size)
+		// capacity * 1.3 = (capacity * 13) / 10
+		fc.out.MovRegToReg("rdi", "r9")             // rdi = capacity
+		fc.out.MovImmToReg("rax", "13")             // rax = 13
+		fc.out.Emit([]byte{0x48, 0x0f, 0xaf, 0xf8}) // imul rdi, rax (rdi *= 13)
+		fc.out.MovImmToReg("rax", "10")             // rax = 10
+		fc.out.XorRegWithReg("rdx", "rdx")          // rdx = 0 (for div)
+		fc.out.MovRegToReg("rcx", "rdi")            // rcx = capacity * 13 (save)
+		fc.out.MovRegToReg("rax", "rcx")            // rax = capacity * 13
+		fc.out.MovImmToReg("rcx", "10")             // rcx = 10
+		fc.out.Emit([]byte{0x48, 0xf7, 0xf1})       // div rcx (rax = capacity * 13 / 10)
+		fc.out.MovRegToReg("rdi", "rax")            // rdi = capacity * 1.3
 
-	fc.out.PopReg("rbp")
-	fc.out.Ret()
+		// Check if we need even more space
+		fc.out.MovRegToReg("rsi", "r13") // rsi = aligned_offset
+		fc.out.AddRegToReg("rsi", "r12") // rsi = aligned_offset + size
+		fc.out.CmpRegToReg("rdi", "rsi") // compare 1.3*capacity with needed
+		skipMaxJump := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreaterOrEqual, 0) // jge skip_max
+		fc.out.MovRegToReg("rdi", "rsi")              // rdi = max(1.3*capacity, needed)
+		skipMaxLabel := fc.eb.text.Len()
+		fc.patchJumpImmediate(skipMaxJump+2, int32(skipMaxLabel-(skipMaxJump+6)))
+
+		// rdi now contains new_capacity
+		fc.out.MovRegToReg("r9", "rdi") // r9 = new_capacity (update)
+
+		// Check if new capacity exceeds max (1GB)
+		fc.out.MovImmToReg("rax", "1073741824") // 1GB max
+		fc.out.CmpRegToReg("r9", "rax")
+		arenaMaxExceeded := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreater, 0) // jg to error if > 1GB
+
+		// Grow the arena buffer
+		var arenaErrorJump int
+		if fc.eb.target.OS() == OSLinux {
+			// Use mremap syscall on Linux
+			// syscall 25: mremap(void *old_address, size_t old_size, size_t new_size, int flags, ...)
+			// MREMAP_MAYMOVE = 1
+			fc.out.MovRegToReg("rdi", "r8")     // rdi = old buffer_ptr
+			fc.out.MovMemToReg("rsi", "rbx", 8) // rsi = old capacity from arena
+			fc.out.MovRegToReg("rdx", "r9")     // rdx = new_capacity
+			fc.out.MovImmToReg("r10", "1")      // r10 = MREMAP_MAYMOVE
+			fc.out.MovImmToReg("rax", "25")     // rax = syscall number for mremap
+			fc.out.Syscall()
+
+			// Check if mremap failed (returns MAP_FAILED = -1 or negative on error)
+			fc.out.CmpRegToImm("rax", -1)
+			arenaErrorJump = fc.eb.text.Len()
+			fc.out.JumpConditional(JumpEqual, 0) // je to error (mremap failed)
+		} else {
+			// Use realloc on Windows/macOS
+			fc.out.MovRegToReg("rdi", "r8") // rdi = old buffer_ptr
+			fc.out.MovRegToReg("rsi", "r9") // rsi = new_capacity
+			shadowSpace := fc.allocateShadowSpace()
+			fc.trackFunctionCall("realloc")
+			fc.eb.GenerateCallInstruction("realloc")
+			fc.deallocateShadowSpace(shadowSpace)
+
+			// Check if realloc failed (returns NULL)
+			fc.out.TestRegReg("rax", "rax")
+			arenaErrorJump = fc.eb.text.Len()
+			fc.out.JumpConditional(JumpEqual, 0) // je to error (realloc failed)
+		}
+
+		// Realloc succeeded: update arena structure
+		fc.out.MovRegToMem("rax", "rbx", 0) // [arena_ptr+0] = new buffer_ptr
+		fc.out.MovRegToMem("r9", "rbx", 8)  // [arena_ptr+8] = new capacity
+		fc.out.MovRegToReg("r8", "rax")     // r8 = new buffer_ptr
+
+		// Now allocate from the grown arena
+		fc.out.MovRegToReg("rax", "r8")      // rax = buffer_ptr
+		fc.out.AddRegToReg("rax", "r13")     // rax = buffer_ptr + aligned_offset
+		fc.out.MovRegToReg("rdx", "r13")     // rdx = aligned_offset
+		fc.out.AddRegToReg("rdx", "r12")     // rdx = aligned_offset + size
+		fc.out.MovRegToMem("rdx", "rbx", 16) // [arena_ptr+16] = new offset
+
+		arenaDoneJump2 := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0) // jmp to done
+
+		// Error path: realloc failed or max size exceeded
+		arenaErrorLabel := fc.eb.text.Len()
+		fc.patchJumpImmediate(arenaErrorJump+2, int32(arenaErrorLabel-(arenaErrorJump+6)))
+		fc.patchJumpImmediate(arenaMaxExceeded+2, int32(arenaErrorLabel-(arenaMaxExceeded+6)))
+		fc.eb.MarkLabel("_arena_alloc_error")
+
+		// Print error message to stderr and exit(1)
+		// Write to stderr (fd=2): "Error: Arena allocation failed (out of memory)\n"
+		errorMsg := "Error: Arena allocation failed (out of memory or exceeded 1GB limit)\n"
+		errorLabel := fmt.Sprintf("_arena_error_msg_%d", fc.stringCounter)
+		fc.stringCounter++
+		fc.eb.Define(errorLabel, errorMsg)
+
+		fc.out.MovImmToReg("rdi", "2") // stderr
+		fc.out.LeaSymbolToReg("rsi", errorLabel)
+		fc.out.MovImmToReg("rdx", fmt.Sprintf("%d", len(errorMsg)))
+		fc.out.MovImmToReg("rax", "1") // write syscall
+		fc.out.Syscall()
+
+		fc.out.MovImmToReg("rdi", "1")  // exit code 1
+		fc.out.MovImmToReg("rax", "60") // exit syscall
+		fc.out.Syscall()
+
+		// Done label
+		arenaDoneLabel := fc.eb.text.Len()
+		fc.patchJumpImmediate(arenaDoneJump+1, int32(arenaDoneLabel-(arenaDoneJump+5)))
+		fc.patchJumpImmediate(arenaDoneJump2+1, int32(arenaDoneLabel-(arenaDoneJump2+5)))
+		fc.eb.MarkLabel("_arena_alloc_done")
+
+		// rax already contains the allocated pointer - don't overwrite it!
+
+		fc.out.PopReg("r14") // Pop extra register for stack alignment
+		fc.out.PopReg("r13")
+		fc.out.PopReg("r12")
+		fc.out.PopReg("rbx")
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+
+		// Generate _c67_arena_destroy(arena_ptr)
+		// Frees all memory associated with the arena
+		// Argument: rdi = arena_ptr
+		fc.eb.MarkLabel("_c67_arena_destroy")
+
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
+		fc.out.PushReg("rbx")
+
+		fc.out.MovRegToReg("rbx", "rdi") // rbx = arena_ptr
+
+		// Munmap buffer: munmap(ptr, size) via syscall 11
+		fc.out.MovMemToReg("rdi", "rbx", 0) // rdi = buffer_ptr
+		fc.out.MovMemToReg("rsi", "rbx", 8) // rsi = capacity
+		fc.out.MovImmToReg("rax", "11")     // rax = syscall number for munmap
+		fc.out.Syscall()
+
+		// Munmap arena structure: munmap(ptr, 32) via syscall 11
+		fc.out.MovRegToReg("rdi", "rbx")  // rdi = arena_ptr
+		fc.out.MovImmToReg("rsi", "4096") // rsi = page size (was 32, but mmap'd full page)
+		fc.out.MovImmToReg("rax", "11")   // rax = syscall number for munmap
+		fc.out.Syscall()
+
+		fc.out.PopReg("rbx")
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+
+		// Generate _c67_arena_reset(arena_ptr)
+		// Resets the arena offset to 0, effectively freeing all allocations
+		// Argument: rdi = arena_ptr
+		fc.eb.MarkLabel("_c67_arena_reset")
+
+		fc.out.PushReg("rbp")
+		fc.out.MovRegToReg("rbp", "rsp")
+
+		// Reset offset to 0
+		fc.out.MovImmToMem(0, "rdi", 16) // [arena_ptr+16] = 0
+
+		fc.out.PopReg("rbp")
+		fc.out.Ret()
+	} // end if usesArenas (will reopen for arena_ensure_capacity later)
 
 	// Generate _c67_list_cons(element_float, list_ptr_float) -> new_list_ptr
 	// LINKED LIST implementation - creates a cons cell: [head|tail]
