@@ -18093,6 +18093,115 @@ func collectDefinedFromExpr(expr Expression, defined map[string]bool) {
 	}
 }
 
+// checkForwardReferences ensures functions are defined before they're called
+// Returns a list of error messages for forward references
+func checkForwardReferences(program *Program) []string {
+	var errors []string
+	defined := make(map[string]bool)
+	
+	// Builtins are always available
+	builtins := map[string]bool{
+		"printf": true, "exit": true, "syscall": true,
+		"getpid": true, "me": true,
+		"print": true, "println": true,
+		"eprint": true, "eprintln": true, "eprintf": true,
+		"exitln": true, "exitf": true,
+		"sqrt": true, "sin": true, "cos": true, "tan": true,
+		"asin": true, "acos": true, "atan": true, "atan2": true,
+		"exp": true, "log": true, "pow": true,
+		"floor": true, "ceil": true, "round": true,
+		"abs": true, "approx": true,
+		"popcount": true, "clz": true, "ctz": true,
+		"chan": true, "close": true,
+		"append": true, "head": true, "tail": true, "pop": true,
+		"error": true, "is_nan": true,
+		"_error_code_extract": true,
+		"printa": true,
+		"alloc": true, "free": true,
+		"dlopen": true, "dlsym": true, "dlclose": true,
+		"read_i8": true, "read_u8": true, "read_i16": true, "read_u16": true,
+		"read_i32": true, "read_u32": true, "read_i64": true, "read_u64": true, "read_f64": true,
+		"write_i8": true, "write_u8": true, "write_i16": true, "write_u16": true,
+		"write_i32": true, "write_u32": true, "write_i64": true, "write_u64": true, "write_f32": true, "write_f64": true,
+		"call": true, "arena_create": true, "arena_alloc": true, "arena_reset": true, "arena_destroy": true,
+	}
+	
+	// Mark builtins as defined
+	for k := range builtins {
+		defined[k] = true
+	}
+	
+	// Collect C imports
+	cImports := make(map[string]bool)
+	for _, stmt := range program.Statements {
+		if cImp, ok := stmt.(*CImportStmt); ok {
+			cImports[cImp.Alias] = true
+		}
+	}
+	
+	// Pre-scan to find all functions that WILL BE defined (anywhere in the program)
+	allDefined := collectDefinedFunctions(program)
+	
+	// Process statements in order
+	for _, stmt := range program.Statements {
+		// Only check top-level calls (not calls inside lambda bodies which execute later)
+		// Get top-level calls from this statement
+		calls := make(map[string]bool)
+		if exprStmt, ok := stmt.(*ExpressionStmt); ok {
+			// Top-level expression statement - check its calls
+			collectFunctionCallsWithParams(exprStmt.Expr, calls, nil)
+		}
+		// Note: We DON'T check calls inside AssignStmt values because those are lambda bodies
+		// Lambda bodies execute later when the function is called, not when it's defined
+		
+		// Get the name being defined in this statement (for recursion detection)
+		var definingName string
+		if assign, ok := stmt.(*AssignStmt); ok {
+			definingName = assign.Name
+		}
+		
+		for funcName := range calls {
+			// Skip if it's a C import (namespace.function)
+			if strings.Contains(funcName, ".") {
+				parts := strings.SplitN(funcName, ".", 2)
+				if len(parts) == 2 && (cImports[parts[0]] || parts[0] == "c") {
+					continue
+				}
+			}
+			
+			// Skip builtin operators
+			if funcName == "+" || funcName == "-" || funcName == "*" || funcName == "/" ||
+				funcName == "mod" || funcName == "%" ||
+				funcName == "<" || funcName == "<=" || funcName == ">" || funcName == ">=" ||
+				funcName == "==" || funcName == "!=" ||
+				funcName == "and" || funcName == "or" || funcName == "not" ||
+				funcName == "~b" || funcName == "&b" || funcName == "|b" || funcName == "^b" ||
+				funcName == "<<" || funcName == ">>" {
+				continue
+			}
+			
+			// Skip if this is a recursive call (function calling itself in its own definition)
+			if funcName == definingName {
+				continue
+			}
+			
+			// Only flag as forward reference if:
+			// 1. Not currently defined
+			// 2. WILL BE defined later (exists in allDefined)
+			if !defined[funcName] && allDefined[funcName] {
+				errors = append(errors, fmt.Sprintf("  Function '%s' called before it is defined", funcName))
+			}
+		}
+		
+		// Now mark new definitions from this statement
+		if assign, ok := stmt.(*AssignStmt); ok {
+			defined[assign.Name] = true
+		}
+	}
+	
+	return errors
+}
+
 // Confidence that this function is working: 95%
 // getUnknownFunctions determines which functions are called but not defined
 func getUnknownFunctions(program *Program) []string {
@@ -18809,6 +18918,13 @@ func CompileC67WithOptions(inputPath string, outputPath string, platform Platfor
 	// }
 
 	// Final check: verify all functions are defined (after all dependency resolution)
+	// Check for FORWARD REFERENCES - functions must be defined before use
+	forwardRefErrors := checkForwardReferences(program)
+	if len(forwardRefErrors) > 0 {
+		return fmt.Errorf("forward reference error:\n%s", strings.Join(forwardRefErrors, "\n"))
+	}
+
+	// Also check for completely undefined functions
 	finalUnknownFuncs := getUnknownFunctions(program)
 	if len(finalUnknownFuncs) > 0 {
 		// Sort for consistent error messages
