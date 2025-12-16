@@ -5931,7 +5931,6 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 		// Restore tail position
 		fc.inTailPosition = savedTailPosition
 
-
 	case *MatchExpr:
 		fc.compileMatchExpr(e)
 
