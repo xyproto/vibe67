@@ -4122,17 +4122,19 @@ func (p *Parser) parsePrimary() Expression {
 
 		p.nextToken() // skip '('
 
-		// Check for empty parameter list: () ->
+		// Check for empty parameter list: () -> or () {
 		if p.current.Type == TOKEN_RPAREN {
-			if p.peek.Type == TOKEN_ARROW {
+			if p.peek.Type == TOKEN_ARROW || p.peek.Type == TOKEN_LBRACE {
 				p.nextToken()               // skip ')'
-				p.nextToken()               // skip '->'
+				if p.current.Type == TOKEN_ARROW {
+					p.nextToken()           // skip '->'
+				}
 				p.lambdaParams = []string{} // No parameters
 				body := p.parseLambdaBody()
 				p.lambdaParams = nil
 				return &LambdaExpr{Params: []string{}, VariadicParam: "", Body: body}
 			}
-			// Empty parens without arrow is an error, but skip for now
+			// Empty parens without arrow or block is an error, but skip for now
 			p.nextToken()
 			return nil
 		}
