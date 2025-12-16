@@ -2692,7 +2692,7 @@ main()  // Explicit call
 
 // NOT auto-called (main() called in match expression)
 main = { println("Hello!") }
-x = 42 { 0 => 0, ~> main() }  // main() in match
+x = 42 { 0 => 0 ~> main() }  // main() in match default case
 // Output: Hello! (called once from match)
 
 // Auto-called (main() only called inside a lambda, not at top level)
