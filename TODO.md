@@ -1,5 +1,31 @@
 # TODO
 
+## Completed - Recent Fixes ✅
+
+### Guard Match Expression Fix (2025-12-16)
+**Problem**: Guard match expressions at module level returned 0 instead of their actual values.
+
+Example that was broken:
+```c67
+test = { | x == 0 => 100 ~> 999 }  // Returned 0 instead of 999
+println(f"test = {test}")          // Printed "test = 0"
+```
+
+**Root Cause**: Parser was incorrectly wrapping guard match expressions in zero-argument lambdas.
+The logic assumed that match expressions with non-IdentExpr conditions should be lambdas.
+Guard matches use `NumberExpr{1.0}` as their condition, so they were always wrapped.
+
+**Solution**: Match expressions now ALWAYS execute immediately. They are never wrapped in lambdas
+automatically. If users want a lambda that returns a match result, they write it explicitly:
+```c67
+f = (x) { | x == 0 => "zero" }  // Explicit lambda parameter
+```
+
+**Impact**: This was a critical bug affecting all guard match expressions at module/global scope.
+Function-level guards worked correctly because they executed in a lambda context anyway.
+
+---
+
 ## Completed
 - [x] Let `println` handle multiple arguments.
 - [x] Implement peephole optimization patterns (infrastructure exists in optimizer.go).
@@ -27,41 +53,12 @@
   - Automatic scalar cleanup loop for non-aligned sizes
   - Pattern matching for: result[i] = a[i] OP b[i]
 
-## Completed - Multi-File Compilation ✅
-
-### Overview
-Multi-file compilation now works! `c67 file1.c67 file2.c67 -o output` concatenates sources and compiles them together.
-
-### Root Cause - SOLVED
-The issue was NOT a compiler bug. Test files used invalid syntax: `(n) { ... }` instead of valid `(n) -> { ... }` or `n -> { ... }`. 
-
-### Implementation - COMPLETE
-- [x] Update `cmdBuild()` to collect multiple input files from args
-- [x] Filter out flags (-o, etc.) to get clean file list
-- [x] Add multi-file detection logic (len(inputFiles) > 1)
-- [x] Check all files exist before compilation
-- [x] Concatenate sources with newlines
-- [x] Write combined source to temp file
-- [x] Compile temp file with existing infrastructure
-- [x] Cleanup temp file after compilation
-- [x] Add verbose output showing files and byte counts
-
-### Testing - ALL PASS
-- [x] Library pattern test (lib.c67 defines functions, use.c67 calls them)
-- [x] add.c67 + hello.c67 integration test  
-- [x] All Go test suite passes
-- [x] Verbose mode confirmed working
-
-### Solution
-Simple and elegant: concatenate sources → temp file → compile → cleanup.
-No complex parser state management needed!
-
 ## High Priority - Executable Size Optimization (for 64k demos)
 
 ### Current Status
 - Minimal program (x := 42): 45KB
 - Code segment: 36KB
-- Data segment: ~1KB  
+- Data segment: ~1KB
 - Removed unused debug strings: ~500 bytes saved
 
 ### Size Reduction Tasks
@@ -179,11 +176,11 @@ No complex parser state management needed!
 ## High Priority - Fix Core Language Issues
 
 ### Issue 1: Mixed Statement-Guard Blocks
-**Status**: Not yet needed - current design works well  
+**Status**: Not yet needed - current design works well
 **Note**: Blocks can be either statement blocks OR match blocks, not mixed. This is clean and unambiguous.
 
 ### Issue 2: Ackermann Function (Doubly-Nested Recursive Calls)
-**Status**: Known bug (see ERRORS.md)  
+**Status**: Known bug (see ERRORS.md)
 **Root Cause**: Unknown - possibly memoization or arg evaluation order
 
 Tasks:
@@ -195,7 +192,7 @@ Tasks:
 - [ ] Fix and add regression test
 
 ### Issue 3: List Building with Recursive Concatenation
-**Status**: Known bug (see ERRORS.md)  
+**Status**: Known bug (see ERRORS.md)
 **Symptom**: Returns 0 instead of built list
 
 Tasks:
