@@ -7595,12 +7595,15 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Generate syscall-based printf runtime on Linux
 	fc.GeneratePrintfSyscallRuntime()
 
-	fc.generateCacheLookup()
-	fc.generateCacheInsert()
+	// Only generate cache functions if actually used (small optimization)
+	if len(fc.cacheEnabledLambdas) > 0 {
+		fc.generateCacheLookup()
+		fc.generateCacheInsert()
 
-	for lambdaName := range fc.cacheEnabledLambdas {
-		cacheName := lambdaName + "_cache"
-		fc.eb.Define(cacheName, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
+		for lambdaName := range fc.cacheEnabledLambdas {
+			cacheName := lambdaName + "_cache"
+			fc.eb.Define(cacheName, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
+		}
 	}
 
 	// Generate _c67_string_concat(left_ptr, right_ptr) -> new_ptr
