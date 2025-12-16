@@ -110,14 +110,27 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 		return fmt.Errorf("usage: c67 build <file.c67> [-o output]")
 	}
 
-	inputFile := args[0]
+	// Collect input files (all non-flag arguments)
+	inputFiles := []string{}
 	outputPath := ""
-
-	// Parse optional -o flag from args first (takes precedence)
-	for i := 1; i < len(args); i++ {
+	
+	for i := 0; i < len(args); i++ {
 		if args[i] == "-o" && i+1 < len(args) {
 			outputPath = args[i+1]
-			i++
+			i++ // Skip the output filename
+		} else if !strings.HasPrefix(args[i], "-") {
+			inputFiles = append(inputFiles, args[i])
+		}
+	}
+
+	if len(inputFiles) == 0 {
+		return fmt.Errorf("no input files specified")
+	}
+
+	// Check all files exist
+	for _, file := range inputFiles {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			return fmt.Errorf("file not found: %s", file)
 		}
 	}
 
@@ -126,39 +139,76 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 		outputPath = ctx.OutputPath
 	}
 
-	// Auto-detect Windows target from .exe extension if outputPath was specified
+	// Auto-detect Windows target from .exe extension
 	if outputPath != "" && strings.HasSuffix(strings.ToLower(outputPath), ".exe") && ctx.Platform.OS != OSWindows {
-		// Output ends with .exe but target isn't Windows - auto-detect
 		ctx.Platform.OS = OSWindows
 		if ctx.Verbose {
 			fmt.Fprintf(os.Stderr, "Auto-detected Windows target from .exe output filename\n")
 		}
 	}
 
-	// If still no output path specified, use input filename without extension
+	// If still no output path, use first input filename without extension
 	if outputPath == "" {
-		outputPath = strings.TrimSuffix(filepath.Base(inputFile), ".c67")
-		// Add .exe extension for Windows targets
+		outputPath = strings.TrimSuffix(filepath.Base(inputFiles[0]), ".c67")
 		if ctx.Platform.OS == OSWindows {
 			outputPath += ".exe"
 		}
 	}
 
-	// When a specific file is given (not -s flag explicitly passed), enable single-file mode
-	// This ensures c67 doesn't look for other .c67 files in the same directory
+	// Enable single-file mode to prevent automatic sibling loading
 	oldSingleFlag := SingleFlag
 	if !ctx.SingleFile {
-		// Only set SingleFlag if not already set via command line
 		SingleFlag = true
 		defer func() { SingleFlag = oldSingleFlag }()
 	}
 
 	if ctx.Verbose {
-		fmt.Fprintf(os.Stderr, "Building %s -> %s (single-file mode: %v)\n", inputFile, outputPath, SingleFlag)
+		if len(inputFiles) == 1 {
+			fmt.Fprintf(os.Stderr, "Building %s -> %s\n", inputFiles[0], outputPath)
+		} else {
+			fmt.Fprintf(os.Stderr, "Building %d files -> %s\n", len(inputFiles), outputPath)
+		}
 	}
 
-	// Compile
-	err := CompileC67WithOptions(inputFile, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	// Compile - if multiple files, concatenate and compile
+	var err error
+	if len(inputFiles) == 1 {
+		err = CompileC67WithOptions(inputFiles[0], outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	} else {
+		// Multi-file: concatenate sources
+		var combinedSource strings.Builder
+		for i, file := range inputFiles {
+			content, readErr := os.ReadFile(file)
+			if readErr != nil {
+				return fmt.Errorf("failed to read %s: %v", file, readErr)
+			}
+			if i > 0 {
+				combinedSource.WriteString("\n")
+			}
+			combinedSource.Write(content)
+			if ctx.Verbose {
+				fmt.Fprintf(os.Stderr, "  + %s (%d bytes)\n", file, len(content))
+			}
+		}
+
+		// Write combined source to temp file
+		tmpFile, tmpErr := os.CreateTemp("", "c67_multi_*.c67")
+		if tmpErr != nil {
+			return fmt.Errorf("failed to create temp file: %v", tmpErr)
+		}
+		tmpPath := tmpFile.Name()
+		defer os.Remove(tmpPath)
+
+		if _, writeErr := tmpFile.WriteString(combinedSource.String()); writeErr != nil {
+			tmpFile.Close()
+			return fmt.Errorf("failed to write combined source: %v", writeErr)
+		}
+		tmpFile.Close()
+
+		// Compile the combined file
+		err = CompileC67WithOptions(tmpPath, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	}
+
 	if err != nil {
 		return fmt.Errorf("compilation failed: %v", err)
 	}
