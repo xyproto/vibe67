@@ -140,7 +140,6 @@ type C67Compiler struct {
 	usesCPUFeatures  bool // Track if CPU feature detection is needed (FMA, SIMD, etc.)
 
 	// Runtime function emission flags (all true by default for full compatibility)
-	runtimeFeatures *RuntimeFeatures // Enhanced runtime feature tracker
 
 }
 
@@ -234,8 +233,7 @@ func NewC67Compiler(platform Platform, verbose bool) (*C67Compiler, error) {
 		dataSection:         []byte{},
 		moduleLevelVars:     make(map[string]bool),
 
-		// Initialize runtime feature tracker
-		runtimeFeatures: NewRuntimeFeatures(),
+		// Initialize all runtime function emission flags to true (full compatibility mode)
 
 	}, nil
 }
@@ -645,131 +643,7 @@ func (fc *C67Compiler) collectAllFunctions(program *Program) {
 	}
 }
 
-func (fc *C67Compiler) analyzeRuntimeFeatures(program *Program) {
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "-> Pre-analysis: Detecting required runtime features\n")
-	}
-
-	// Walk through all statements and expressions to detect runtime feature usage
-	for _, stmt := range program.Statements {
-		fc.analyzeStatementFeatures(stmt)
-	}
-
-	if VerboseMode {
-		if fc.runtimeFeatures.Uses(FeatureStringConcat) {
-			fmt.Fprintf(os.Stderr, "   Detected: string concatenation\n")
-		}
-		if fc.runtimeFeatures.needsArenaInit() {
-			fmt.Fprintf(os.Stderr, "   Detected: arena allocation needed\n")
-		}
-		if fc.runtimeFeatures.needsCPUDetection() {
-			fmt.Fprintf(os.Stderr, "   Detected: CPU feature detection needed\n")
-		}
-	}
-}
-
-func (fc *C67Compiler) analyzeStatementFeatures(stmt Statement) {
-	switch s := stmt.(type) {
-	case *AssignStmt:
-		fc.analyzeExpressionFeatures(s.Value)
-	case *ExpressionStmt:
-		fc.analyzeExpressionFeatures(s.Expr)
-	}
-}
-
-func (fc *C67Compiler) analyzeExpressionFeatures(expr Expression) {
-	if expr == nil {
-		return
-	}
-
-	switch e := expr.(type) {
-	case *BinaryExpr:
-		// String concatenation
-		if e.Operator == "+" {
-			leftType := fc.getExprTypeForAnalysis(e.Left)
-			rightType := fc.getExprTypeForAnalysis(e.Right)
-			if leftType == "string" || rightType == "string" {
-				fc.runtimeFeatures.Mark(FeatureStringConcat)
-			}
-		}
-		fc.analyzeExpressionFeatures(e.Left)
-		fc.analyzeExpressionFeatures(e.Right)
-	
-	case *CallExpr:
-		// Check for builtin functions that use runtime features
-		switch e.Function {
-		case "printf", "println":
-			fc.runtimeFeatures.Mark(FeaturePrintf)
-		}
-		for _, arg := range e.Args {
-			fc.analyzeExpressionFeatures(arg)
-		}
-	
-	case *LambdaExpr:
-		fc.analyzeExpressionFeatures(e.Body)
-	
-	case *BlockExpr:
-		for _, stmt := range e.Statements {
-			fc.analyzeStatementFeatures(stmt)
-		}
-	
-	case *MatchExpr:
-		if e.Condition != nil {
-			fc.analyzeExpressionFeatures(e.Condition)
-		}
-		for _, clause := range e.Clauses {
-			if clause.Guard != nil {
-				fc.analyzeExpressionFeatures(clause.Guard)
-			}
-			if clause.Result != nil {
-				fc.analyzeExpressionFeatures(clause.Result)
-			}
-		}
-		if e.DefaultExpr != nil {
-			fc.analyzeExpressionFeatures(e.DefaultExpr)
-		}
-	
-	case *LoopExpr:
-		for _, stmt := range e.Body {
-			fc.analyzeStatementFeatures(stmt)
-		}
-		if e.Iterable != nil {
-			fc.analyzeExpressionFeatures(e.Iterable)
-		}
-	
-	case *FStringExpr:
-		// F-strings require string concatenation
-		fc.runtimeFeatures.Mark(FeatureStringConcat)
-		for _, part := range e.Parts {
-			fc.analyzeExpressionFeatures(part)
-		}
-	}
-}
-
-func (fc *C67Compiler) getExprTypeForAnalysis(expr Expression) string {
-	if expr == nil {
-		return "unknown"
-	}
-
-	switch e := expr.(type) {
-	case *StringExpr:
-		return "string"
-	case *NumberExpr:
-		return "number"
-	case *BinaryExpr:
-		if e.Operator == "+" {
-			leftType := fc.getExprTypeForAnalysis(e.Left)
-			rightType := fc.getExprTypeForAnalysis(e.Right)
-			if leftType == "string" || rightType == "string" {
-				return "string"
-			}
-		}
-		return "number"
-	}
-	return "unknown"
-}
-
-
+// reorderStatementsForForwardRefs reorders statements to put function definitions first
 // This allows functions to be called before they appear in the source (forward references)
 func (fc *C67Compiler) reorderStatementsForForwardRefs(statements []Statement) []Statement {
 	var functionDefs []Statement
@@ -804,9 +678,9 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	fc.movedVars = make(map[string]bool)
 	fc.scopedMoved = []map[string]bool{make(map[string]bool)}
 
-	// Arenas will be enabled on-demand when string concat, list operations, etc. are detected
-	// via trackFunctionCall()
-	fc.usesArenas = false
+	// Arenas will be enabled on-demand when needed (string concat, list operations, etc.)
+	// TODO: Currently always enabled to ensure compatibility
+	fc.usesArenas = true
 
 	// Check if main() is called at top level (to decide whether to auto-call main)
 	fc.mainCalledAtTopLevel = fc.detectMainCallInTopLevel(program.Statements)
@@ -836,15 +710,6 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// Reorder statements to put function definitions first
 	// This ensures all functions are defined before being called
 	program.Statements = fc.reorderStatementsForForwardRefs(program.Statements)
-
-	// PRE-ANALYSIS PASS: Analyze what runtime features are needed
-	// This must happen before any code emission so we know what to initialize
-	fc.analyzeRuntimeFeatures(program)
-
-	// Update usesArenas flag based on runtime feature analysis
-	if fc.runtimeFeatures.needsArenaInit() {
-		fc.usesArenas = true
-	}
 
 	// Use ARM64 code generator if target is ARM64
 	if fc.eb.target.Arch() == ArchARM64 {
@@ -892,55 +757,52 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	fc.out.XorRegWithReg("rsi", "rsi")
 
 	// ===== CPU FEATURE DETECTION =====
-	// Only emit CPU feature detection if SIMD/FMA instructions are actually used
-	if fc.runtimeFeatures.needsCPUDetection() {
-		// Detect FMA, AVX2, POPCNT, and AVX-512 support at runtime
-		// This enables dynamic optimization for available CPU features
+	// Detect FMA, AVX2, POPCNT, and AVX-512 support at runtime
+	// This enables dynamic optimization for available CPU features
 
-		fc.eb.DefineWritable("cpu_has_fma", "\x00")    // FMA3 support (Haswell 2013+)
-		fc.eb.DefineWritable("cpu_has_avx2", "\x00")   // AVX2 support (Haswell 2013+)
-		fc.eb.DefineWritable("cpu_has_popcnt", "\x00") // POPCNT support (Nehalem 2008+)
-		fc.eb.DefineWritable("cpu_has_avx512", "\x00") // AVX-512F support (Skylake-X 2017+)
+	fc.eb.DefineWritable("cpu_has_fma", "\x00")    // FMA3 support (Haswell 2013+)
+	fc.eb.DefineWritable("cpu_has_avx2", "\x00")   // AVX2 support (Haswell 2013+)
+	fc.eb.DefineWritable("cpu_has_popcnt", "\x00") // POPCNT support (Nehalem 2008+)
+	fc.eb.DefineWritable("cpu_has_avx512", "\x00") // AVX-512F support (Skylake-X 2017+)
 
-		// Check CPUID leaf 1 for FMA and POPCNT
-		fc.out.MovImmToReg("rax", "1")     // CPUID leaf 1
-		fc.out.XorRegWithReg("rcx", "rcx") // subleaf 0
-		fc.out.Emit([]byte{0x0f, 0xa2})    // cpuid
+	// Check CPUID leaf 1 for FMA and POPCNT
+	fc.out.MovImmToReg("rax", "1")     // CPUID leaf 1
+	fc.out.XorRegWithReg("rcx", "rcx") // subleaf 0
+	fc.out.Emit([]byte{0x0f, 0xa2})    // cpuid
 
-		// Test ECX bit 12 (FMA)
-		fc.out.Emit([]byte{0x0f, 0xba, 0xe1, 0x0c}) // bt ecx, 12
-		fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
-		fc.out.LeaSymbolToReg("rbx", "cpu_has_fma")
-		fc.out.MovByteRegToMem("rax", "rbx", 0)
+	// Test ECX bit 12 (FMA)
+	fc.out.Emit([]byte{0x0f, 0xba, 0xe1, 0x0c}) // bt ecx, 12
+	fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
+	fc.out.LeaSymbolToReg("rbx", "cpu_has_fma")
+	fc.out.MovByteRegToMem("rax", "rbx", 0)
 
-		// Test ECX bit 23 (POPCNT)
-		fc.out.Emit([]byte{0x0f, 0xba, 0xe1, 0x17}) // bt ecx, 23
-		fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
-		fc.out.LeaSymbolToReg("rbx", "cpu_has_popcnt")
-		fc.out.MovByteRegToMem("rax", "rbx", 0)
+	// Test ECX bit 23 (POPCNT)
+	fc.out.Emit([]byte{0x0f, 0xba, 0xe1, 0x17}) // bt ecx, 23
+	fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
+	fc.out.LeaSymbolToReg("rbx", "cpu_has_popcnt")
+	fc.out.MovByteRegToMem("rax", "rbx", 0)
 
-		// Check CPUID leaf 7 for AVX2 and AVX-512
-		fc.out.MovImmToReg("rax", "7")     // CPUID leaf 7
-		fc.out.XorRegWithReg("rcx", "rcx") // subleaf 0
-		fc.out.Emit([]byte{0x0f, 0xa2})    // cpuid
+	// Check CPUID leaf 7 for AVX2 and AVX-512
+	fc.out.MovImmToReg("rax", "7")     // CPUID leaf 7
+	fc.out.XorRegWithReg("rcx", "rcx") // subleaf 0
+	fc.out.Emit([]byte{0x0f, 0xa2})    // cpuid
 
-		// Test EBX bit 5 (AVX2)
-		fc.out.Emit([]byte{0x0f, 0xba, 0xe3, 0x05}) // bt ebx, 5
-		fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
-		fc.out.LeaSymbolToReg("rbx", "cpu_has_avx2")
-		fc.out.MovByteRegToMem("rax", "rbx", 0)
+	// Test EBX bit 5 (AVX2)
+	fc.out.Emit([]byte{0x0f, 0xba, 0xe3, 0x05}) // bt ebx, 5
+	fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
+	fc.out.LeaSymbolToReg("rbx", "cpu_has_avx2")
+	fc.out.MovByteRegToMem("rax", "rbx", 0)
 
-		// Test EBX bit 16 (AVX512F - foundation)
-		fc.out.Emit([]byte{0x0f, 0xba, 0xe3, 0x10}) // bt ebx, 16
-		fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
-		fc.out.LeaSymbolToReg("rbx", "cpu_has_avx512")
-		fc.out.MovByteRegToMem("rax", "rbx", 0)
+	// Test EBX bit 16 (AVX512F - foundation)
+	fc.out.Emit([]byte{0x0f, 0xba, 0xe3, 0x10}) // bt ebx, 16
+	fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
+	fc.out.LeaSymbolToReg("rbx", "cpu_has_avx512")
+	fc.out.MovByteRegToMem("rax", "rbx", 0)
 
-		// Clear registers used for CPUID
-		fc.out.XorRegWithReg("rax", "rax")
-		fc.out.XorRegWithReg("rbx", "rbx")
-		fc.out.XorRegWithReg("rcx", "rcx")
-	}
+	// Clear registers used for CPUID
+	fc.out.XorRegWithReg("rax", "rax")
+	fc.out.XorRegWithReg("rbx", "rbx")
+	fc.out.XorRegWithReg("rcx", "rcx")
 	// ===== END CPU FEATURE DETECTION =====
 
 	// Two-pass compilation: First pass collects all variable declarations
@@ -965,7 +827,7 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// currentArena is already set to 1 in NewC67Compiler (representing meta-arena[0])
 	// Arena initialization is needed only if we actually use arenas
 	// (e.g., for string concat, list operations, etc.)
-	if fc.runtimeFeatures.needsArenaInit() {
+	if fc.usesArenas {
 		fc.initializeMetaArenaAndGlobalArena()
 	}
 
@@ -1426,7 +1288,6 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 		// Track arena depth during symbol collection
 		// This ensures alloc() calls are validated correctly
 		fc.usesArenas = true // Mark that this program uses arenas (for runtime helper generation)
-		fc.runtimeFeatures.Mark(FeatureArenaAlloc)
 		previousArena := fc.currentArena
 		fc.currentArena++
 
@@ -2091,7 +1952,6 @@ func (fc *C67Compiler) popDeferScope() {
 func (fc *C67Compiler) compileArenaStmt(stmt *ArenaStmt) {
 	// Mark that this program uses arenas
 	fc.usesArenas = true
-	fc.runtimeFeatures.Mark(FeatureArenaAlloc)
 
 	// Save previous arena context and increment to next arena
 	previousArena := fc.currentArena
@@ -2132,7 +1992,6 @@ func (fc *C67Compiler) compileArenaStmt(stmt *ArenaStmt) {
 func (fc *C67Compiler) compileArenaExpr(expr *ArenaExpr) {
 	// Mark that this program uses arenas
 	fc.usesArenas = true
-	fc.runtimeFeatures.Mark(FeatureArenaAlloc)
 
 	// First, collect symbols from all statements in the block
 	for _, stmt := range expr.Body {
@@ -5863,7 +5722,6 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 		// Variadic functions need arena allocation for argument lists
 		if e.VariadicParam != "" {
 			fc.usesArenas = true
-			fc.runtimeFeatures.Mark(FeatureArenaAlloc)
 		}
 
 		// Detect if lambda is pure (eligible for memoization)
@@ -8015,7 +7873,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	}
 
 	// Generate _c67_string_concat only if used
-	if fc.runtimeFeatures.Uses(FeatureStringConcat) {
+	if fc.usedFunctions["_c67_string_concat"] {
 		// Generate _c67_string_concat(left_ptr, right_ptr) -> new_ptr
 		// Arguments: rdi = left_ptr, rsi = right_ptr
 		// Returns: rax = pointer to new concatenated string
@@ -8135,7 +7993,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	} // end if _c67_string_concat used
 
 	// Generate _c67_string_to_cstr only if used (for printf, f-strings, C FFI)
-	if fc.runtimeFeatures.needsStringToCstr() {
+	if fc.usedFunctions["_c67_string_to_cstr"] || fc.usedFunctions["println"] || fc.usedFunctions["printf"] {
 		// Generate _c67_string_to_cstr(c67_string_ptr) -> cstr_ptr
 		// Converts a C67 string (map format) to a null-terminated C string
 		// Argument: xmm0 = C67 string pointer (as float64)
@@ -8335,7 +8193,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	} // end if _c67_string_to_cstr used
 
 	// Generate _c67_cstr_to_string only if used (for C FFI string returns)
-	if fc.runtimeFeatures.Uses(FeatureCstrToString) {
+	if fc.usedFunctions["_c67_cstr_to_string"] {
 		// Generate _c67_cstr_to_string(cstr_ptr) -> c67_string_ptr
 		// Converts a null-terminated C string to a C67 string (map format)
 		// Argument: rdi = C string pointer
@@ -8442,7 +8300,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	} // end if _c67_cstr_to_string used
 
 	// Generate _c67_slice_string only if used
-	if fc.runtimeFeatures.Uses(FeatureStringSlice) {
+	if fc.usedFunctions["_c67_slice_string"] {
 		// Generate _c67_slice_string(str_ptr, start, end, step) -> new_str_ptr
 		// Arguments: rdi = string_ptr, rsi = start_index (int64), rdx = end_index (int64), rcx = step (int64)
 		// Returns: rax = pointer to new sliced string
@@ -8637,7 +8495,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Arguments: rdi = left_ptr, rsi = right_ptr
 	// Returns: rax = pointer to new concatenated list
 	// List format: [length (8 bytes)][elem0 (8 bytes)][elem1 (8 bytes)]...
-	if fc.runtimeFeatures.Uses(FeatureListConcat) {
+	if fc.usedFunctions["_c67_list_concat"] {
 		fc.eb.MarkLabel("_c67_list_concat")
 
 		// Function prologue
@@ -8745,7 +8603,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Arguments: rdi = list_ptr, rdx = count (integer)
 	// Returns: rax = pointer to new repeated list (heap-allocated)
 	// Simple implementation: just call list_concat repeatedly
-	if fc.runtimeFeatures.Uses(FeatureListRepeat) {
+	if fc.usedFunctions["_c67_list_repeat"] {
 		fc.eb.MarkLabel("_c67_list_repeat")
 
 		// Function prologue
@@ -8827,7 +8685,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Arguments: rdi = left_ptr, rsi = right_ptr
 	// Returns: xmm0 = 1.0 if equal, 0.0 if not
 	// String format: [count (8 bytes)][key0 (8)][val0 (8)][key1 (8)][val1 (8)]...
-	if fc.runtimeFeatures.Uses(FeatureStringEq) {
+	if fc.usedFunctions["_c67_string_eq"] {
 		fc.eb.MarkLabel("_c67_string_eq")
 
 		fc.out.PushReg("rbp")
@@ -18107,32 +17965,6 @@ func (fc *C67Compiler) trackFunctionCall(funcName string) {
 		fc.usedFunctions[funcName] = true
 	}
 	fc.callOrder = append(fc.callOrder, funcName)
-
-	// Update runtime features tracker
-	switch funcName {
-	case "_c67_string_concat":
-		fc.runtimeFeatures.Mark(FeatureStringConcat)
-	case "_c67_string_to_cstr":
-		fc.runtimeFeatures.Mark(FeatureStringToCstr)
-	case "_c67_cstr_to_string":
-		fc.runtimeFeatures.Mark(FeatureCstrToString)
-	case "_c67_slice_string":
-		fc.runtimeFeatures.Mark(FeatureStringSlice)
-	case "_c67_string_eq":
-		fc.runtimeFeatures.Mark(FeatureStringEq)
-	case "_c67_list_concat":
-		fc.runtimeFeatures.Mark(FeatureListConcat)
-	case "_c67_list_repeat":
-		fc.runtimeFeatures.Mark(FeatureListRepeat)
-	case "printf", "println":
-		fc.runtimeFeatures.Mark(FeaturePrintf)
-	case "_c67_print_syscall":
-		fc.runtimeFeatures.Mark(FeaturePrintSyscall)
-	case "_c67_arena_create":
-		fc.runtimeFeatures.Mark(FeatureArenaCreate)
-	case "_c67_arena_alloc":
-		fc.runtimeFeatures.Mark(FeatureArenaAlloc)
-	}
 }
 
 // callMallocAligned calls malloc with proper stack alignment.
