@@ -264,7 +264,24 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 		}
 	}
 
-	gotBase, rodataBaseAddr, textAddr, pltBase, err := fc.eb.WriteCompleteDynamicELF(ds, pltFunctions)
+	// Generate ELF file (static or dynamic based on needs)
+	var gotBase, rodataBaseAddr, textAddr, pltBase uint64
+	var err error
+	
+	if fc.runtimeFeatures.needsDynamicLinking() || len(pltFunctions) > 0 {
+		// Dynamic ELF with PLT/GOT for external function calls
+		if VerboseMode || fc.debug {
+			fmt.Fprintf(os.Stderr, "Generating dynamic ELF with %d external functions\n", len(pltFunctions))
+		}
+		gotBase, rodataBaseAddr, textAddr, pltBase, err = fc.eb.WriteCompleteDynamicELF(ds, pltFunctions)
+	} else {
+		// Static ELF with no external dependencies
+		if VerboseMode || fc.debug {
+			fmt.Fprintf(os.Stderr, "Generating static ELF (no external functions)\n")
+		}
+		gotBase, rodataBaseAddr, textAddr, pltBase, err = fc.eb.WriteCompleteStaticELF(ds)
+	}
+	
 	if err != nil {
 		return err
 	}
