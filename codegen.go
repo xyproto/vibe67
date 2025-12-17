@@ -141,7 +141,6 @@ type C67Compiler struct {
 
 	// Runtime function emission flags (all true by default for full compatibility)
 	runtimeFeatures *RuntimeFeatures // Enhanced runtime feature tracker
-	analysisVarTypes map[string]string // Variable types during pre-analysis
 
 }
 
@@ -651,18 +650,7 @@ func (fc *C67Compiler) analyzeRuntimeFeatures(program *Program) {
 		fmt.Fprintf(os.Stderr, "-> Pre-analysis: Detecting required runtime features\n")
 	}
 
-	// First pass: collect variable types
-	varTypes := make(map[string]string)
-	for _, stmt := range program.Statements {
-		if assign, ok := stmt.(*AssignStmt); ok {
-			varTypes[assign.Name] = fc.getExprTypeForAnalysis(assign.Value)
-		}
-	}
-
-	// Store for use in expression analysis
-	fc.analysisVarTypes = varTypes
-
-	// Second pass: analyze feature usage
+	// Walk through all statements and expressions to detect runtime feature usage
 	for _, stmt := range program.Statements {
 		fc.analyzeStatementFeatures(stmt)
 	}
@@ -710,14 +698,8 @@ func (fc *C67Compiler) analyzeExpressionFeatures(expr Expression) {
 	case *CallExpr:
 		// Check for builtin functions that use runtime features
 		switch e.Function {
-		case "printf", "println", "print":
+		case "printf", "println":
 			fc.runtimeFeatures.Mark(FeaturePrintf)
-		case "popcount", "clz", "ctz":
-			fc.runtimeFeatures.Mark(FeaturePOPCNT)
-		case "arena":
-			fc.runtimeFeatures.Mark(FeatureArenaCreate)
-		case "alloc":
-			fc.runtimeFeatures.Mark(FeatureArenaAlloc)
 		}
 		for _, arg := range e.Args {
 			fc.analyzeExpressionFeatures(arg)
@@ -774,14 +756,6 @@ func (fc *C67Compiler) getExprTypeForAnalysis(expr Expression) string {
 		return "string"
 	case *NumberExpr:
 		return "number"
-	case *IdentExpr:
-		// Look up variable type
-		if fc.analysisVarTypes != nil {
-			if t, ok := fc.analysisVarTypes[e.Name]; ok {
-				return t
-			}
-		}
-		return "unknown"
 	case *BinaryExpr:
 		if e.Operator == "+" {
 			leftType := fc.getExprTypeForAnalysis(e.Left)
@@ -791,10 +765,6 @@ func (fc *C67Compiler) getExprTypeForAnalysis(expr Expression) string {
 			}
 		}
 		return "number"
-	case *ListExpr:
-		return "list"
-	case *MapExpr:
-		return "map"
 	}
 	return "unknown"
 }
@@ -880,9 +850,7 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 		fmt.Fprintf(os.Stderr, "Runtime feature analysis results:\n")
 		fmt.Fprintf(os.Stderr, "  needsCPUDetection: %v\n", fc.runtimeFeatures.needsCPUDetection())
 		fmt.Fprintf(os.Stderr, "  needsArenaInit: %v\n", fc.runtimeFeatures.needsArenaInit())
-		fmt.Fprintf(os.Stderr, "  needsStringToCstr: %v\n", fc.runtimeFeatures.needsStringToCstr())
 		fmt.Fprintf(os.Stderr, "  usesArenas: %v\n", fc.usesArenas)
-		fmt.Fprintf(os.Stderr, "  Features marked: %v\n", fc.runtimeFeatures.features)
 	}
 
 	// Use ARM64 code generator if target is ARM64

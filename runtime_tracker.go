@@ -55,15 +55,3 @@ func (rf *RuntimeFeatures) needsArenaInit() bool {
 		rf.Uses(FeatureArenaAlloc) || rf.Uses(FeatureStringConcat) || 
 		rf.Uses(FeatureListConcat) || rf.Uses(FeatureListRepeat)
 }
-
-func (rf *RuntimeFeatures) AnalyzeGeneratedCode(code []byte) {
-	// Scan generated machine code for patterns that indicate runtime feature usage
-	// This catches features we missed in static analysis
-	
-	// Check for calls to arena functions (look for "call" instructions)
-	// Check for string operations
-	// Check for list operations
-	// etc.
-	
-	// For now, this is a placeholder - we can expand it later
-}
