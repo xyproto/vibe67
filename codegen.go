@@ -140,7 +140,7 @@ type C67Compiler struct {
 	usesCPUFeatures  bool // Track if CPU feature detection is needed (FMA, SIMD, etc.)
 
 	// Runtime function emission flags (all true by default for full compatibility)
-	runtimeFeatures  *RuntimeFeatures  // Enhanced runtime feature tracker
+	runtimeFeatures *RuntimeFeatures // Enhanced runtime feature tracker
 	analysisVarTypes map[string]string // Variable types during pre-analysis
 
 }
@@ -237,6 +237,7 @@ func NewC67Compiler(platform Platform, verbose bool) (*C67Compiler, error) {
 
 		// Initialize runtime feature tracker
 		runtimeFeatures: NewRuntimeFeatures(),
+
 	}, nil
 }
 
@@ -705,7 +706,7 @@ func (fc *C67Compiler) analyzeExpressionFeatures(expr Expression) {
 		}
 		fc.analyzeExpressionFeatures(e.Left)
 		fc.analyzeExpressionFeatures(e.Right)
-
+	
 	case *CallExpr:
 		// Check for builtin functions that use runtime features
 		switch e.Function {
@@ -721,15 +722,15 @@ func (fc *C67Compiler) analyzeExpressionFeatures(expr Expression) {
 		for _, arg := range e.Args {
 			fc.analyzeExpressionFeatures(arg)
 		}
-
+	
 	case *LambdaExpr:
 		fc.analyzeExpressionFeatures(e.Body)
-
+	
 	case *BlockExpr:
 		for _, stmt := range e.Statements {
 			fc.analyzeStatementFeatures(stmt)
 		}
-
+	
 	case *MatchExpr:
 		if e.Condition != nil {
 			fc.analyzeExpressionFeatures(e.Condition)
@@ -745,7 +746,7 @@ func (fc *C67Compiler) analyzeExpressionFeatures(expr Expression) {
 		if e.DefaultExpr != nil {
 			fc.analyzeExpressionFeatures(e.DefaultExpr)
 		}
-
+	
 	case *LoopExpr:
 		for _, stmt := range e.Body {
 			fc.analyzeStatementFeatures(stmt)
@@ -753,7 +754,7 @@ func (fc *C67Compiler) analyzeExpressionFeatures(expr Expression) {
 		if e.Iterable != nil {
 			fc.analyzeExpressionFeatures(e.Iterable)
 		}
-
+	
 	case *FStringExpr:
 		// F-strings require string concatenation
 		fc.runtimeFeatures.Mark(FeatureStringConcat)
@@ -797,6 +798,7 @@ func (fc *C67Compiler) getExprTypeForAnalysis(expr Expression) string {
 	}
 	return "unknown"
 }
+
 
 // This allows functions to be called before they appear in the source (forward references)
 func (fc *C67Compiler) reorderStatementsForForwardRefs(statements []Statement) []Statement {
