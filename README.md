@@ -224,6 +224,7 @@ We welcome contributions from the open source community!
 2.  Run tests: `go test ./...`
 3.  Submit a PR!
 
-## 📄 License
+## 📄 Leneral info
 
-BSD 3-Clause. See [LICENSE](LICENSE).
+* Version: 1.5.3
+* License: BSD-3
