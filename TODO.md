@@ -2,40 +2,9 @@
 
 ## unsafe
 
-Fix this problem:
-
-Unsafe Block Limitation: unsafe blocks allow register assignment (rax <- var).
-* Without cast (rax <- ptr): The compiler silently ignores the assignment because ptr is not a register.
-* With cast (rax <- ptr as int64): The compiler performs bit reinterpretation of the float64 variable. Since the pointer address was converted to a double (e.g.
-  0x1234 -> 4660.0), reinterpreting the float bits into an integer yields garbage (IEEE754 representation), not the original address.
-* rax <- ptr is silently ignored by the compiler because ptr is not a register.
-* rax <- ptr as int64 performs bit reinterpretation, loading the IEEE 754 float bits instead of the address value. This results in a garbage address and segfaults.
-* Impact: You cannot iterate over a file buffer (e.g., source code) byte-by-byte, which is essential for a lexer/parser.
-
-Consequence: You cannot perform pointer arithmetic on buffers allocated via c.malloc, nor can you read/write them byte-by-byte using unsafe blocks.
+- [ ] Fix unsafe block register assignment limitation (rax <- ptr)
 
 ## High Priority - Executable Size Optimization (for 64k demos)
-
-When running a C67 program with "c67 run program.c67", the command line
-arguments after that should be passed to the C67 program, so that:
-
-c67 run program.c67 hello
-
-Outputs a string containing "hello" if program.c67 tries to print /proc/self/cmdline.
-
-### Current Status
-- Minimal program (x := 42): 21KB (was 45KB - 53% reduction achieved!)
-- Code segment: 12KB (was 36KB - dynamic sizing based on actual code)
-- Data segment: ~1KB
-- Function naming harmonized: all runtime functions now use `_c67_` prefix
-- Removed duplicate emit* flags: using only usedFunctions map for tracking
-- Arena initialization: only when actually used (usesArenas flag)
-- Printf runtime: only when printf/print_syscall are used
-
-### Completed Optimizations
-- Dynamic text section sizing (codeSize + 1 page safety margin)
-- Conditional arena initialization based on usesArenas flag
-- Conditional printf runtime generation based on usedFunctions
 
 ### Remaining Size Reduction Tasks
 - [ ] Further optimize runtime functions (already conditionally included)
@@ -80,9 +49,6 @@ Outputs a string containing "hello" if program.c67 tries to print /proc/self/cmd
 - [ ] Add circular dependency detection
 
 ## Architecture-Specific
-
-### x86-64 Optimizations
-- (All basic BMI1/BMI2 optimizations are implemented)
 
 ### ARM64 Optimizations
 - [ ] Add CSEL instruction support in ARM64 backend
