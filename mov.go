@@ -6,8 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/xyproto/env/v2"
 )
 
 type Out struct {
@@ -524,6 +522,10 @@ func (o *Out) CallSymbol(symbol string) {
 	}
 }
 
+func envBool(name string) bool {
+	return os.Getenv(name) != ""
+}
+
 func (o *Out) callSymbolX86(symbol string) {
 	// Emit CALL rel32 instruction (E8)
 	posBeforeE8 := o.eb.text.Len()
@@ -534,7 +536,7 @@ func (o *Out) callSymbolX86(symbol string) {
 	callPos := o.eb.text.Len()
 	o.WriteUnsigned(0x12345678) // Match placeholder used in x86_64_codegen.go
 
-	if env.Bool("DEBUG") && (symbol == "_c67_arena_ensure_capacity" || symbol == "malloc$stub") {
+	if envBool("DEBUG") && (symbol == "_c67_arena_ensure_capacity" || symbol == "malloc$stub") {
 		fmt.Fprintf(os.Stderr, "DEBUG mov.go: CallSymbol(%s): posBeforeE8=%d, posAfterE8=%d, callPos=%d (recorded)\n",
 			symbol, posBeforeE8, posAfterE8, callPos)
 	}
