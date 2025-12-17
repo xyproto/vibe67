@@ -8,46 +8,46 @@ hello: add.c67 hello.c67
 ackermann: ackermann.c67
 	c67 -o $@ $<
 
-factorial: ackermann.c67
+factorial: factorial.c67
 	c67 -o $@ $<
 
-fib: factorial.c67
+fib: fib.c67
 	c67 -o $@ $<
 
-fib_bench: fib.c67
+fib_bench: fib_bench.c67
 	c67 -o $@ $<
 
-hello_simple: fib_bench.c67
+hello_simple: hello_simple.c67
 	c67 -o $@ $<
 
-hello_test: hello_simple.c67
+hello_test: hello_test.c67
 	c67 -o $@ $<
 
-minimal: hello_test.c67
+minimal: minimal.c67
 	c67 -o $@ $<
 
-primes: minimal.c67
+primes: primes.c67
 	c67 -o $@ $<
 
-sdl3example: primes.c67
+sdl3example: sdl3example.c67
 	c67 -o $@ $<
 
-test_bool: sdl3example.c67
+test_bool: test_bool.c67
 	c67 -o $@ $<
 
-test_bool2: test_bool.c67
+test_bool2: test_bool2.c67
 	c67 -o $@ $<
 
-test_cli_args: test_bool2.c67
+test_cli_args: test_cli_args.c67
 	c67 -o $@ $<
 
-test_cstring_access: test_cli_args.c67
+test_cstring_access: test_cstring_access.c67
 	c67 -o $@ $<
 
-test_fstring: test_cstring_access.c67
+test_fstring: test_fstring.c67
 	c67 -o $@ $<
 
-test_match: test_fstring.c67
+test_match: test_match.c67
 	c67 -o $@ $<
 
 clean:
