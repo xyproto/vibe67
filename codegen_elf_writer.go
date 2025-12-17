@@ -332,20 +332,18 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	// DON'T re-define rodata symbols - they already exist from first pass
 	// Re-defining them would change their addresses and break PC-relative references
 
-	// ===== AVX-512 CPU DETECTION (regenerated only if needed) =====
-	if fc.runtimeFeatures.needsCPUDetection() {
-		fc.out.MovImmToReg("rax", "7")              // CPUID leaf 7
-		fc.out.XorRegWithReg("rcx", "rcx")          // subleaf 0
-		fc.out.Emit([]byte{0x0f, 0xa2})             // cpuid
-		fc.out.Emit([]byte{0xf6, 0xc3, 0x01})       // test bl, 1
-		fc.out.Emit([]byte{0x0f, 0xba, 0xe3, 0x10}) // bt ebx, 16
-		fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
-		fc.out.LeaSymbolToReg("rbx", "cpu_has_avx512")
-		fc.out.MovByteRegToMem("rax", "rbx", 0) // Write only AL, not full RAX
-		fc.out.XorRegWithReg("rax", "rax")
-		fc.out.XorRegWithReg("rbx", "rbx")
-		fc.out.XorRegWithReg("rcx", "rcx")
-	}
+	// ===== AVX-512 CPU DETECTION (regenerated) =====
+	fc.out.MovImmToReg("rax", "7")              // CPUID leaf 7
+	fc.out.XorRegWithReg("rcx", "rcx")          // subleaf 0
+	fc.out.Emit([]byte{0x0f, 0xa2})             // cpuid
+	fc.out.Emit([]byte{0xf6, 0xc3, 0x01})       // test bl, 1
+	fc.out.Emit([]byte{0x0f, 0xba, 0xe3, 0x10}) // bt ebx, 16
+	fc.out.Emit([]byte{0x0f, 0x92, 0xc0})       // setc al
+	fc.out.LeaSymbolToReg("rbx", "cpu_has_avx512")
+	fc.out.MovByteRegToMem("rax", "rbx", 0) // Write only AL, not full RAX
+	fc.out.XorRegWithReg("rax", "rax")
+	fc.out.XorRegWithReg("rbx", "rbx")
+	fc.out.XorRegWithReg("rcx", "rcx")
 	// ===== END AVX-512 DETECTION =====
 
 	// Recompile with correct addresses
@@ -381,10 +379,8 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 
 	fc.pushDeferScope()
 
-	// Initialize arena system only if needed (malloc'd arenas at runtime)
-	if fc.usesArenas {
-		fc.initializeMetaArenaAndGlobalArena()
-	}
+	// Initialize arena system (malloc'd arenas at runtime)
+	fc.initializeMetaArenaAndGlobalArena()
 
 	// Generate code with symbols collected
 	for _, stmt := range program.Statements {

@@ -846,13 +846,6 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 		fc.usesArenas = true
 	}
 
-	if VerboseMode || fc.debug {
-		fmt.Fprintf(os.Stderr, "Runtime feature analysis results:\n")
-		fmt.Fprintf(os.Stderr, "  needsCPUDetection: %v\n", fc.runtimeFeatures.needsCPUDetection())
-		fmt.Fprintf(os.Stderr, "  needsArenaInit: %v\n", fc.runtimeFeatures.needsArenaInit())
-		fmt.Fprintf(os.Stderr, "  usesArenas: %v\n", fc.usesArenas)
-	}
-
 	// Use ARM64 code generator if target is ARM64
 	if fc.eb.target.Arch() == ArchARM64 {
 		if VerboseMode {
