@@ -21,6 +21,9 @@ const (
 	FeatureAVX2         RuntimeFeature = "avx2"
 	FeatureAVX512       RuntimeFeature = "avx512"
 	FeaturePOPCNT       RuntimeFeature = "popcnt"
+	FeatureDynamicLink  RuntimeFeature = "dynamic_link"
+	FeatureMalloc       RuntimeFeature = "malloc"
+	FeatureCFFI         RuntimeFeature = "cffi"
 )
 
 type RuntimeFeatures struct {
@@ -54,6 +57,10 @@ func (rf *RuntimeFeatures) needsArenaInit() bool {
 	return rf.Uses(FeatureMetaArena) || rf.Uses(FeatureArenaCreate) || 
 		rf.Uses(FeatureArenaAlloc) || rf.Uses(FeatureStringConcat) || 
 		rf.Uses(FeatureListConcat) || rf.Uses(FeatureListRepeat)
+}
+
+func (rf *RuntimeFeatures) needsDynamicLinking() bool {
+	return rf.Uses(FeatureDynamicLink) || rf.Uses(FeatureMalloc) || rf.Uses(FeatureCFFI)
 }
 
 func (rf *RuntimeFeatures) AnalyzeGeneratedCode(code []byte) {

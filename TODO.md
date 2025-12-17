@@ -1,5 +1,48 @@
 # TODO
 
+## Binary Size Optimization
+
+### Current State (DONE)
+- ✅ Runtime feature tracking implemented (53% size reduction: 45KB → 21KB)
+- ✅ Conditional CPU detection (only if SIMD/FMA/AVX used)
+- ✅ Conditional arena initialization (only if strings/lists/arenas used)
+- ✅ Type-aware analysis for detecting string concatenation
+- ✅ Minimal program (`x = 42`) compiles without CPU detection or arena init
+
+### Static ELF Generation (IN PROGRESS)
+**Goal**: Further reduce binary size by eliminating PLT/GOT for programs with no external function calls.
+
+**Current blocker**: 21KB includes ~8KB for PLT/GOT/dynamic sections even when unused.
+
+**Key insight**: c67 runtime uses syscalls (write, mmap, exit), NOT libc functions! So minimal programs need ZERO external function calls and can be fully static.
+
+**Implementation approach** (for future work):
+1. Track dynamic linking needs via `needsDynamicLinking()` (DONE in runtime_tracker.go)
+2. Conditionally enable/disable `useDynamicLinking` flag (needs more work)
+3. Modify `WriteCompleteDynamicELF()` to handle both static and dynamic cases:
+   - Static: 4 program headers (PHDR, LOAD(ro), LOAD(rx), LOAD(rw))
+   - Dynamic: 6 program headers (+ INTERP, + DYNAMIC)
+   - Skip: interpreter string, dynsym, dynstr, hash, rela, PLT, GOT, dynamic section
+
+**Challenges**:
+- `elf_complete.go` is 900+ lines designed for dynamic linking
+- Many layout calculations assume dynamic sections exist
+- Program header count changes (4 vs 6)
+- Read-only segment size calculation differs
+- Executable segment start differs (text vs plt+text)
+- Writable segment start differs (rodata vs dynamic+got+rodata)
+
+**Expected savings**: ~5-8KB (from 21KB → 13-16KB for minimal programs)
+
+**Testing needed**:
+- Verify static ELF type (ET_EXEC not ET_DYN)
+- Verify no INTERP or DYNAMIC program headers  
+- Ensure `ldd` shows "not a dynamic executable"
+- Test on different Linux distros
+- Verify debuggability with gdb
+
+## Other TODOs
+
 ## unsafe
 
 Fix this problem:
