@@ -128,8 +128,7 @@ sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
 defer sdl.SDL_Quit()
 ```
 
-## 🎮 Example: SDL3 Pong
-A complete, no-dependency graphical application in ~60 lines.
+## 🎮 Example: Simple use of SDL3
 
 ```c67
 import sdl3 as sdl
