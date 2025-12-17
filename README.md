@@ -130,46 +130,80 @@ defer sdl.SDL_Quit()
 
 ## 🎮 Example: Simple use of SDL3
 
+* Requires `img/grumpy-cat.bmp`.
+* When compiling for Windows, this also requires `SDL3.dll` and the `include/SDL3` folder (with SDL3 header files).
+
 ```c67
+// Import the SDL3 library (auto detect header files and library files with pkg-config on Linux, use SDL3.dll and include/* on Windows)
 import sdl3 as sdl
 
-WIDTH := 800
-HEIGHT := 600
+// Set the window dimentions
+width = 620
+height = 387
 
-sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! exitln("Init failed")
+// Initialize SDL with SDL_Init. Use the "or!" keyword to handle the case where SDL_Init returns nothing.
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
+    // Exitf is like printf, but writes to stderr and also quits the program with error code 1
+    exitf("SDL_Init failed: %s\n", sdl.SDL_GetError())
+}
+
+// Call SDL_Quit when the program ends
 defer sdl.SDL_Quit()
 
-window := sdl.SDL_CreateWindow("Pong", WIDTH, HEIGHT, 0) or! exitln("Window failed")
+// Create window, or exit with an error
+window = sdl.SDL_CreateWindow("Hello World!", width, height, sdl.SDL_WINDOW_RESIZABLE) or! {
+    exitf("Failed to create window: %s\n", sdl.SDL_GetError())
+}
+
+// Call SDL_DestroyWindow when the program ends (before SDL_Quit)
 defer sdl.SDL_DestroyWindow(window)
 
-renderer := sdl.SDL_CreateRenderer(window, 0) or! exitln("Renderer failed")
+// Create renderer, or exit with an error
+renderer = sdl.SDL_CreateRenderer(window, 0) or! {
+    exitf("Failed to create renderer: %s\n", sdl.SDL_GetError())
+}
+
+// Call SDL_DestroyRenderer when the program ends (before SDL_DestroyWindow and SDL_Quit)
 defer sdl.SDL_DestroyRenderer(renderer)
 
-ball_y := 300.0
-speed := 4.0
-running := 1
-
-@ { // Infinite loop
-    // Event handling
-    @ {
-        e := sdl.SDL_PollEvent(0)
-        | e == 0 => ret @ // break inner loop
-        | sdl.SDL_EventType(e) == sdl.SDL_EVENT_QUIT => { running = 0; ret @ }
-    }
-    | running == 0 => ret @ // break outer loop
-
-    // Logic
-    ball_y += speed
-    | ball_y > 600 or ball_y < 0 => speed = -speed
-
-    // Render
-    sdl.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255)
-    sdl.SDL_RenderClear(renderer)
-    sdl.SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255)
-    sdl.SDL_RenderFillRect(renderer, 400, ball_y, 20, 20)
-    sdl.SDL_RenderPresent(renderer)
-    sdl.SDL_Delay(16)
+// Load BMP file, or exit with an error
+file = sdl.SDL_IOFromFile("img/grumpy-cat.bmp", "rb") or! {
+    exitf("Error reading file: %s\n", sdl.SDL_GetError())
 }
+
+// Load surface from file, or exit with an error
+bmp = sdl.SDL_LoadBMP_IO(file, 1) or! {
+    exitf("Error creating surface: %s\n", sdl.SDL_GetError())
+}
+
+// Clean up the surface when the program ends
+defer sdl.SDL_DestroySurface(bmp)
+
+// Create texture from surface, or exit with an error
+tex = sdl.SDL_CreateTextureFromSurface(renderer, bmp) or! {
+    exitf("Error creating texture: %s\n", sdl.SDL_GetError())
+}
+
+// Clean up the surface when the program ends
+defer sdl.SDL_DestroyTexture(tex)
+
+// Main rendering loop. Run for approximately 2 seconds (20 frames * 100ms = 2s)
+@ frame in 0..<20 {
+
+    // Clear screen
+    sdl.SDL_RenderClear(renderer)
+
+    // Render texture (fills entire window)
+    sdl.SDL_RenderTexture(renderer, tex, 0, 0)
+
+    // Present the rendered frame
+    sdl.SDL_RenderPresent(renderer)
+
+    // Delay to maintain framerate
+    sdl.SDL_Delay(100)
+}
+
+// That's it
 ```
 
 ## 🔧 Platform Support
