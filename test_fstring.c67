@@ -1,2 +1,0 @@
-name = "C67"
-println(f"Hello, {name}!")
