@@ -1,6 +1,26 @@
 # TODO
 
-## Priority 0: Fixes and verifications
+## Priority 0: ARM64/macOS Test Failures (Immediate)
+
+### Operators Not Implemented
+- [ ] Implement bit test operator (`?b`) for ARM64
+- [ ] Implement match guards for ARM64
+
+### C FFI Integration Issues
+- [ ] Fix C function calls (sin, cos, strlen, malloc) - currently treated as undefined instead of using C FFI
+- [ ] Ensure C library functions are properly resolved through dynamic linking
+
+### Lambda/Block Issues
+- [ ] Fix lambda execution - lambdas compile but don't execute correctly (empty output)
+- [ ] Debug lambda parameter passing and return values
+- [ ] Fix lambda variable capture in ARM64
+
+### Type Conversion & String Handling
+- [ ] Implement `str()` function for ARM64 (number to string conversion)
+- [ ] Fix f-string compilation for ARM64 (currently hangs due to missing str() function)
+- [ ] Ensure string concatenation works in f-string context
+
+## Priority 0: Fixes and verifications (General)
 
 - [ ] Fix variable scope tracking in lambda compilation (module-level mutable globals).
 - [ ] Verify import system properly initializes closures across modules.
