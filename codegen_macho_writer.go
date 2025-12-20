@@ -196,12 +196,25 @@ func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 	}
 
 	textSize := uint64(fc.eb.text.Len())
-	textSizeAligned := (textSize + pageSize - 1) &^ (pageSize - 1)
+
+	// Calculate stubs size (12 bytes per stub on ARM64, if dynamic linking)
+	stubsSize := uint64(0)
+	if fc.eb.useDynamicLinking && numImports > 0 {
+		stubsSize = uint64(numImports * 12)
+	}
+
+	// Calculate __TEXT segment size (must match WriteMachO logic)
+	// textSegFileSize = fileHeaderSize + textSize + stubsSize
+	textSegFileSize := fileHeaderSize + textSize + stubsSize
+	textSegVMSize := (textSegFileSize + pageSize - 1) &^ (pageSize - 1)
 
 	// Calculate rodata address (comes after __TEXT segment)
-	rodataAddr := baseAddr + pageSize + textSizeAligned
+	// This MUST match WriteMachO's calculation: rodataAddr = textAddr + textSegVMSize
+	rodataAddr := baseAddr + textSegVMSize
 
 	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "DEBUG: textSegFileSize=0x%x, textSegVMSize=0x%x, rodataAddr=0x%x\n",
+			textSegFileSize, textSegVMSize, rodataAddr)
 		fmt.Fprintln(os.Stderr, "-> Writing rodata symbols")
 	}
 
@@ -220,9 +233,10 @@ func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 	rodataSize = fc.eb.rodata.Len()
 
 	// Now write all writable data symbols to the data buffer and assign addresses
-	// Data comes after rodata
-	rodataSizeAligned := uint64((uint64(rodataSize) + pageSize - 1) &^ (pageSize - 1))
-	dataAddr := rodataAddr + rodataSizeAligned
+	// Data comes after rodata (NOT page-aligned - it's in the same __DATA segment)
+	// The __DATA segment file layout is: rodata + writable_data + padding + got
+	// So writable data VM address = rodataAddr + rodataSize (no page alignment)
+	dataAddr := rodataAddr + uint64(rodataSize)
 
 	if VerboseMode {
 		fmt.Fprintln(os.Stderr, "-> Writing data symbols")
