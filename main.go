@@ -337,7 +337,36 @@ func (eb *ExecutableBuilder) patchX86_64PCRel(textBytes []byte, offset int, text
 }
 
 func (eb *ExecutableBuilder) patchARM64PCRel(textBytes []byte, offset int, textAddr, targetAddr uint64, symbolName string) {
-	// ARM64: ADRP at offset, ADD at offset+4
+	// Check if this is a BL instruction (4 bytes) or an ADRP+ADD pair (8 bytes)
+	// BL starts with 0x94 (little-endian, so it's the last byte of the 32-bit word)
+	// Actually, in little-endian, 0x94 is the 4th byte.
+	if offset+4 <= len(textBytes) {
+		instr := uint32(textBytes[offset]) |
+			(uint32(textBytes[offset+1]) << 8) |
+			(uint32(textBytes[offset+2]) << 16) |
+			(uint32(textBytes[offset+3]) << 24)
+
+		if (instr & 0xFC000000) == 0x94000000 {
+			// This is a BL instruction
+			instrAddr := textAddr + uint64(offset)
+			pcOffset := int64(targetAddr) - int64(instrAddr)
+			imm26 := pcOffset >> 2
+
+			newInstr := (instr & 0xFC000000) | (uint32(imm26) & 0x03FFFFFF)
+			textBytes[offset] = byte(newInstr & 0xFF)
+			textBytes[offset+1] = byte((newInstr >> 8) & 0xFF)
+			textBytes[offset+2] = byte((newInstr >> 16) & 0xFF)
+			textBytes[offset+3] = byte((newInstr >> 24) & 0xFF)
+
+			if VerboseMode {
+				fmt.Fprintf(os.Stderr, "Patched ARM64 BL relocation: %s at offset 0x%x, target 0x%x, pcOffset %d\n",
+					symbolName, offset, targetAddr, pcOffset)
+			}
+			return
+		}
+	}
+
+	// Default: ADRP at offset, ADD at offset+4
 	// ADRP loads page-aligned address (upper 52 bits)
 	// ADD adds the low 12 bits
 	if offset+8 > len(textBytes) {
@@ -879,8 +908,8 @@ func (eb *ExecutableBuilder) GenerateCallInstruction(funcName string) error {
 	// - Internal C67 runtime functions (starting with _c67)
 	// - Functions starting with double underscore (like __acrt_iob_func on Windows)
 	targetName := funcName
-	if strings.HasPrefix(funcName, "_") && !strings.HasPrefix(funcName, "_c67") && !strings.HasPrefix(funcName, "__") {
-		targetName = funcName[1:] // Remove underscore for external C functions
+	if eb.target.OS() == OSDarwin && strings.HasPrefix(funcName, "_") && !strings.HasPrefix(funcName, "_c67") && !strings.HasPrefix(funcName, "__") {
+		targetName = funcName[1:] // Remove underscore for external C functions on macOS
 	}
 
 	// Register the call patch for later resolution
@@ -895,9 +924,15 @@ func (eb *ExecutableBuilder) GenerateCallInstruction(funcName string) error {
 			dispPosition = position + 2 // Skip FF 15 prefix
 		}
 	}
+
+	patchName := targetName
+	if !strings.HasPrefix(funcName, "_c67") && !strings.HasPrefix(funcName, "__") {
+		patchName += "$stub"
+	}
+
 	eb.callPatches = append(eb.callPatches, CallPatch{
 		position:   dispPosition,
-		targetName: targetName + "$stub",
+		targetName: patchName,
 	})
 
 	// Generate architecture-specific call instruction with placeholder
@@ -916,6 +951,11 @@ func (eb *ExecutableBuilder) GenerateCallInstruction(funcName string) error {
 		}
 	case ArchARM64:
 		w.WriteUnsigned(0x94000000) // BL placeholder
+		// Also add to pcRelocations so PatchPCRelocations can handle it
+		eb.pcRelocations = append(eb.pcRelocations, PCRelocation{
+			offset:     uint64(position),
+			symbolName: patchName,
+		})
 	case ArchRiscv64:
 		w.WriteUnsigned(0x000000EF) // JAL placeholder
 	}

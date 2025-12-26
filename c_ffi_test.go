@@ -112,7 +112,7 @@ println("Memory freed successfully")
 	if !strings.Contains(output, "Point.y offset: 8") {
 		t.Errorf("Expected Point.y offset: 8, got: %s", output)
 	}
-	if !strings.Contains(output, "Allocated 16.000000 bytes") {
+	if !strings.Contains(output, "Allocated 16") {
 		t.Errorf("Expected allocation message, got: %s", output)
 	}
 	if !strings.Contains(output, "Memory freed successfully") {

@@ -470,6 +470,8 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 	// Calculate sizes
 	textSize := uint64(eb.text.Len())
 	rodataSize := uint64(eb.rodata.Len())
+	dataSize := uint64(eb.data.Len())
+	combinedDataSize := rodataSize + dataSize
 
 	// Calculate dynamic linking section sizes
 	numImports := uint32(len(eb.neededFunctions))
@@ -481,10 +483,10 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 	}
 
 	// Align sizes (for reference, but mostly calculated dynamically now)
-	_ = (textSize + pageSize - 1) &^ (pageSize - 1)   // textSizeAligned - calculated dynamically in segment
-	_ = (rodataSize + pageSize - 1) &^ (pageSize - 1) // rodataSizeAligned - may be used later
-	_ = (stubsSize + 15) &^ 15                        // stubsSizeAligned - may be used for stub alignment
-	_ = (gotSize + 15) &^ 15                          // May be used for GOT alignment
+	_ = (textSize + pageSize - 1) &^ (pageSize - 1)         // textSizeAligned - calculated dynamically in segment
+	_ = (combinedDataSize + pageSize - 1) &^ (pageSize - 1) // rodataSizeAligned - may be used later
+	_ = (stubsSize + 15) &^ 15                              // stubsSizeAligned - may be used for stub alignment
+	_ = (gotSize + 15) &^ 15                                // May be used for GOT alignment
 
 	// Calculate addresses - __TEXT starts after zero page
 	textAddr := zeroPageSize // __TEXT segment starts at 4GB (includes headers at start)
@@ -543,9 +545,9 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 	prelimLoadCmdsSize += uint32(binary.Size(SegmentCommand64{}) + int(textNSects)*binary.Size(Section64{}))
 
 	// __DATA segment with sections (if needed)
-	if rodataSize > 0 || (eb.useDynamicLinking && numImports > 0) {
+	if combinedDataSize > 0 || (eb.useDynamicLinking && numImports > 0) {
 		dataNSects := uint32(0)
-		if rodataSize > 0 {
+		if combinedDataSize > 0 {
 			dataNSects++
 		}
 		if eb.useDynamicLinking && numImports > 0 {
@@ -852,16 +854,16 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 	}
 
 	// 3. LC_SEGMENT_64 for __DATA with __data and __got sections
-	if rodataSize > 0 || (eb.useDynamicLinking && numImports > 0) {
+	if combinedDataSize > 0 || (eb.useDynamicLinking && numImports > 0) {
 		dataNSects := uint32(0)
-		if rodataSize > 0 {
+		if combinedDataSize > 0 {
 			dataNSects++
 		}
 		if eb.useDynamicLinking && numImports > 0 {
 			dataNSects++
 		}
 
-		dataFileSize := rodataSize + uint64(eb.data.Len())
+		dataFileSize := combinedDataSize
 		if eb.useDynamicLinking && numImports > 0 {
 			dataFileSize += gotSize
 		}
@@ -883,11 +885,11 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 		copy(seg.SegName[:], "__DATA")
 		binary.Write(&loadCmdsBuf, binary.LittleEndian, &seg)
 
-		// __data section (rodata)
-		if rodataSize > 0 {
+		// __data section (rodata + writable data)
+		if combinedDataSize > 0 {
 			sect := Section64{
 				Addr:      rodataSectAddr,
-				Size:      rodataSize,
+				Size:      combinedDataSize,
 				Offset:    uint32(rodataFileOffset),
 				Align:     3, // 2^3 = 8 byte alignment
 				Reloff:    0,
@@ -1253,7 +1255,7 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 		buf.Write(eb.rodata.Bytes())
 	}
 	// Write writable data (like _itoa_buffer)
-	dataSize := uint64(eb.data.Len())
+	dataSize = uint64(eb.data.Len())
 	if dataSize > 0 {
 		buf.Write(eb.data.Bytes())
 	}

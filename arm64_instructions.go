@@ -962,6 +962,107 @@ func (a *ARM64Out) FmovGPToDouble(dest, src string) error {
 	return nil
 }
 
+// FMADD (scalar): FMADD Dd, Dn, Dm, Da (d = n*m + a)
+func (a *ARM64Out) FmaddScalar64(dest, op1, op2, acc string) error {
+	rd, ok := arm64FPRegs[dest]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", dest)
+	}
+	rn, ok := arm64FPRegs[op1]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", op1)
+	}
+	rm, ok := arm64FPRegs[op2]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", op2)
+	}
+	ra, ok := arm64FPRegs[acc]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", acc)
+	}
+
+	// FMADD (scalar, double): sf=1, S=0, type=01, opcode=0000
+	// 1f000000 | (Rm<<16) | (Ra<<10) | (Rn<<5) | Rd
+	instr := uint32(0x1f000000) | (rm << 16) | (ra << 10) | (rn << 5) | rd
+	a.encodeInstr(instr)
+	return nil
+}
+
+// FMSUB (scalar): FMSUB Dd, Dn, Dm, Da (d = n*m - a)
+func (a *ARM64Out) FmsubScalar64(dest, op1, op2, acc string) error {
+	rd, ok := arm64FPRegs[dest]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", dest)
+	}
+	rn, ok := arm64FPRegs[op1]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", op1)
+	}
+	rm, ok := arm64FPRegs[op2]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", op2)
+	}
+	ra, ok := arm64FPRegs[acc]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", acc)
+	}
+
+	// FMSUB (scalar, double): opcode=1000 (negate accumulator)
+	instr := uint32(0x1f008000) | (rm << 16) | (ra << 10) | (rn << 5) | rd
+	a.encodeInstr(instr)
+	return nil
+}
+
+// FNMADD (scalar): FNMADD Dd, Dn, Dm, Da (d = -n*m + a)
+func (a *ARM64Out) FnmaddScalar64(dest, op1, op2, acc string) error {
+	rd, ok := arm64FPRegs[dest]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", dest)
+	}
+	rn, ok := arm64FPRegs[op1]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", op1)
+	}
+	rm, ok := arm64FPRegs[op2]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", op2)
+	}
+	ra, ok := arm64FPRegs[acc]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", acc)
+	}
+
+	// FNMADD (scalar, double): opcode=0001 (negate product) -> bit 21 set
+	instr := uint32(0x1f200000) | (rm << 16) | (ra << 10) | (rn << 5) | rd
+	a.encodeInstr(instr)
+	return nil
+}
+
+// FNMSUB (scalar): FNMSUB Dd, Dn, Dm, Da (d = -n*m - a)
+func (a *ARM64Out) FnmsubScalar64(dest, op1, op2, acc string) error {
+	rd, ok := arm64FPRegs[dest]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", dest)
+	}
+	rn, ok := arm64FPRegs[op1]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", op1)
+	}
+	rm, ok := arm64FPRegs[op2]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", op2)
+	}
+	ra, ok := arm64FPRegs[acc]
+	if !ok {
+		return fmt.Errorf("invalid ARM64 FP register: %s", acc)
+	}
+
+	// FNMSUB (scalar, double): opcode=1001 (negate product and accumulator)
+	instr := uint32(0x1f208000) | (rm << 16) | (ra << 10) | (rn << 5) | rd
+	a.encodeInstr(instr)
+	return nil
+}
+
 // FCMP (scalar): FCMP Dn, Dm (floating-point compare, sets flags)
 func (a *ARM64Out) FcmpScalar64(op1, op2 string) error {
 	rn, ok := arm64FPRegs[op1]

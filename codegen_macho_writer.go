@@ -72,7 +72,7 @@ func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 		funcName := strings.TrimSuffix(patch.targetName, "$stub")
 
 		// Skip internal C67 runtime functions (they're defined in the binary)
-		if strings.HasPrefix(funcName, "_c67_") || strings.HasPrefix(funcName, "c67_") {
+		if strings.HasPrefix(funcName, "_c67_") || strings.HasPrefix(funcName, "c67_") || strings.HasPrefix(funcName, "__") {
 			continue
 		}
 
@@ -120,10 +120,11 @@ func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 	// Calculate preliminary load commands size (matching macho.go logic exactly)
 	// Check if there are any rodata symbols to be written
 	rodataSymbols := fc.eb.RodataSection()
-	hasRodata := len(rodataSymbols) > 0
+	dataSymbols := fc.eb.DataSection()
+	hasRodata := len(rodataSymbols) > 0 || len(dataSymbols) > 0
 	rodataSize := 0
 	if hasRodata {
-		rodataSize = 1 // Placeholder value >  0 to indicate rodata exists
+		rodataSize = 1 // Placeholder value >  0 to indicate rodata/data exists
 	}
 	numImports := uint32(len(neededFuncs))
 	loadCmdsSize := uint32(0)
@@ -243,7 +244,7 @@ func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 	}
 
 	// Get all writable data symbols and write them
-	dataSymbols := fc.eb.DataSection()
+	dataSymbols = fc.eb.DataSection()
 	currentAddr = dataAddr
 	for symbol, value := range dataSymbols {
 		fc.eb.WriteData([]byte(value))
@@ -256,14 +257,23 @@ func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 
 	dataSize := fc.eb.data.Len()
 
-	// Set lambda function addresses from labels
+	// Set addresses for all labels (lambdas and runtime helpers)
 	for labelName, offset := range fc.eb.labels {
-		if strings.HasPrefix(labelName, "lambda_") {
-			lambdaAddr := textSectAddr + uint64(offset)
-			fc.eb.DefineAddr(labelName, lambdaAddr)
-			if VerboseMode {
-				fmt.Fprintf(os.Stderr, "DEBUG: Setting %s address to 0x%x (offset %d)\n", labelName, lambdaAddr, offset)
-			}
+		labelAddr := textSectAddr + uint64(offset)
+		fc.eb.DefineAddr(labelName, labelAddr)
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "DEBUG: Setting label %s address to 0x%x (offset %d)\n", labelName, labelAddr, offset)
+		}
+	}
+
+	// Set stub addresses for external functions
+	stubsAddr := textSectAddr + uint64(fc.eb.text.Len())
+	for i, funcName := range fc.eb.neededFunctions {
+		stubName := funcName + "$stub"
+		stubAddr := stubsAddr + uint64(i*12)
+		fc.eb.DefineAddr(stubName, stubAddr)
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "DEBUG: Setting stub %s address to 0x%x\n", stubName, stubAddr)
 		}
 	}
 
