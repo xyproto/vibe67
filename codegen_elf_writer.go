@@ -16,7 +16,71 @@ import (
 
 // Confidence that this function is working: 85%
 func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
-	// Enable dynamic linking for ELF (required for WriteCompleteDynamicELF)
+	// Check if dynamic linking is actually needed
+	// On Linux, printf/println use syscalls, not libc
+	libcFunctions := map[string]bool{
+		// Note: printf NOT in list - C67 implements it with syscalls on Linux
+		"sprintf": true, "snprintf": true, "fprintf": true, "dprintf": true,
+		"puts": true, "putchar": true, "fputc": true, "fputs": true, "fflush": true,
+		"scanf": true, "sscanf": true, "fscanf": true,
+		"fopen": true, "fclose": true, "fread": true, "fwrite": true, "fseek": true, "ftell": true,
+		"malloc": true, "calloc": true, "realloc": true, "free": true,
+		"memcpy": true, "memset": true, "memmove": true, "memcmp": true,
+		"strlen": true, "strcpy": true, "strncpy": true, "strcmp": true, "strncmp": true,
+		"strcat": true, "strncat": true, "strchr": true, "strrchr": true, "strstr": true,
+		"exit": true, "abort": true, "atexit": true,
+		"getenv": true, "setenv": true, "unsetenv": true,
+		"time": true, "clock": true, "localtime": true, "gmtime": true,
+		"dlopen": true, "dlsym": true, "dlclose": true, "dlerror": true,
+	}
+	
+	needsLibc := false
+	for funcName := range fc.usedFunctions {
+		if libcFunctions[funcName] {
+			needsLibc = true
+			if VerboseMode {
+				fmt.Fprintf(os.Stderr, "Function '%s' requires libc\n", funcName)
+			}
+			break
+		}
+	}
+	
+	// Check if any C FFI functions are used
+	hasCFFI := len(fc.cFFIFunctions) > 0
+	
+	// TEMPORARILY DISABLE STATIC ELF - always use dynamic
+	// TODO: Fix static ELF generation (crashes on execution)
+	needsStatic := false // !needsLibc && !hasCFFI
+	_ = hasCFFI // suppress unused warning
+	
+	// If no dynamic libraries needed, use simple static ELF
+	if needsStatic {
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "No dynamic linking needed - generating static ELF\n")
+		}
+		fc.eb.useDynamicLinking = false
+		
+		// Write simple static ELF header
+		if err := fc.eb.WriteELFHeader(); err != nil {
+			return fmt.Errorf("failed to write ELF header: %v", err)
+		}
+		
+		// Get complete binary (header + rodata + data + text)
+		elfBytes := fc.eb.Bytes()
+		if err := os.WriteFile(outputPath, elfBytes, 0755); err != nil {
+			return fmt.Errorf("failed to write executable: %v", err)
+		}
+		
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "Wrote static ELF: %d bytes\n", len(elfBytes))
+		}
+		return nil
+	}
+	
+	// Dynamic linking needed - use complete dynamic ELF writer
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "Dynamic linking required\n")
+	}
 	fc.eb.useDynamicLinking = true
 
 	// First pass: Build initial PLT with main program functions
@@ -51,28 +115,7 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	ds := NewDynamicSections(fc.eb.target.Arch())
 	fc.dynamicSymbols = ds
 
-	// Add library dependencies based on functions used in main program
-	libcFunctions := map[string]bool{
-		"printf": true, "sprintf": true, "snprintf": true, "fprintf": true, "dprintf": true,
-		"puts": true, "putchar": true, "fputc": true, "fputs": true, "fflush": true,
-		"scanf": true, "sscanf": true, "fscanf": true,
-		"fopen": true, "fclose": true, "fread": true, "fwrite": true, "fseek": true, "ftell": true,
-		"malloc": true, "calloc": true, "realloc": true, "free": true,
-		"memcpy": true, "memset": true, "memmove": true, "memcmp": true,
-		"strlen": true, "strcpy": true, "strncpy": true, "strcmp": true, "strncmp": true,
-		"strcat": true, "strncat": true, "strchr": true, "strrchr": true, "strstr": true,
-		"exit": true, "abort": true, "atexit": true,
-		"getenv": true, "setenv": true, "unsetenv": true,
-		"time": true, "clock": true, "localtime": true, "gmtime": true,
-		"dlopen": true, "dlsym": true, "dlclose": true, "dlerror": true,
-	}
-	needsLibc := false
-	for funcName := range fc.usedFunctions {
-		if libcFunctions[funcName] {
-			needsLibc = true
-			break
-		}
-	}
+	// Add library dependencies
 	if needsLibc {
 		ds.AddNeeded("libc.so.6")
 	}
@@ -82,24 +125,8 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 		ds.AddNeeded("libpthread.so.0")
 	}
 
-	// Check if libm functions are used
-	libmFunctions := map[string]bool{
-		"sqrt": true, "sin": true, "cos": true, "tan": true,
-		"asin": true, "acos": true, "atan": true, "atan2": true,
-		"sinh": true, "cosh": true, "tanh": true,
-		"log": true, "log10": true, "exp": true, "pow": true,
-		"fabs": true, "fmod": true, "ceil": true, "floor": true,
-	}
-	needsLibm := false
-	for funcName := range fc.usedFunctions {
-		if libmFunctions[funcName] {
-			needsLibm = true
-			break
-		}
-	}
-	if needsLibm {
-		ds.AddNeeded("libm.so.6")
-	}
+	// Check if libm functions are used (sin, cos, etc use x87 instructions, not libm)
+	// Only need libm if explicitly calling through C FFI
 
 	// Add C library dependencies from imports
 	for libName := range fc.cLibHandles {
