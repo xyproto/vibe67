@@ -44,6 +44,28 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 			break
 		}
 	}
+	
+	// Math functions that require libm when called via C FFI
+	libmFunctions := map[string]bool{
+		"sin": true, "cos": true, "tan": true, "asin": true, "acos": true, "atan": true, "atan2": true,
+		"sinh": true, "cosh": true, "tanh": true,
+		"log": true, "log10": true, "exp": true, "pow": true, "sqrt": true,
+		"fabs": true, "fmod": true, "ceil": true, "floor": true,
+	}
+	
+	needsLibm := false
+	
+	// Check C FFI calls - these need dynamic linking
+	for funcName, libName := range fc.cFFIFunctions {
+		if libName == "c" {
+			// Check if it's a math function
+			if libmFunctions[funcName] {
+				needsLibm = true
+			} else {
+				needsLibc = true
+			}
+		}
+	}
 
 	// Check if any C FFI functions are used
 	hasCFFI := len(fc.cFFIFunctions) > 0
@@ -119,13 +141,14 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	if needsLibc {
 		ds.AddNeeded("libc.so.6")
 	}
+	if needsLibm {
+		ds.AddNeeded("libm.so.6")
+	}
 
 	// Check if pthread functions are used
 	if fc.usedFunctions["pthread_create"] || fc.usedFunctions["pthread_join"] {
 		ds.AddNeeded("libpthread.so.0")
 	}
-
-	// Note: sin, cos, sqrt, pow all use x87/SSE instructions - no libm needed!
 
 	// Add C library dependencies from imports
 	for libName := range fc.cLibHandles {
