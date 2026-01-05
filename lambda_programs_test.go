@@ -56,7 +56,7 @@ println(counter(5))
 			expected: "105\n",
 		},
 		{
-			name:     "lambda_captures_module_global_mutable",
+			name: "lambda_captures_module_global_mutable",
 			source: `counter := 0
 increment := () -> {
     counter <- counter + 1
@@ -83,7 +83,7 @@ println(f(3))
 			expected: "SKIP: Known issue - module-level mutable updates don't reflect in closures",
 		},
 		{
-			name:     "lambda_modifying_captured_mutable",
+			name: "lambda_modifying_captured_mutable",
 			source: `total := 0
 add_to_total := (n) -> {
     total <- total + n

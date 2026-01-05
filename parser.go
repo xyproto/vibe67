@@ -4863,7 +4863,7 @@ func isRegisterName(name string) bool {
 		"xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
 		"stack",
 	}
-	
+
 	// ARM64 registers
 	arm64Regs := []string{
 		"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7",
@@ -4874,7 +4874,7 @@ func isRegisterName(name string) bool {
 		"w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7",
 		"v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
 	}
-	
+
 	// RISC-V registers
 	riscvRegs := []string{
 		"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
@@ -4883,7 +4883,7 @@ func isRegisterName(name string) bool {
 		"ra", "sp", "gp", "tp",
 		"fa0", "fa1", "fa2", "fa3", "fa4", "fa5", "fa6", "fa7",
 	}
-	
+
 	for _, reg := range x86Regs {
 		if name == reg {
 			return true
@@ -5057,7 +5057,7 @@ func (p *Parser) parseUnsafeValue() interface{} {
 	if leftIsImmediate {
 		return leftValue
 	}
-	
+
 	// Check if left is a register name or a variable
 	// If it's a known register, return as string
 	// Otherwise, return as IdentExpr (variable reference)
