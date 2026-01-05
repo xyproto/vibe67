@@ -71,6 +71,7 @@ type C67Compiler struct {
 	functionSignatures   map[string]*FunctionSignature // function name -> signature (params, variadic)
 	sourceCode           string                        // Store source for recompilation
 	usedFunctions        map[string]bool               // Track which functions are called
+	calledLambdas        map[string]bool               // Track which user lambdas are called
 	unknownFunctions     map[string]bool               // Track functions called but not defined
 	callOrder            []string                      // Track order of function calls
 	cFFIFunctions        map[string]string             // Track C FFI calls: function -> library
@@ -208,6 +209,7 @@ func NewC67Compiler(platform Platform, verbose bool) (*C67Compiler, error) {
 		varTypeInfo:         make(map[string]*C67Type),
 		functionSignatures:  make(map[string]*FunctionSignature),
 		usedFunctions:       make(map[string]bool),
+		calledLambdas:       make(map[string]bool),
 		unknownFunctions:    make(map[string]bool),
 		callOrder:           []string{},
 		cFFIFunctions:       make(map[string]string),
@@ -7221,9 +7223,49 @@ func (fc *C67Compiler) predeclareLambdaSymbols() {
 }
 
 func (fc *C67Compiler) generateLambdaFunctions() {
+	// Dead code elimination: collect all function calls from the program
+	// to determine which lambdas are actually used
+	calls := make(map[string]bool)
+	
+	// Collect calls from all statements (including lambdas)
+	for _, lambda := range fc.lambdaFuncs {
+		collectFunctionCalls(lambda.Body, calls)
+	}
+	
+	// Mark called lambdas
+	for funcName := range calls {
+		fc.calledLambdas[funcName] = true
+	}
+	
+	// Always include "main" if it exists
+	fc.calledLambdas["main"] = true
+	
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "DEBUG DCE: Total lambdas=%d, Called lambdas=%d\n", 
+			len(fc.lambdaFuncs), len(fc.calledLambdas))
+		if len(fc.calledLambdas) < len(fc.lambdaFuncs) {
+			uncalled := []string{}
+			for _, lambda := range fc.lambdaFuncs {
+				if !fc.calledLambdas[lambda.Name] {
+					uncalled = append(uncalled, lambda.Name)
+				}
+			}
+			fmt.Fprintf(os.Stderr, "DEBUG DCE: Skipping unused functions: %v\n", uncalled)
+		}
+	}
+	
 	// Use index-based loop to handle lambdas added during iteration (nested lambdas)
 	for i := 0; i < len(fc.lambdaFuncs); i++ {
 		lambda := fc.lambdaFuncs[i]
+		
+		// Skip unused lambdas (DCE)
+		if !fc.calledLambdas[lambda.Name] {
+			if VerboseMode {
+				fmt.Fprintf(os.Stderr, "DEBUG DCE: Skipping unused lambda '%s'\n", lambda.Name)
+			}
+			continue
+		}
+		
 		if VerboseMode {
 			fmt.Fprintf(os.Stderr, "DEBUG generateLambdaFunctions: generating lambda '%s' with body type %T\n", lambda.Name, lambda.Body)
 		}
@@ -12163,7 +12205,7 @@ func (fc *C67Compiler) compileCFunctionCall(libName string, funcName string, arg
 
 	// Track library dependency for ELF generation
 	fc.cLibHandles[libName] = "linked" // Mark as needing dynamic linking
-	
+
 	// Track C FFI function and library for verbose output
 	fc.cFFIFunctions[funcName] = libName
 	fc.dynamicLibraries[libName] = true
@@ -12657,6 +12699,9 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fmt.Fprintf(os.Stderr, "DEBUG compileCall: function='%s'\n", call.Function)
 		fmt.Fprintf(os.Stderr, "DEBUG compileCall: variables=%v\n", fc.variables)
 	}
+
+	// Track this function call for DCE
+	fc.calledLambdas[call.Function] = true
 
 	// Check if this is a recursive call (function name matches current lambda)
 	isRecursive := fc.currentLambda != nil && call.Function == fc.currentLambda.Name
@@ -19201,7 +19246,7 @@ func CompileC67WithOptions(inputPath string, outputPath string, platform Platfor
 			}
 		}
 	}
-	
+
 	// Report dynamic linking information in verbose mode
 	if verbose {
 		fmt.Fprintf(os.Stderr, "\n=== Dynamic Linking ===\n")

@@ -29,7 +29,7 @@ func (eb *ExecutableBuilder) WriteELFHeader() error {
 	w := eb.ELFWriter()
 	rodataSize := eb.rodata.Len()
 	codeSize := eb.text.Len()
-	
+
 	if VerboseMode {
 		fmt.Fprintf(os.Stderr, "WriteELFHeader: rodata=%d bytes, text=%d bytes, data=%d bytes\n",
 			rodataSize, codeSize, eb.data.Len())

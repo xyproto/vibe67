@@ -33,7 +33,7 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 		"time": true, "clock": true, "localtime": true, "gmtime": true,
 		"dlopen": true, "dlsym": true, "dlclose": true, "dlerror": true,
 	}
-	
+
 	needsLibc := false
 	for funcName := range fc.usedFunctions {
 		if libcFunctions[funcName] {
@@ -44,39 +44,39 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 			break
 		}
 	}
-	
+
 	// Check if any C FFI functions are used
 	hasCFFI := len(fc.cFFIFunctions) > 0
-	
+
 	// TEMPORARILY DISABLE STATIC ELF - always use dynamic
 	// TODO: Fix static ELF generation (crashes on execution)
 	needsStatic := false // !needsLibc && !hasCFFI
-	_ = hasCFFI // suppress unused warning
-	
+	_ = hasCFFI          // suppress unused warning
+
 	// If no dynamic libraries needed, use simple static ELF
 	if needsStatic {
 		if VerboseMode {
 			fmt.Fprintf(os.Stderr, "No dynamic linking needed - generating static ELF\n")
 		}
 		fc.eb.useDynamicLinking = false
-		
+
 		// Write simple static ELF header
 		if err := fc.eb.WriteELFHeader(); err != nil {
 			return fmt.Errorf("failed to write ELF header: %v", err)
 		}
-		
+
 		// Get complete binary (header + rodata + data + text)
 		elfBytes := fc.eb.Bytes()
 		if err := os.WriteFile(outputPath, elfBytes, 0755); err != nil {
 			return fmt.Errorf("failed to write executable: %v", err)
 		}
-		
+
 		if VerboseMode {
 			fmt.Fprintf(os.Stderr, "Wrote static ELF: %d bytes\n", len(elfBytes))
 		}
 		return nil
 	}
-	
+
 	// Dynamic linking needed - use complete dynamic ELF writer
 	if VerboseMode {
 		fmt.Fprintf(os.Stderr, "Dynamic linking required\n")
