@@ -4850,6 +4850,58 @@ func (p *Parser) parseUnsafeBlock() []Statement {
 	return statements
 }
 
+// isRegisterName checks if a name refers to a register
+func isRegisterName(name string) bool {
+	// x86_64 registers
+	x86Regs := []string{
+		"rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp", "rsp",
+		"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15",
+		"eax", "ebx", "ecx", "edx", "esi", "edi", "ebp", "esp",
+		"ax", "bx", "cx", "dx", "si", "di", "bp", "sp",
+		"al", "bl", "cl", "dl", "sil", "dil", "bpl", "spl",
+		"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
+		"xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
+		"stack",
+	}
+	
+	// ARM64 registers
+	arm64Regs := []string{
+		"x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7",
+		"x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15",
+		"x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23",
+		"x24", "x25", "x26", "x27", "x28", "x29", "x30",
+		"sp", "xzr", "lr",
+		"w0", "w1", "w2", "w3", "w4", "w5", "w6", "w7",
+		"v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
+	}
+	
+	// RISC-V registers
+	riscvRegs := []string{
+		"a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7",
+		"t0", "t1", "t2", "t3", "t4", "t5", "t6",
+		"s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11",
+		"ra", "sp", "gp", "tp",
+		"fa0", "fa1", "fa2", "fa3", "fa4", "fa5", "fa6", "fa7",
+	}
+	
+	for _, reg := range x86Regs {
+		if name == reg {
+			return true
+		}
+	}
+	for _, reg := range arm64Regs {
+		if name == reg {
+			return true
+		}
+	}
+	for _, reg := range riscvRegs {
+		if name == reg {
+			return true
+		}
+	}
+	return false
+}
+
 // parseUnsafeValue parses the RHS of a register assignment in unsafe blocks
 func (p *Parser) parseUnsafeValue() interface{} {
 	// Check for memory load: [rax] or [rax + offset]
@@ -5005,7 +5057,14 @@ func (p *Parser) parseUnsafeValue() interface{} {
 	if leftIsImmediate {
 		return leftValue
 	}
-	return left
+	
+	// Check if left is a register name or a variable
+	// If it's a known register, return as string
+	// Otherwise, return as IdentExpr (variable reference)
+	if isRegisterName(left) {
+		return left
+	}
+	return &IdentExpr{Name: left}
 }
 
 // parseTypeAnnotation parses a type annotation (after :)

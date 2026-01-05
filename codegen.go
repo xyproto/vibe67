@@ -6731,6 +6731,14 @@ func (fc *C67Compiler) compileRegisterAssignment(stmt *RegisterAssignStmt) {
 		// Type cast: rax <- 42 as uint8, rax <- ptr as pointer
 		fc.compileUnsafeCast(register, v)
 
+	case *IdentExpr:
+		// Variable reference: rax <- ptr
+		// Load the variable value and move it to the register
+		fc.compileExpression(v)
+		// Result is in xmm0 as float64 representing the integer value
+		// Convert back to integer
+		fc.out.Cvttsd2si(register, "xmm0")
+
 	default:
 		compilerError("unsupported value type in register assignment: %T", v)
 	}

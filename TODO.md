@@ -51,7 +51,7 @@ The goal is to enable the creation of competitive 64k intros (Linux/x86_64) usin
     - [ ] **Debug Info**: Generate DWARF v5 debug information for GDB/LLDB support.
     - [ ] **Formatter**: Implement `c67 fmt` for canonical code style.
 - [ ] **Compiler Correctness & Robustness**
-    - [ ] **Fix Unsafe Bug**: Fix register assignment limitation (`rax <- ptr`) to allow raw memory iteration.
+    - [ ] **Register Allocation**: Upgrade from simple allocator to Linear Scan or Graph Coloring for denser code.
     - [ ] **Register Allocation**: Upgrade from simple allocator to Linear Scan or Graph Coloring for denser code.
     - [ ] **Fuzzing**: Set up fuzz testing for the parser to prevent crashes on invalid input.
 - [ ] **Performance Proof**

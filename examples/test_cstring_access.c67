@@ -1,66 +1,66 @@
 // Test C string pointer arithmetic and byte access
 // This mimics how a compiler would parse source code stored as a C string
 
+import "libc.so.6" as c
+
 // 1. Allocate a C string manually
 // "ABC" = 65, 66, 67, 0
-ptr := c.malloc(4)
+ptr := c.malloc(4 as uint64)
 println(f"ptr: {ptr}")
 
-println("Skipping unsafe pointer access test: Direct pointer arithmetic on c.malloc pointers is not currently supported (see TODO.md).")
-
 // Write "ABC\0" to memory
-// unsafe {
-//     rax <- ptr
-//     [rax] <- 65 as uint8
-//     [rax + 1] <- 66 as uint8
-//     [rax + 2] <- 67 as uint8
-//     [rax + 3] <- 0 as uint8
-// } {
-//     x0 <- ptr
-//     [x0] <- 65 as uint8
-//     [x0 + 1] <- 66 as uint8
-//     [x0 + 2] <- 67 as uint8
-//     [x0 + 3] <- 0 as uint8
-// } {
-//     a0 <- ptr
-//     [a0] <- 65 as uint8
-//     [a0 + 1] <- 66 as uint8
-//     [a0 + 2] <- 67 as uint8
-//     [a0 + 3] <- 0 as uint8
-// }
-//
-// // 2. Read bytes back using pointer arithmetic
-// read_byte = (base_ptr, offset) -> {
-//     unsafe {
-//         rax <- base_ptr
-//         rbx <- offset
-//         rax <- rax + rbx
-//         rbx <- [rax] as uint8
-//         rax <- rbx // Return value must be in rax
-//     } {
-//         // ARM64 implementation
-//         x0 <- base_ptr
-//         x1 <- offset
-//         x0 <- x0 + x1
-//         x0 <- [x0] as uint8
-//     } {
-//         // RISCV64 implementation
-//         a0 <- base_ptr
-//         a1 <- offset
-//         a0 <- a0 + a1
-//         a0 <- [a0] as uint8
-//     }
-// }
-//
-// // 3. Test reading
-// byte0 := read_byte(ptr, 0)
-// byte1 := read_byte(ptr, 1)
-// byte2 := read_byte(ptr, 2)
-// byte3 := read_byte(ptr, 3)
-//
-// println(byte0) // Expected: 65
-// println(byte1) // Expected: 66
-// println(byte2) // Expected: 67
-// println(byte3) // Expected: 0
+unsafe {
+    rax <- ptr
+    [rax] <- 65 as uint8
+    [rax + 1] <- 66 as uint8
+    [rax + 2] <- 67 as uint8
+    [rax + 3] <- 0 as uint8
+} {
+    x0 <- ptr
+    [x0] <- 65 as uint8
+    [x0 + 1] <- 66 as uint8
+    [x0 + 2] <- 67 as uint8
+    [x0 + 3] <- 0 as uint8
+} {
+    a0 <- ptr
+    [a0] <- 65 as uint8
+    [a0 + 1] <- 66 as uint8
+    [a0 + 2] <- 67 as uint8
+    [a0 + 3] <- 0 as uint8
+}
+
+// 2. Read bytes back using pointer arithmetic
+read_byte = (base_ptr, offset) -> {
+    unsafe {
+        rax <- base_ptr
+        rbx <- offset
+        rax <- rax + rbx
+        rbx <- [rax] as uint8
+        rax <- rbx // Return value must be in rax
+    } {
+        // ARM64 implementation
+        x0 <- base_ptr
+        x1 <- offset
+        x0 <- x0 + x1
+        x0 <- [x0] as uint8
+    } {
+        // RISCV64 implementation
+        a0 <- base_ptr
+        a1 <- offset
+        a0 <- a0 + a1
+        a0 <- [a0] as uint8
+    }
+}
+
+// 3. Test reading
+byte0 := read_byte(ptr, 0)
+byte1 := read_byte(ptr, 1)
+byte2 := read_byte(ptr, 2)
+byte3 := read_byte(ptr, 3)
+
+println(byte0) // Expected: 65
+println(byte1) // Expected: 66
+println(byte2) // Expected: 67
+println(byte3) // Expected: 0
 
 c.free(ptr)
