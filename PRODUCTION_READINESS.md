@@ -25,7 +25,9 @@
 - Current: 3 LOAD segments with 4KB alignment = 12KB minimum
 - Target: 1 LOAD segment with 1-byte alignment = actual code size
 - Merge .text, .data, .rodata into single segment
-**Implementation**: Custom ELF writer mode
+**Implementation**: Simple static ELF writer in elf.go already exists!
+**Status**: Partially working - generates 730-byte binaries but crashes on execution
+**Issue**: Entry point or initialization sequence needs investigation
 
 ### Solution 3: Dead Code Elimination
 **Saves**: ~5KB
