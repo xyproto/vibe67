@@ -8,7 +8,7 @@
 2. [ ] Strip dynamic linker if no C FFI used (auto-detect libc dependency)
 3. [ ] Merge all segments into single RWX segment with custom ELF header (saves ~8KB)
 4. [ ] Use smallest ELF header (overlap PHDR with ELF header, 52 bytes minimum)
-5. [ ] Add verbose output showing which dynamic libs/functions are used
+5. [x] Add verbose output showing which dynamic libs/functions are used
 
 ## Priority 1: ARM64 Backend Fixes
 
