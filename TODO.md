@@ -4,11 +4,12 @@
 
 ### Critical for demoscene - current 21KB blocks 64k intros
 
-1. [ ] Implement dead code elimination at function level
-2. [ ] Strip dynamic linker if no C FFI used (auto-detect libc dependency)
-3. [ ] Merge all segments into single RWX segment with custom ELF header (saves ~8KB)
-4. [ ] Use smallest ELF header (overlap PHDR with ELF header, 52 bytes minimum)
-5. [x] Add verbose output showing which dynamic libs/functions are used
+1. [x] Implement dead code elimination at function level (partial - lambdas only)
+2. [ ] Complete DCE: scan main program statements for calls
+3. [ ] Strip dynamic linker if no C FFI used (infrastructure exists, needs debug)
+4. [ ] Merge all segments into single RWX segment with custom ELF header (saves ~8KB)
+5. [ ] Use smallest ELF header (overlap PHDR with ELF header, 52 bytes minimum)
+6. [x] Add verbose output showing which dynamic libs/functions are used
 
 ## Priority 1: ARM64 Backend Fixes
 
