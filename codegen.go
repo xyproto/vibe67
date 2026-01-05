@@ -909,7 +909,7 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 				if VerboseMode {
 					fmt.Fprintf(os.Stderr, "DEBUG: Skipping auto-call of main() (already called at top level)\n")
 				}
-				fc.out.XorRegWithReg("xmm0", "xmm0")
+				fc.out.XorpdXmm("xmm0", "xmm0")
 			}
 		} else {
 			// main is a direct value - just load it
@@ -918,7 +918,7 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 		// Result is in xmm0 (float64)
 	} else {
 		// No main - use exit code 0
-		fc.out.XorRegWithReg("xmm0", "xmm0")
+		fc.out.XorpdXmm("xmm0", "xmm0")
 	}
 
 	// Convert float64 result in xmm0 to int32 in rdi (for exit code)
@@ -13089,6 +13089,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		// print (without newline) uses syscalls on Linux, printf on Windows
 		if len(call.Args) == 0 {
 			// Nothing to print
+			fc.out.XorpdXmm("xmm0", "xmm0")
 			return
 		}
 
@@ -13143,6 +13144,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.eb.GenerateCallInstruction("_c67_print_syscall")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
+			fc.out.XorpdXmm("xmm0", "xmm0")
 			return
 		} else if fstrExpr, ok := arg.(*FStringExpr); ok {
 			// F-string - compile it and then print
@@ -13166,6 +13168,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.eb.GenerateCallInstruction("_c67_print_syscall")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
+			fc.out.XorpdXmm("xmm0", "xmm0")
 			return
 		} else {
 			// Number or other expression
@@ -13207,6 +13210,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.deallocateShadowSpace(shadowSpace)
 			}
 		}
+		fc.out.XorpdXmm("xmm0", "xmm0")
 		return
 
 	case "println":
@@ -13236,6 +13240,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.eb.GenerateCallInstruction("printf")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
+			fc.out.XorpdXmm("xmm0", "xmm0")
 			return
 		}
 
@@ -13493,6 +13498,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 			fc.eb.GenerateCallInstruction("printf")
 			fc.deallocateShadowSpace(shadowSpace)
 		}
+		fc.out.XorpdXmm("xmm0", "xmm0")
 		return
 
 	case "printf":
@@ -13511,6 +13517,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		// On Linux, use syscall-based printf; on other systems, use libc
 		if fc.eb.target.OS() == OSLinux {
 			fc.compilePrintfSyscall(call, strExpr)
+			fc.out.XorpdXmm("xmm0", "xmm0")
 			return
 		}
 
@@ -13779,6 +13786,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		for i := len(allocatedCalleeSaved) - 1; i >= 0; i-- {
 			fc.out.PopReg(allocatedCalleeSaved[i])
 		}
+		fc.out.XorpdXmm("xmm0", "xmm0")
 
 	case "eprint", "eprintln", "eprintf":
 		// Confidence that this function is working: 85%

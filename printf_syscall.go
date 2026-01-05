@@ -619,6 +619,7 @@ func (fc *C67Compiler) compilePrintfSyscall(call *CallExpr, formatStr *StringExp
 			}
 		}
 	}
+	fc.out.XorpdXmm("xmm0", "xmm0")
 }
 
 // emitSyscallPrintLiteral emits code to print a literal string using syscalls
