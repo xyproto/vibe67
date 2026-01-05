@@ -4870,23 +4870,18 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 			jumpPos := fc.eb.text.Len()
 			fc.out.JumpConditional(JumpNotEqual, 0) // Placeholder
 
-			// Modulo by zero: print error and exit
-			errorMsg := "Error: modulo by zero\n"
-			errorLabel := fmt.Sprintf("mod_zero_error_%d", fc.stringCounter)
-			fc.stringCounter++
-			fc.eb.Define(errorLabel, errorMsg)
+			// Modulo by zero: return error NaN with "mod\0" code
+			// Error format: 0x7FF8_0000_6D6F_6400 (quiet NaN + "mod\0")
+			fc.out.Emit([]byte{0x48, 0xb8})                                     // mov rax, immediate64
+			fc.out.Emit([]byte{0x00, 0x64, 0x6f, 0x6d, 0x00, 0x00, 0xf8, 0x7f}) // NaN with "mod\0"
+			fc.out.SubImmFromReg("rsp", 8)
+			fc.out.MovRegToMem("rax", "rsp", 0)
+			fc.out.MovMemToXmm("xmm0", "rsp", 0)
+			fc.out.AddImmToReg("rsp", 8)
 
-			// syscall: write(2, msg, len)
-			fc.out.MovImmToReg("rax", "1")
-			fc.out.MovImmToReg("rdi", "2")
-			fc.out.LeaSymbolToReg("rsi", errorLabel)
-			fc.out.MovImmToReg("rdx", fmt.Sprintf("%d", len(errorMsg)))
-			fc.eb.Emit("syscall")
-
-			// syscall: exit(1)
-			fc.out.MovImmToReg("rax", "60")
-			fc.out.MovImmToReg("rdi", "1")
-			fc.eb.Emit("syscall")
+			// Jump over the normal modulo
+			modDonePos := fc.eb.text.Len()
+			fc.out.JumpUnconditional(0) // Placeholder
 
 			// Patch jump to here (safe modulo)
 			safePos := fc.eb.text.Len()
@@ -4916,6 +4911,11 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 
 			fc.regTracker.FreeXMM(tmpDividend)
 			fc.regTracker.FreeXMM(tmpDivisor)
+
+			// Patch the jump over modulo
+			endPos := fc.eb.text.Len()
+			modDoneOffset := int32(endPos - (modDonePos + 5))
+			fc.patchJumpImmediate(modDonePos+1, modDoneOffset)
 		case "<", "<=", ">", ">=", "==", "!=":
 			// Compare xmm0 with xmm1, sets flags
 			fc.out.Ucomisd("xmm0", "xmm1")
@@ -11098,8 +11098,44 @@ func (fc *C67Compiler) compileBinaryOpSafe(left, right Expression, operator stri
 	case "*":
 		fc.out.MulsdXmm("xmm0", "xmm1")
 	case "/":
-		// Division needs zero check - caller should handle
-		fc.out.DivsdXmm("xmm0", "xmm1")
+		// Check for division by zero (xmm1 == 0.0)
+		zeroReg := fc.regTracker.AllocXMM("div_zero_check")
+		if zeroReg == "" {
+			zeroReg = "xmm2" // Fallback
+		}
+		fc.out.XorpdXmm(zeroReg, zeroReg) // zero register = 0.0
+		fc.out.Ucomisd("xmm1", zeroReg)   // Compare divisor with 0
+		fc.regTracker.FreeXMM(zeroReg)
+
+		// Jump to division if not zero
+		jumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpNotEqual, 0) // Placeholder, will patch later
+
+		// Division by zero: return error NaN with "dv0\0" code
+		// Error format: 0x7FF8_0000_6476_3000 (quiet NaN + error code)
+		fc.out.Emit([]byte{0x48, 0xb8})                                     // mov rax, immediate64
+		fc.out.Emit([]byte{0x00, 0x30, 0x76, 0x64, 0x00, 0x00, 0xf8, 0x7f}) // NaN with "dv0\0"
+		fc.out.SubImmFromReg("rsp", 8)
+		fc.out.MovRegToMem("rax", "rsp", 0)
+		fc.out.MovMemToXmm("xmm0", "rsp", 0)
+		fc.out.AddImmToReg("rsp", 8)
+
+		// Jump over the normal division
+		divDonePos := fc.eb.text.Len()
+		fc.out.JumpUnconditional(0) // Placeholder
+
+		// Patch jump to here (safe division)
+		safePos := fc.eb.text.Len()
+		jumpEndPos := jumpPos + 6
+		offset := int32(safePos - jumpEndPos)
+		fc.patchJumpImmediate(jumpPos+2, offset)
+
+		fc.out.DivsdXmm("xmm0", "xmm1") // divsd xmm0, xmm1
+
+		// Patch the jump over division
+		endPos := fc.eb.text.Len()
+		divDoneOffset := int32(endPos - (divDonePos + 5))
+		fc.patchJumpImmediate(divDonePos+1, divDoneOffset)
 	default:
 		compilerError("unsupported operator in compileBinaryOpSafe: %s", operator)
 	}
