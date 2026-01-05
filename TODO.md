@@ -4,11 +4,11 @@
 
 ### Critical for demoscene - current 21KB blocks 64k intros
 
-1. [ ] Strip dynamic linker dependency - use direct syscalls only (saves ~4KB)
-2. [ ] Merge all segments into single RWX segment with custom ELF header (saves ~8KB page alignment)
-3. [ ] Implement dead code elimination - remove unused printf/arena code (saves ~5KB)
+1. [ ] Implement dead code elimination at function level
+2. [ ] Strip dynamic linker if no C FFI used (auto-detect libc dependency)
+3. [ ] Merge all segments into single RWX segment with custom ELF header (saves ~8KB)
 4. [ ] Use smallest ELF header (overlap PHDR with ELF header, 52 bytes minimum)
-5. [ ] Add `-tiny` flag: disable .dynamic, .interp sections, minimal PLT/GOT
+5. [ ] Add verbose output showing which dynamic libs/functions are used
 
 ## Priority 1: ARM64 Backend Fixes
 
