@@ -51,7 +51,6 @@ The goal is to enable the creation of competitive 64k intros (Linux/x86_64) usin
     - [ ] **Formatter**: Implement `c67 fmt` for canonical code style.
 - [ ] **Compiler Correctness & Robustness**
     - [ ] **Register Allocation**: Upgrade from simple allocator to Linear Scan or Graph Coloring for denser code.
-    - [ ] **Register Allocation**: Upgrade from simple allocator to Linear Scan or Graph Coloring for denser code.
     - [ ] **Fuzzing**: Set up fuzz testing for the parser to prevent crashes on invalid input.
 - [ ] **Performance Proof**
     - [ ] Create a benchmark suite comparing C67 vs C (gcc -O2/-O3) vs Go.

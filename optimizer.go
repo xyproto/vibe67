@@ -157,13 +157,13 @@ func foldConstantExpr(expr Expression) Expression {
 				if rightNum.Value != 0 {
 					result = leftNum.Value / rightNum.Value
 				} else {
-					return e // Don't fold division by zero
+					return e // Don't fold division by zero - let it be runtime error
 				}
 			case "mod", "%":
 				if rightNum.Value != 0 {
 					result = math.Mod(leftNum.Value, rightNum.Value)
 				} else {
-					return e // Don't fold modulo by zero
+					return e // Don't fold modulo by zero - let it be runtime error
 				}
 			default:
 				return e // Don't fold comparisons
