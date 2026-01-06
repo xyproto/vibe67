@@ -141,6 +141,12 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 				textAddr, rodataAddr)
 		}
 		fc.eb.PatchPCRelocations(textAddr, rodataAddr, rodataSize)
+		
+		// Patch direct function calls
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "Patching call sites: textAddr=0x%x\n", textAddr)
+		}
+		fc.eb.PatchCallSites(textAddr)
 
 		// Get complete binary (header + rodata + data + text)
 		elfBytes := fc.eb.Bytes()
