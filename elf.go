@@ -28,11 +28,12 @@ const (
 func (eb *ExecutableBuilder) WriteELFHeader() error {
 	w := eb.ELFWriter()
 	rodataSize := eb.rodata.Len()
+	dataSize := eb.data.Len()
 	codeSize := eb.text.Len()
 
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "WriteELFHeader: rodata=%d bytes, text=%d bytes, data=%d bytes\n",
-			rodataSize, codeSize, eb.data.Len())
+		fmt.Fprintf(os.Stderr, "WriteELFHeader: rodata=%d bytes, data=%d bytes, text=%d bytes\n",
+			rodataSize, dataSize, codeSize)
 	}
 
 	// Magic
@@ -57,11 +58,11 @@ func (eb *ExecutableBuilder) WriteELFHeader() error {
 		fmt.Fprintln(os.Stderr)
 	}
 
-	entry := uint64(baseAddr + headerSize + rodataSize)
+	entry := uint64(baseAddr + headerSize + rodataSize + dataSize)
 
 	w.Write8u(entry)
 	w.Write8(progHeaderOffset)
-	w.Write8u(sectionTableAddr)
+	w.Write8u(0) // No section headers in static ELF
 	w.Write4(0)
 	w.Write2(elfHeaderSize)
 	w.Write2(progHeaderSize)
@@ -82,7 +83,7 @@ func (eb *ExecutableBuilder) WriteELFHeader() error {
 	w.Write8u(0)
 	w.Write8u(baseAddr)
 	w.Write8u(baseAddr)
-	fileSize := uint64(headerSize + rodataSize + codeSize)
+	fileSize := uint64(headerSize + rodataSize + dataSize + codeSize)
 	w.Write8u(fileSize)
 	w.Write8u(fileSize)
 	w.Write8u(pageSize)

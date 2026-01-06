@@ -70,10 +70,8 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	// Check if any C FFI functions are used
 	hasCFFI := len(fc.cFFIFunctions) > 0
 
-	// TEMPORARILY DISABLE STATIC ELF - always use dynamic
-	// TODO: Fix static ELF generation (crashes on execution)
-	needsStatic := false // !needsLibc && !hasCFFI
-	_ = hasCFFI          // suppress unused warning
+	// Enable static ELF when no dynamic libraries needed
+	needsStatic := !needsLibc && !needsLibm && !hasCFFI
 
 	// If no dynamic libraries needed, use simple static ELF
 	if needsStatic {
@@ -82,10 +80,67 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 		}
 		fc.eb.useDynamicLinking = false
 
-		// Write simple static ELF header
+		// Build data section from writable constants FIRST
+		fc.eb.data.Reset()
+		dataSymbols := make(map[string]int) // name -> offset in data section
+		currentOffset := 0
+		
+		// Collect writable constants
+		writableConsts := []struct{
+			name string
+			c *Const
+		}{}
+		for name, c := range fc.eb.consts {
+			if c.writable {
+				writableConsts = append(writableConsts, struct{name string; c *Const}{name, c})
+			}
+		}
+		
+		// Write data section
+		for _, entry := range writableConsts {
+			dataSymbols[entry.name] = currentOffset
+			fc.eb.data.Write([]byte(entry.c.value))
+			// Align to 8 bytes
+			padding := (8 - len(entry.c.value)%8) % 8
+			for i := 0; i < padding; i++ {
+				fc.eb.data.Write([]byte{0})
+			}
+			currentOffset += len(entry.c.value) + padding
+		}
+		
+		// NOW write ELF header (after data is populated)
 		if err := fc.eb.WriteELFHeader(); err != nil {
 			return fmt.Errorf("failed to write ELF header: %v", err)
 		}
+
+		// Calculate addresses for PC-relative relocations
+		headerSize := 64 + 56
+		rodataSize := fc.eb.rodata.Len()
+		dataSize := fc.eb.data.Len()
+		
+		// Memory layout: [headers][rodata][data][text]
+		rodataAddr := uint64(baseAddr + headerSize)
+		dataAddr := uint64(baseAddr + headerSize + rodataSize)
+		textAddr := uint64(baseAddr + headerSize + rodataSize + dataSize)
+		
+		// Assign addresses to data symbols
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "Assigning data symbol addresses: dataAddr=0x%x, size=%d\n",
+				dataAddr, dataSize)
+		}
+		for name, offset := range dataSymbols {
+			addr := dataAddr + uint64(offset)
+			fc.eb.DefineAddr(name, addr)
+			if VerboseMode {
+				fmt.Fprintf(os.Stderr, "  %s -> 0x%x (offset=%d)\n", name, addr, offset)
+			}
+		}
+		
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "Patching PC relocations: textAddr=0x%x, rodataAddr=0x%x\n",
+				textAddr, rodataAddr)
+		}
+		fc.eb.PatchPCRelocations(textAddr, rodataAddr, rodataSize)
 
 		// Get complete binary (header + rodata + data + text)
 		elfBytes := fc.eb.Bytes()
