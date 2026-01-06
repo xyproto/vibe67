@@ -712,6 +712,7 @@ func (fc *C67Compiler) emitSyscallPrintInteger() {
 // emitSyscallPrintC67String emits code to print a C67 string (in xmm0)
 func (fc *C67Compiler) emitSyscallPrintC67String() {
 	// Call the existing print syscall helper
+	fc.trackFunctionCall("_c67_print_syscall")
 	fc.out.MovqXmmToReg("rdi", "xmm0")
 	fc.out.CallSymbol("_c67_print_syscall")
 }

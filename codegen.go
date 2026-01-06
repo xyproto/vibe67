@@ -10253,8 +10253,13 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 	// Generate syscall-based print helpers for Linux
 	if fc.eb.target.OS() == OSLinux {
-		fc.generatePrintSyscall()
-		fc.generatePrintlnSyscall()
+		// Only generate if actually used
+		if fc.usedFunctions["_c67_print_syscall"] {
+			fc.generatePrintSyscall()
+		}
+		if fc.usedFunctions["_c67_println_syscall"] {
+			fc.generatePrintlnSyscall()
+		}
 	}
 
 	// Generate _c67_arena_ensure_capacity if arenas are used
