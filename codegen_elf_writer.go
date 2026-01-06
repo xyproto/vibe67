@@ -70,12 +70,16 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	// Check if any C FFI functions are used
 	hasCFFI := len(fc.cFFIFunctions) > 0
 
-	// Check if printf/println is used (requires dynamic linking for now)
-	// TODO: Implement static printf using only syscalls
-	needsPrintf := fc.usedFunctions["printf"] || fc.usedFunctions["println"] || fc.usedFunctions["print"]
+	// Check if printf/println/eprint is explicitly used by user code
+	needsPrintf := fc.usedFunctions["printf"] || fc.usedFunctions["println"] || fc.usedFunctions["print"] ||
+		fc.usedFunctions["eprint"] || fc.usedFunctions["eprintln"] || fc.usedFunctions["eprintf"]
+	
+	// Check if safety checks are used (they emit printf in error handlers)
+	// Only count if not in unsafe block (safety checks disabled)
+	needsSafetyPrintf := (fc.usesNullCheck || fc.usesBoundsCheck) && !fc.inUnsafeBlock
 
 	// Enable static ELF when no dynamic libraries needed AND no printf
-	needsStatic := !needsLibc && !needsLibm && !hasCFFI && !needsPrintf
+	needsStatic := !needsLibc && !needsLibm && !hasCFFI && !needsPrintf && !needsSafetyPrintf
 
 	// If no dynamic libraries needed, use simple static ELF
 	if needsStatic {

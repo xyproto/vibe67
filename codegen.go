@@ -143,6 +143,11 @@ type C67Compiler struct {
 	usesArenaAlloc   bool // Track if arena allocation is explicitly used
 	usesCPUFeatures  bool // Track if CPU feature detection is needed (FMA, SIMD, etc.)
 
+	// Safety check tracking (for DCE of error handlers)
+	usesNullCheck   bool // Track if null pointer checks are needed
+	usesBoundsCheck bool // Track if bounds checks are needed
+	usesDivCheck    bool // Track if division by zero checks are needed
+
 	// Runtime function emission flags (all true by default for full compatibility)
 
 }
@@ -685,9 +690,7 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	fc.movedVars = make(map[string]bool)
 	fc.scopedMoved = []map[string]bool{make(map[string]bool)}
 
-	// Arenas will be enabled on-demand when needed (string concat, list operations, etc.)
-	// TODO: Currently always enabled to ensure compatibility
-	fc.usesArenas = true
+	// Arenas enabled on-demand when needed (string concat, list operations, etc.)
 
 	// Check if main() is called at top level (to decide whether to auto-call main)
 	fc.mainCalledAtTopLevel = fc.detectMainCallInTopLevel(program.Statements)
@@ -835,6 +838,9 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// Arena initialization is needed only if we actually use arenas
 	// (e.g., for string concat, list operations, etc.)
 	if fc.usesArenas {
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "DEBUG: Initializing arena (usesArenas=%v)\n", fc.usesArenas)
+		}
 		fc.initializeMetaArenaAndGlobalArena()
 	}
 
@@ -4023,6 +4029,7 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 			fc.out.SubImmFromReg("rsp", StackSlotSize)
 
 			// Call _c67_string_concat(rdi, rsi) -> rax
+			fc.usesArenas = true
 			fc.trackFunctionCall("_c67_string_concat")
 			fc.out.CallSymbol("_c67_string_concat")
 
@@ -4517,6 +4524,7 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				fc.out.SubImmFromReg("rsp", StackSlotSize)
 
 				// Call the helper function (direct call, not through PLT)
+				fc.usesArenas = true
 				fc.trackFunctionCall("_c67_string_concat")
 				fc.out.CallSymbol("_c67_string_concat")
 
@@ -4823,6 +4831,9 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 			fc.out.Write(0xA9) // Opcode: VFMADD213SD
 			fc.out.Write(0xC1) // ModR/M: 11 000 001 (xmm0, xmm0, xmm1)
 		case "/":
+			// Track that division checks are used
+			fc.usesDivCheck = true
+			
 			// Check for division by zero (xmm1 == 0.0)
 			zeroReg := fc.regTracker.AllocXMM("div_zero_check")
 			if zeroReg == "" {
@@ -6962,6 +6973,9 @@ func (fc *C67Compiler) compileSizedMemoryStore(store *MemoryStore) {
 // and aborts the program with an error message if so.
 // This prevents segfaults from null pointer dereferences.
 func (fc *C67Compiler) emitNullPointerCheck(reg string) {
+	// Track that null checks are used
+	fc.usesNullCheck = true
+	
 	// Test if register is zero (null)
 	// test reg, reg sets ZF if reg == 0
 	fc.out.TestRegReg(reg, reg)
@@ -6973,12 +6987,12 @@ func (fc *C67Compiler) emitNullPointerCheck(reg string) {
 	// Null pointer detected - print error and exit
 	fc.out.LeaSymbolToReg("rdi", "_null_ptr_msg")
 	fc.out.XorRegWithReg("rax", "rax") // AL=0 for variadic function
-	fc.trackFunctionCall("printf")
+	// Don't track printf for safety checks - they're rarely executed
 	fc.eb.GenerateCallInstruction("printf")
 
 	// exit(1)
 	fc.out.MovImmToReg("rdi", "1")
-	fc.trackFunctionCall("exit")
+	// Don't track exit for safety checks
 	fc.eb.GenerateCallInstruction("exit")
 
 	// Patch the jump to skip error handling
@@ -6992,6 +7006,9 @@ func (fc *C67Compiler) emitNullPointerCheck(reg string) {
 // indexReg: register containing the index (as signed 64-bit integer)
 // lengthReg: register containing the list/array length (as signed 64-bit integer)
 func (fc *C67Compiler) emitBoundsCheck(indexReg, lengthReg string) {
+	// Track that bounds checks are used
+	fc.usesBoundsCheck = true
+	
 	// Check if index < 0
 	fc.out.CmpRegToImm(indexReg, 0)
 	negativeJumpPos := fc.eb.text.Len()
@@ -7010,20 +7027,20 @@ func (fc *C67Compiler) emitBoundsCheck(indexReg, lengthReg string) {
 	negativePos := fc.eb.text.Len()
 	fc.out.LeaSymbolToReg("rdi", "_bounds_negative_msg")
 	fc.out.XorRegWithReg("rax", "rax") // AL=0 for variadic function
-	fc.trackFunctionCall("printf")
+	// Don't track printf for safety checks
 	fc.eb.GenerateCallInstruction("printf")
 	fc.out.MovImmToReg("rdi", "1")
-	fc.trackFunctionCall("exit")
+	// Don't track exit for safety checks
 	fc.eb.GenerateCallInstruction("exit")
 
 	// Index >= length error handler
 	tooLargePos := fc.eb.text.Len()
 	fc.out.LeaSymbolToReg("rdi", "_bounds_too_large_msg")
 	fc.out.XorRegWithReg("rax", "rax") // AL=0 for variadic function
-	fc.trackFunctionCall("printf")
+	// Don't track printf for safety checks
 	fc.eb.GenerateCallInstruction("printf")
 	fc.out.MovImmToReg("rdi", "1")
-	fc.trackFunctionCall("exit")
+	// Don't track exit for safety checks
 	fc.eb.GenerateCallInstruction("exit")
 
 	// Continue here if index is valid
@@ -11180,6 +11197,9 @@ func (fc *C67Compiler) compileBinaryOpSafe(left, right Expression, operator stri
 	case "*":
 		fc.out.MulsdXmm("xmm0", "xmm1")
 	case "/":
+		// Track that division checks are used
+		fc.usesDivCheck = true
+		
 		// Check for division by zero (xmm1 == 0.0)
 		zeroReg := fc.regTracker.AllocXMM("div_zero_check")
 		if zeroReg == "" {
