@@ -70,8 +70,12 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	// Check if any C FFI functions are used
 	hasCFFI := len(fc.cFFIFunctions) > 0
 
-	// Enable static ELF when no dynamic libraries needed
-	needsStatic := !needsLibc && !needsLibm && !hasCFFI
+	// Check if printf/println is used (requires dynamic linking for now)
+	// TODO: Implement static printf using only syscalls
+	needsPrintf := fc.usedFunctions["printf"] || fc.usedFunctions["println"] || fc.usedFunctions["print"]
+
+	// Enable static ELF when no dynamic libraries needed AND no printf
+	needsStatic := !needsLibc && !needsLibm && !hasCFFI && !needsPrintf
 
 	// If no dynamic libraries needed, use simple static ELF
 	if needsStatic {
@@ -84,18 +88,21 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 		fc.eb.data.Reset()
 		dataSymbols := make(map[string]int) // name -> offset in data section
 		currentOffset := 0
-		
+
 		// Collect writable constants
-		writableConsts := []struct{
+		writableConsts := []struct {
 			name string
-			c *Const
+			c    *Const
 		}{}
 		for name, c := range fc.eb.consts {
 			if c.writable {
-				writableConsts = append(writableConsts, struct{name string; c *Const}{name, c})
+				writableConsts = append(writableConsts, struct {
+					name string
+					c    *Const
+				}{name, c})
 			}
 		}
-		
+
 		// Write data section
 		for _, entry := range writableConsts {
 			dataSymbols[entry.name] = currentOffset
@@ -107,7 +114,7 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 			}
 			currentOffset += len(entry.c.value) + padding
 		}
-		
+
 		// NOW write ELF header (after data is populated)
 		if err := fc.eb.WriteELFHeader(); err != nil {
 			return fmt.Errorf("failed to write ELF header: %v", err)
@@ -117,12 +124,12 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 		headerSize := 64 + 56
 		rodataSize := fc.eb.rodata.Len()
 		dataSize := fc.eb.data.Len()
-		
+
 		// Memory layout: [headers][rodata][data][text]
 		rodataAddr := uint64(baseAddr + headerSize)
 		dataAddr := uint64(baseAddr + headerSize + rodataSize)
 		textAddr := uint64(baseAddr + headerSize + rodataSize + dataSize)
-		
+
 		// Assign addresses to data symbols
 		if VerboseMode {
 			fmt.Fprintf(os.Stderr, "Assigning data symbol addresses: dataAddr=0x%x, size=%d\n",
@@ -135,13 +142,13 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 				fmt.Fprintf(os.Stderr, "  %s -> 0x%x (offset=%d)\n", name, addr, offset)
 			}
 		}
-		
+
 		if VerboseMode {
 			fmt.Fprintf(os.Stderr, "Patching PC relocations: textAddr=0x%x, rodataAddr=0x%x\n",
 				textAddr, rodataAddr)
 		}
 		fc.eb.PatchPCRelocations(textAddr, rodataAddr, rodataSize)
-		
+
 		// Patch direct function calls
 		if VerboseMode {
 			fmt.Fprintf(os.Stderr, "Patching call sites: textAddr=0x%x\n", textAddr)
@@ -150,10 +157,10 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 
 		// Get complete binary (header + rodata + data + text)
 		elfBytes := fc.eb.Bytes()
-		
+
 		// Detect bad addresses (unpatched relocations)
 		fc.detectBadAddresses(elfBytes)
-		
+
 		if err := os.WriteFile(outputPath, elfBytes, 0755); err != nil {
 			return fmt.Errorf("failed to write executable: %v", err)
 		}
