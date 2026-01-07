@@ -289,3 +289,246 @@ Remaining issues:
 
 Current state: All functionality working, tests passing, but binary sizes not yet optimized.
 
+---
+
+## CRITICAL: Demoscene & Game Development Readiness
+
+**Mission:** Make C67 production-ready for releasing cross-platform games on Steam and creating competitive demoscene productions (64k intros, demos).
+
+**Status as of 2026-01-07:** Tests passing, examples work, core compiler solid. Need production-level features below.
+
+### 1. BLOCKER: Binary Size for 64k Intros (HIGHEST PRIORITY)
+**Current State:** Minimal programs 609 bytes ✅, but realistic programs still 21KB (printf overhead)
+**Goal:** <10KB for typical intro with graphics, audio, effects
+**Required For:** 64k intro competitions, 4k intro competitions
+
+**Critical Fixes:**
+- [ ] **URGENT:** Strip unused printf/println components when only basic I/O needed
+- [ ] **URGENT:** Implement static syscall-based printf/println (no libc dependency, ~2KB vs 10KB)
+- [ ] **URGENT:** Merge segments to single RWX (saves ~8KB)
+- [ ] **HIGH:** Compress embedded error messages or make them optional via compiler flag
+- [ ] **HIGH:** Add `-tiny` compiler flag: disables NaN-boxing error handling, minimal runtime
+- [ ] **MEDIUM:** Dead code elimination for error handlers (currently unconditionally included)
+
+**Why This Matters:** 64k intros are the most popular demoscene category. Cannot compete at 21KB baseline.
+
+### 2. CRITICAL: Cross-Platform Binary Generation
+**Current State:** Linux x86-64 working, ARM64/RISC-V backends exist, Windows PE basic support
+**Goal:** Single-command builds for Windows, Linux, macOS (all architectures)
+**Required For:** Steam releases require Windows x64, Linux x64, macOS ARM64 minimum
+
+**Must-Have:**
+- [ ] **URGENT:** Fix Windows PE generation for optimized binaries (currently broken with some optimizations)
+- [ ] **URGENT:** Test and fix ARM64 backend (lambda execution empty output bug)
+- [ ] **URGENT:** Test and fix ARM64 C FFI (sin, cos, malloc treated as undefined)
+- [ ] **HIGH:** Complete Mach-O writer for macOS/ARM64 (partially implemented)
+- [ ] **HIGH:** Cross-compilation support (compile for other platforms from Linux host)
+- [ ] **MEDIUM:** Test RISC-V backend (infrastructure exists, needs validation)
+- [ ] **MEDIUM:** Add `-target` flag: `-target windows-x64`, `-target linux-arm64`, etc.
+
+**Why This Matters:** Steam requires Windows+Linux minimum. macOS strongly recommended. Cannot release without multi-platform.
+
+### 3. CRITICAL: Graphics & Audio Integration
+**Current State:** SDL3 tested and working ✅, basic C FFI works
+**Goal:** Battle-tested, production-ready graphics and audio pipelines
+**Required For:** Both games (real-time 3D) and demoscene (effects, procedural graphics)
+
+**Must-Have:**
+- [ ] **HIGH:** Validate SDL3 integration on Windows (currently only tested on Linux)
+- [ ] **HIGH:** Validate SDL3 integration on macOS (Mach-O + ARM64)
+- [ ] **HIGH:** OpenGL interop testing (SDL3 + OpenGL context + shader loading)
+- [ ] **HIGH:** Vulkan FFI support (demoscene increasingly uses Vulkan for effects)
+- [ ] **HIGH:** Audio synthesis examples (SDL3 audio, procedural sound for demos)
+- [ ] **MEDIUM:** DirectX 12 FFI support (Windows game performance)
+- [ ] **MEDIUM:** Metal FFI support (macOS/iOS game performance)
+- [ ] **LOW:** ImGui integration for debug overlays/tools
+
+**Why This Matters:** Games need 60fps stable rendering. Demos need advanced GPU effects. No graphics = not viable.
+
+### 4. CRITICAL: Floating-Point Precision & Math Performance
+**Current State:** FMA optimization working ✅, basic math via C FFI works
+**Goal:** Fast, accurate math for physics, graphics transforms, procedural generation
+**Required For:** Physics engines, 3D transforms, procedural content, shader math
+
+**Must-Have:**
+- [ ] **HIGH:** Validate FMA on Windows/ARM64 (currently x86-64 only tested)
+- [ ] **HIGH:** SIMD vectorization for vector math (3D vec3, vec4, mat4 operations)
+- [ ] **MEDIUM:** Fast transcendental functions (sin, cos, exp, log) via lookup tables or approximations
+- [ ] **MEDIUM:** Quaternion operations (critical for 3D rotations)
+- [ ] **MEDIUM:** Add `unsafe` SIMD intrinsics for manual optimization (SSE, AVX, NEON)
+- [ ] **LOW:** Soft-float mode for deterministic physics (same results across platforms)
+
+**Why This Matters:** Games need fast matrix math. Demos need fast procedural generation. Slow math = low FPS.
+
+### 5. CRITICAL: Memory Management for Production
+**Current State:** Arena allocators ✅, manual malloc/free via C FFI ✅
+**Goal:** Predictable, leak-free memory management for long-running games
+**Required For:** Games (hours of runtime), demos (repeated playback at events)
+
+**Must-Have:**
+- [ ] **HIGH:** Memory leak detection mode (track allocations, report leaks at exit)
+- [ ] **HIGH:** Arena cleanup verification (ensure scoped arenas free correctly)
+- [ ] **MEDIUM:** Custom allocator support (pool allocators for game objects)
+- [ ] **MEDIUM:** Stack allocator for per-frame temporary data
+- [ ] **LOW:** Memory profiling tool (show allocation hotspots)
+
+**Why This Matters:** Games cannot leak memory (multi-hour sessions). Demos must be stable for competition playback.
+
+### 6. IMPORTANT: Build Times & Developer Experience
+**Current State:** Fast compilation ✅ (< 100ms for small programs)
+**Goal:** Sub-second rebuilds for 10k+ LOC, great error messages
+**Required For:** Iteration speed during development, team productivity
+
+**Should-Have:**
+- [ ] **HIGH:** Incremental compilation (only recompile changed files)
+- [ ] **HIGH:** Better error messages with context (show line + surrounding code)
+- [ ] **MEDIUM:** Parallel compilation of multiple files
+- [ ] **MEDIUM:** Show warnings (unused variables, implicit conversions, etc.)
+- [ ] **LOW:** `-Wall` equivalent: all warnings enabled
+- [ ] **LOW:** Hot reload for development (already exists on Unix ✅, test thoroughly)
+
+**Why This Matters:** Fast iteration = better games. Clear errors = fewer bugs.
+
+### 7. IMPORTANT: Standard Library & Ecosystem
+**Current State:** Minimal builtins ✅ (by design), import system works ✅
+**Goal:** Essential libraries for game/demo development readily available
+**Required For:** Productivity, code reuse, community growth
+
+**Should-Have:**
+- [ ] **HIGH:** Math library (vec2, vec3, vec4, mat3, mat4, quaternions)
+- [ ] **HIGH:** String utilities (formatting, parsing, UTF-8)
+- [ ] **HIGH:** Collections library (dynamic arrays, hash tables, trees)
+- [ ] **MEDIUM:** File I/O library (read/write binary, text, JSON)
+- [ ] **MEDIUM:** Image loading (PNG, JPEG, TGA for textures)
+- [ ] **MEDIUM:** Audio loading (WAV, OGG, MP3 for sound effects/music)
+- [ ] **LOW:** Compression library (DEFLATE, LZ4 for asset compression)
+
+**Why This Matters:** Developers shouldn't reinvent the wheel. Standard library accelerates development.
+
+### 8. IMPORTANT: Performance Profiling & Optimization
+**Current State:** No profiling tools, manual optimization only
+**Goal:** Identify and fix performance bottlenecks quickly
+**Required For:** Hitting 60 FPS, optimizing demo effects, reducing load times
+
+**Should-Have:**
+- [ ] **HIGH:** Built-in CPU profiler (sampling profiler, show hot functions)
+- [ ] **MEDIUM:** Frame time profiler for games (show per-frame breakdown)
+- [ ] **MEDIUM:** Memory profiler (show allocation patterns)
+- [ ] **MEDIUM:** GPU profiler integration (OpenGL/Vulkan query timers)
+- [ ] **LOW:** Cache miss profiler (detect cache inefficiencies)
+
+**Why This Matters:** Cannot ship slow games/demos. Need to know where time is spent.
+
+### 9. NICE-TO-HAVE: Debugging & Tooling
+**Current State:** No debugger, no IDE integration
+**Goal:** Step through code, inspect variables, set breakpoints
+**Required For:** Finding complex bugs, understanding crashes
+
+**Nice-To-Have:**
+- [ ] **MEDIUM:** DWARF debug info generation (enable GDB/LLDB)
+- [ ] **MEDIUM:** Source-level debugging (step through C67 code, not assembly)
+- [ ] **LOW:** Basic LSP (go-to-definition, find-references)
+- [ ] **LOW:** Syntax highlighting for popular editors (VSCode, Vim, Emacs)
+- [ ] **LOW:** Code formatter (`c67 fmt`)
+
+**Why This Matters:** Debugging is painful without tools. Good tools = faster development.
+
+### 10. NICE-TO-HAVE: Asset Pipeline
+**Current State:** Manual asset management only
+**Goal:** Seamless asset loading and management
+**Required For:** Game production workflow, demo creation workflow
+
+**Nice-To-Have:**
+- [ ] **MEDIUM:** Asset bundling tool (pack all assets into single file)
+- [ ] **MEDIUM:** Asset hot reload (reload textures/sounds without restart)
+- [ ] **LOW:** Asset compression (automatic compression of assets)
+- [ ] **LOW:** Asset validation (check for missing/corrupt assets)
+
+**Why This Matters:** Games have hundreds of assets. Demos need packed data. Manual management doesn't scale.
+
+---
+
+### Priority Ranking for Steam/Demoscene Launch
+
+**PHASE 1: Core Blockers (Must ship before ANY release)**
+1. Binary size optimization for demos (64k intros require <10KB baseline)
+2. Windows PE + macOS Mach-O fully working (Steam requires multi-platform)
+3. SDL3 validated on all platforms (graphics + audio are fundamental)
+4. ARM64 backend bugs fixed (macOS + mobile)
+
+**PHASE 2: Production Readiness (Must ship before STABLE release)**
+5. Memory leak detection (games cannot leak)
+6. Better error messages (developers need good feedback)
+7. Math library (games need fast vec/mat operations)
+8. Incremental compilation (large projects need fast builds)
+
+**PHASE 3: Ecosystem Growth (Ship within 3-6 months)**
+9. CPU profiler (performance is everything in games/demos)
+10. DWARF debug info (complex bugs need debugger)
+11. Standard collections library (productivity)
+12. Image/audio loading (asset pipeline basics)
+
+**PHASE 4: Polish (Ship within 6-12 months)**
+13. LSP/tooling (IDE integration)
+14. Asset bundling (production workflow)
+15. GPU profiler integration (advanced optimization)
+
+---
+
+### Success Criteria
+
+**Demoscene Production Ready:**
+- [ ] Can create 64k intro that fits size limit (baseline <10KB)
+- [ ] Can render 60 FPS fullscreen effects on mid-range GPU
+- [ ] Can synthesize audio procedurally (no external libraries needed)
+- [ ] Binaries work on Windows, Linux, macOS without modification
+- [ ] Binary size competitive with C/C++ demos
+
+**Game Development / Steam Release Ready:**
+- [ ] Can build Windows + Linux + macOS from single codebase
+- [ ] Can integrate SDL3 or Vulkan graphics reliably
+- [ ] Can load textures, sounds, fonts from disk
+- [ ] Can run for hours without memory leaks
+- [ ] Performance competitive with C/C++ (within 20%)
+- [ ] Build times fast enough for team development (<5s for typical change)
+- [ ] Good enough error messages for onboarding new developers
+
+---
+
+### Estimated Timeline (Aggressive)
+
+**Month 1 (January 2026):**
+- Week 1-2: Binary size optimization (static printf, segment merging, `-tiny` flag)
+- Week 3: Windows PE validation + fixes
+- Week 4: ARM64 backend fixes + macOS testing
+
+**Month 2 (February 2026):**
+- Week 1-2: SDL3 multi-platform validation (Windows, macOS)
+- Week 3: Math library (vec2/3/4, mat4, quaternions)
+- Week 4: Memory leak detection + testing
+
+**Month 3 (March 2026):**
+- Week 1: Better error messages + warnings
+- Week 2-3: Incremental compilation
+- Week 4: First playable game demo + 64k intro demo
+
+**Month 4+ (April 2026+):**
+- Performance profiling tools
+- DWARF debug info
+- Asset pipeline
+- Community building
+
+**REALISTIC LAUNCH TARGET: April-May 2026** (3-4 months from now)
+
+This gives time for:
+- Core features complete ✅
+- Multi-platform testing ✅
+- Example games + demos ✅
+- Documentation ✅
+- Community feedback ✅
+
+---
+
+**Updated: 2026-01-07**
+**Status: All tests passing, examples working, compiler stable. Ready to execute plan above.**
+
