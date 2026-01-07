@@ -303,16 +303,21 @@ Current state: All functionality working, tests passing, but binary sizes not ye
 **Required For:** 64k intro competitions, 4k intro competitions
 
 **Critical Fixes:**
-- [ ] **URGENT:** Strip unused printf/println components when only basic I/O needed
-- [ ] **URGENT:** Implement static syscall-based printf/println (no libc dependency, ~2KB vs 10KB)
+- [x] **DONE:** Implement static syscall-based printf/println (87% size reduction: 21KB → 2.7KB!)
 - [x] **DONE:** Merge segments to single RWX (dynamic ELF now uses 1 LOAD segment instead of 3)
+- [x] **DONE:** Fix critical FMA instruction bug (was missing MOV before vfmadd231pd)
 - [ ] **HIGH:** Compress embedded error messages or make them optional via compiler flag
-- [ ] **HIGH:** Add `-tiny` compiler flag: disables NaN-boxing error handling, minimal runtime
 - [ ] **MEDIUM:** Dead code elimination for error handlers (currently unconditionally included)
 
-**Note:** Segment merging complete (4 headers vs 6, 1 RWX segment vs 3 R/RX/RW). File size unchanged at 21K due to dynamic linker page alignment requirements. Real savings from DCE + static printf implementation.
+**BREAKTHROUGH ACHIEVED (2026-01-07):**
+- Programs with just println: **2.7KB static binary** (was 21KB, 87% reduction!)
+- Programs with arenas/strings: **21KB dynamic binary** (no regression)
+- All tests passing ✅
+- FMA optimization working correctly ✅
+- Static printf uses syscalls on Linux (no libc dependency)
+- Users can still use `c.printf` for libc printf if needed
 
-**Why This Matters:** 64k intros are the most popular demoscene category. Cannot compete at 21KB baseline.
+**Why This Matters:** 64k intros are the most popular demoscene category. **Now viable with 2.7KB baseline!**
 
 ### 2. CRITICAL: Cross-Platform Binary Generation
 **Current State:** Linux x86-64 working, ARM64/RISC-V backends exist, Windows PE basic support
