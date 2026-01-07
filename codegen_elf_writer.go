@@ -70,6 +70,10 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	// Check if any C FFI functions are used
 	hasCFFI := len(fc.cFFIFunctions) > 0
 
+	// On Linux, printf/println use syscalls (no libc needed)
+	// On other platforms, they still need libc
+	printfNeedsLibc := fc.eb.target.OS() != OSLinux
+
 	// Check if printf/println/eprint is explicitly used by user code
 	needsPrintf := fc.usedFunctions["printf"] || fc.usedFunctions["println"] || fc.usedFunctions["print"] ||
 		fc.usedFunctions["eprint"] || fc.usedFunctions["eprintln"] || fc.usedFunctions["eprintf"]
@@ -78,8 +82,11 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	// Only count if not in unsafe block (safety checks disabled)
 	needsSafetyPrintf := (fc.usesNullCheck || fc.usesBoundsCheck) && !fc.inUnsafeBlock
 
-	// Enable static ELF when no dynamic libraries needed AND no printf
-	needsStatic := !needsLibc && !needsLibm && !hasCFFI && !needsPrintf && !needsSafetyPrintf
+	// Enable static ELF when no dynamic libraries needed
+	// On Linux, printf is syscall-based so doesn't need dynamic linking
+	// Arenas require dynamic linking (use mmap syscall)
+	needsStatic := !needsLibc && !needsLibm && !hasCFFI && !fc.usesArenas &&
+		!(printfNeedsLibc && (needsPrintf || needsSafetyPrintf))
 
 	// If no dynamic libraries needed, use simple static ELF
 	if needsStatic {
