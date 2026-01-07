@@ -45,8 +45,10 @@ func (eb *ExecutableBuilder) WriteCompleteDynamicELF(ds *DynamicSections, functi
 	ds.GenerateGOT(functions, 0, 0)
 
 	// Calculate memory layout
-	// We need: PHDR, INTERP, LOAD(ro), LOAD(rx), LOAD(rw), DYNAMIC
-	numProgHeaders := 6
+	// OPTIMIZED: Use single RWX LOAD segment (like static ELF does)
+	// Modern Linux supports this, saves ~8KB from segment separation
+	// We need: PHDR, INTERP, LOAD(rwx), DYNAMIC
+	numProgHeaders := 4
 	headersSize := uint64(elfHeaderSize + progHeaderSize*numProgHeaders)
 
 	// Align to page boundary
@@ -123,7 +125,8 @@ func (eb *ExecutableBuilder) WriteCompleteDynamicELF(ds *DynamicSections, functi
 	currentOffset += uint64((ds.rela.Len() + 7) & ^7)
 	currentAddr += uint64((ds.rela.Len() + 7) & ^7)
 
-	// Align to page for executable segment
+	// Keep page alignment for compatibility with dynamic linker
+	// (tried 16-byte alignment but causes segfault in mprotect)
 	currentOffset = (currentOffset + pageSize - 1) & ^uint64(pageSize-1)
 	currentAddr = (currentAddr + pageSize - 1) & ^uint64(pageSize-1)
 
@@ -393,68 +396,25 @@ func (eb *ExecutableBuilder) WriteCompleteDynamicELF(ds *DynamicSections, functi
 	w.Write8u(uint64(interpLayout.size))
 	w.Write8u(1)
 
-	// PT_LOAD #0 (read-only: ELF header, program headers, + all read-only data)
-	// This covers the PHDR segment
-	roStart := uint64(0) // Start at beginning of file
-	roEnd := layout["rela"].offset + uint64(layout["rela"].size)
-	roSize := roEnd - roStart
+	// OPTIMIZED: Single RWX LOAD segment (like static ELF)
+	// Covers entire binary from start to end, saves ~8KB vs 3-segment layout
+	loadStart := uint64(0)
+	loadEnd := layout["rodata"].offset + uint64(layout["rodata"].size) + uint64(eb.data.Len())
+	loadSize := loadEnd - loadStart
+	
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "\n=== Single RWX LOAD Segment ===\n")
+		fmt.Fprintf(os.Stderr, "Range: 0x%x - 0x%x (%d bytes)\n", loadStart, loadEnd, loadSize)
+	}
+	
 	w.Write4(1) // PT_LOAD
-	w.Write4(4) // PF_R
-	w.Write8u(roStart)
-	w.Write8u(baseAddr + roStart)
-	w.Write8u(baseAddr + roStart)
-	w.Write8u(roSize)
-	w.Write8u(roSize)
-	w.Write8u(pageSize)
-
-	// PT_LOAD #1 (executable: plt, text)
-	exStart := layout["plt"].offset
-	exEnd := layout["text"].offset + uint64(layout["text"].size)
-	exSize := exEnd - exStart
-	w.Write4(1) // PT_LOAD
-	w.Write4(5) // PF_R | PF_X
-	w.Write8u(exStart)
-	w.Write8u(baseAddr + exStart)
-	w.Write8u(baseAddr + exStart)
-	w.Write8u(exSize)
-	w.Write8u(exSize)
-	w.Write8u(pageSize)
-
-	// PT_LOAD #2 (writable: dynamic, got, rodata, data)
-	rwStart := layout["dynamic"].offset
-	rwFileSize := layout["rodata"].offset + uint64(layout["rodata"].size) + uint64(eb.data.Len()) - rwStart
-	rwMemSize := rwFileSize
-
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "\n=== Writable Segment Debug ===\n")
-	}
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "rwStart (dynamic.offset): 0x%x\n", rwStart)
-	}
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "GOT offset: 0x%x, size: %d\n", layout["got"].offset, layout["got"].size)
-	}
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "Rodata offset: 0x%x, size: %d\n", layout["rodata"].offset, layout["rodata"].size)
-	}
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "Data size: %d\n", eb.data.Len())
-	}
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "Calculated rwFileSize: 0x%x\n", rwFileSize)
-	}
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "Calculated rwMemSize: 0x%x\n", rwMemSize)
-	}
-
-	w.Write4(1) // PT_LOAD
-	w.Write4(6) // PF_R | PF_W
-	w.Write8u(rwStart)
-	w.Write8u(baseAddr + rwStart)
-	w.Write8u(baseAddr + rwStart)
-	w.Write8u(rwFileSize)
-	w.Write8u(rwMemSize)
-	w.Write8u(pageSize)
+	w.Write4(7) // PF_R | PF_W | PF_X
+	w.Write8u(loadStart)
+	w.Write8u(baseAddr + loadStart)
+	w.Write8u(baseAddr + loadStart)
+	w.Write8u(loadSize)
+	w.Write8u(loadSize)
+	w.Write8u(pageSize) // Keep page alignment for mmap()
 
 	// PT_DYNAMIC
 	w.Write4(2) // PT_DYNAMIC
@@ -503,8 +463,8 @@ func (eb *ExecutableBuilder) WriteCompleteDynamicELF(ds *DynamicSections, functi
 	}
 	writePadded(&ds.rela, (ds.rela.Len()+7)&^7)
 
-	// Pad to next page
-	currentPos := int(roEnd)
+	// Pad to page boundary before PLT (required by dynamic linker)
+	currentPos := eb.elf.Len()
 	nextPage := (currentPos + int(pageSize) - 1) & ^(int(pageSize) - 1)
 	for i := currentPos; i < nextPage; i++ {
 		w.Write(0)
