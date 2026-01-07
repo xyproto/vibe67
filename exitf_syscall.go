@@ -9,21 +9,21 @@ import (
 // Simplified version that handles the common case: exitf("Error: %s\n", c_string)
 func (fc *C67Compiler) compileExitfSyscall(call *CallExpr, formatStr *StringExpr) {
 	processedFormat := processEscapeSequences(formatStr.Value)
-	
+
 	argIndex := 0
 	i := 0
 	runes := []rune(processedFormat)
-	
+
 	for i < len(runes) {
 		if runes[i] == '%' && i+1 < len(runes) {
 			next := runes[i+1]
-			
+
 			if next == '%' {
 				fc.emitStderrChar('%')
 				i += 2
 				continue
 			}
-			
+
 			if next == 's' {
 				// String argument - assume it's a C string (char*)
 				if argIndex+1 < len(call.Args) {
@@ -68,7 +68,7 @@ func (fc *C67Compiler) emitStderrLiteral(str string) {
 	labelName := fmt.Sprintf("_exitf_lit_%d", fc.stringCounter)
 	fc.stringCounter++
 	fc.eb.Define(labelName, str)
-	
+
 	fc.out.MovImmToReg("rax", "1") // sys_write
 	fc.out.MovImmToReg("rdi", "2") // stderr
 	fc.out.LeaSymbolToReg("rsi", labelName)
@@ -95,7 +95,7 @@ func (fc *C67Compiler) emitStderrCString() {
 	fc.out.PushReg("rbx")
 	fc.out.MovRegToReg("rbx", "rax")
 	fc.out.XorRegWithReg("rdx", "rdx")
-	
+
 	// Calculate strlen
 	strlenStart := fc.eb.text.Len()
 	fc.out.Emit([]byte{0x80, 0x3c, 0x13, 0x00}) // cmp byte [rbx+rdx], 0
@@ -105,16 +105,16 @@ func (fc *C67Compiler) emitStderrCString() {
 	strlenBackJump := fc.eb.text.Len()
 	fc.out.Emit([]byte{0xeb, 0x00}) // jmp back
 	fc.patchShortJump(strlenBackJump+1, strlenStart)
-	
+
 	strlenDone := fc.eb.text.Len()
 	fc.patchShortJump(strlenDoneJump+1, strlenDone)
-	
+
 	// Write using syscall
 	fc.out.MovRegToReg("rsi", "rbx")
 	fc.out.MovImmToReg("rdi", "2") // stderr
 	fc.out.MovImmToReg("rax", "1")
 	fc.out.Syscall()
-	
+
 	fc.out.PopReg("rbx")
 }
 
@@ -124,12 +124,12 @@ func (fc *C67Compiler) emitStderrInteger() {
 	fc.out.PushReg("rbx")
 	fc.out.PushReg("rcx")
 	fc.out.PushReg("rdx")
-	
+
 	// Check if negative
 	fc.out.Emit([]byte{0x48, 0x85, 0xc0}) // test rax, rax
 	positiveJump := fc.eb.text.Len()
 	fc.out.Emit([]byte{0x79, 0x00}) // jns
-	
+
 	// Negative: print minus, negate
 	fc.out.PushReg("rax")
 	fc.out.SubImmFromReg("rsp", 8)
@@ -143,17 +143,17 @@ func (fc *C67Compiler) emitStderrInteger() {
 	fc.out.AddImmToReg("rsp", 8)
 	fc.out.PopReg("rax")
 	fc.out.NegReg("rax")
-	
+
 	// Patch positive jump
 	positiveStart := fc.eb.text.Len()
 	fc.eb.text.Bytes()[positiveJump+1] = byte(positiveStart - (positiveJump + 2))
-	
+
 	// Convert to string
 	fc.out.SubImmFromReg("rsp", 32)
 	fc.out.LeaMemToReg("rbx", "rsp", 31)
 	fc.out.Emit([]byte{0xc6, 0x03, 0x00}) // mov byte [rbx], 0
 	fc.out.MovImmToReg("rcx", "10")
-	
+
 	convertStart := fc.eb.text.Len()
 	fc.out.XorRegWithReg("rdx", "rdx")
 	fc.out.Emit([]byte{0x48, 0xf7, 0xf1}) // div rcx
@@ -164,17 +164,17 @@ func (fc *C67Compiler) emitStderrInteger() {
 	convertJump := fc.eb.text.Len()
 	fc.out.Emit([]byte{0x75, 0x00}) // jnz
 	fc.eb.text.Bytes()[convertJump+1] = byte(convertStart - (convertJump + 2))
-	
+
 	// Calculate length
 	fc.out.LeaMemToReg("rdx", "rsp", 32)
 	fc.out.SubRegFromReg("rdx", "rbx")
-	
+
 	// Write
 	fc.out.MovImmToReg("rax", "1")
 	fc.out.MovImmToReg("rdi", "2") // stderr
 	fc.out.MovRegToReg("rsi", "rbx")
 	fc.out.Syscall()
-	
+
 	fc.out.AddImmToReg("rsp", 32)
 	fc.out.PopReg("rdx")
 	fc.out.PopReg("rcx")

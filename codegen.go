@@ -147,9 +147,12 @@ type C67Compiler struct {
 	usesCPUFeatures  bool // Track if CPU feature detection is needed (FMA, SIMD, etc.)
 
 	// Safety check tracking (for DCE of error handlers)
-	usesNullCheck   bool // Track if null pointer checks are needed
-	usesBoundsCheck bool // Track if bounds checks are needed
-	usesDivCheck    bool // Track if division by zero checks are needed
+	usesNullCheck      bool // Track if null pointer checks are needed
+	usesBoundsCheck    bool // Track if bounds checks are needed
+	usesDivCheck       bool // Track if division by zero checks are needed
+	usesLoopCheck      bool // Track if loop iteration checks are needed
+	usesRecursionCheck bool // Track if recursion depth checks are needed
+	usesMallocCheck    bool // Track if malloc failure checks are needed
 
 	// Runtime function emission flags (all true by default for full compatibility)
 
@@ -749,12 +752,25 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	fc.eb.Define("fmt_str", "%s\x00")
 	fc.eb.Define("fmt_int", "%ld\n\x00")
 	fc.eb.Define("fmt_float", "%.0f\n\x00") // Print float without decimal places
-	fc.eb.Define("_loop_max_exceeded_msg", "Error: loop exceeded maximum iterations\n\x00")
-	fc.eb.Define("_recursion_max_exceeded_msg", "Error: recursion exceeded maximum depth\n\x00")
-	fc.eb.Define("_null_ptr_msg", "ERROR: Null pointer dereference detected\n\x00")
-	fc.eb.Define("_bounds_negative_msg", "ERROR: Array index out of bounds (index < 0)\n\x00")
-	fc.eb.Define("_bounds_too_large_msg", "ERROR: Array index out of bounds (index >= length)\n\x00")
-	fc.eb.Define("_malloc_failed_msg", "ERROR: Memory allocation failed (out of memory)\n\x00")
+	
+	// Error messages - only include if safety checks are enabled
+	// These are only needed when checks are compiled into the code
+	if fc.usesLoopCheck {
+		fc.eb.Define("_loop_max_exceeded_msg", "Error: loop exceeded maximum iterations\n\x00")
+	}
+	if fc.usesRecursionCheck {
+		fc.eb.Define("_recursion_max_exceeded_msg", "Error: recursion exceeded maximum depth\n\x00")
+	}
+	if fc.usesNullCheck {
+		fc.eb.Define("_null_ptr_msg", "ERROR: Null pointer dereference detected\n\x00")
+	}
+	if fc.usesBoundsCheck {
+		fc.eb.Define("_bounds_negative_msg", "ERROR: Array index out of bounds (index < 0)\n\x00")
+		fc.eb.Define("_bounds_too_large_msg", "ERROR: Array index out of bounds (index >= length)\n\x00")
+	}
+	if fc.usesMallocCheck {
+		fc.eb.Define("_malloc_failed_msg", "ERROR: Memory allocation failed (out of memory)\n\x00")
+	}
 
 	// Arena metadata symbols will be defined later if arenas are used
 	// This is checked during the symbol collection pass
@@ -2421,6 +2437,7 @@ func (fc *C67Compiler) compileRangeLoop(stmt *LoopStmt, rangeExpr *RangeExpr) {
 
 	// Runtime max iteration checking (only if needed)
 	if stmt.NeedsMaxCheck {
+		fc.usesLoopCheck = true
 		// Check max iterations (if not infinite)
 		if stmt.MaxIterations != math.MaxInt64 {
 			// Load iteration count
@@ -9362,8 +9379,8 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 	// Generate arena functions only if arenas are actually used
 	// AND at least one arena function is tracked (means code actually calls arena funcs)
-	if fc.usesArenas && (fc.usedFunctions["_c67_string_concat"] || 
-		fc.usedFunctions["_c67_arena_alloc"] || 
+	if fc.usesArenas && (fc.usedFunctions["_c67_string_concat"] ||
+		fc.usedFunctions["_c67_arena_alloc"] ||
 		fc.usedFunctions["alloc"]) {
 		// Generate _c67_arena_create(capacity) -> arena_ptr
 		// Creates a new arena with the specified capacity
@@ -10372,6 +10389,7 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 	fc.out.Syscall()
 
 	// Check if mmap failed (returns -1 on error)
+	fc.usesMallocCheck = true
 	fc.out.MovImmToReg("rcx", "-1")
 	fc.out.CmpRegToReg("rax", "rcx")
 	mmapOkJump := fc.eb.text.Len()
@@ -12227,6 +12245,7 @@ func (fc *C67Compiler) compileRecursiveCall(call *CallExpr) {
 	var depthVarName string
 
 	if needsDepthTracking {
+		fc.usesRecursionCheck = true
 		// Uses a global variable to track recursion depth: functionName_recursion_depth
 		depthVarName = call.Function + "_recursion_depth"
 
@@ -18253,6 +18272,7 @@ func (fc *C67Compiler) callMallocAligned(sizeReg string, pushCount int) {
 	}
 
 	// SAFETY: Check if malloc returned NULL (out of memory)
+	fc.usesMallocCheck = true
 	fc.out.TestRegReg("rax", "rax")
 	okJumpPos := fc.eb.text.Len()
 	fc.out.JumpConditional(JumpNotEqual, 0) // Placeholder, will patch
