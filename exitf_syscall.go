@@ -7,7 +7,7 @@ import (
 
 // compileExitfSyscall compiles exitf() using syscalls to stderr (fd=2)
 // Simplified version that handles the common case: exitf("Error: %s\n", c_string)
-func (fc *C67Compiler) compileExitfSyscall(call *CallExpr, formatStr *StringExpr) {
+func (fc *Vibe67Compiler) compileExitfSyscall(call *CallExpr, formatStr *StringExpr) {
 	processedFormat := processEscapeSequences(formatStr.Value)
 
 	argIndex := 0
@@ -64,7 +64,7 @@ func (fc *C67Compiler) compileExitfSyscall(call *CallExpr, formatStr *StringExpr
 }
 
 // emitStderrLiteral writes a string literal to stderr
-func (fc *C67Compiler) emitStderrLiteral(str string) {
+func (fc *Vibe67Compiler) emitStderrLiteral(str string) {
 	labelName := fmt.Sprintf("_exitf_lit_%d", fc.stringCounter)
 	fc.stringCounter++
 	fc.eb.Define(labelName, str)
@@ -77,7 +77,7 @@ func (fc *C67Compiler) emitStderrLiteral(str string) {
 }
 
 // emitStderrChar writes a single character to stderr
-func (fc *C67Compiler) emitStderrChar(ch rune) {
+func (fc *Vibe67Compiler) emitStderrChar(ch rune) {
 	fc.out.SubImmFromReg("rsp", 8)
 	fc.out.MovImmToReg("rax", fmt.Sprintf("%d", ch))
 	fc.out.MovRegToMem("rax", "rsp", 0)
@@ -91,7 +91,7 @@ func (fc *C67Compiler) emitStderrChar(ch rune) {
 
 // emitStderrCString writes a null-terminated C string to stderr
 // Input: rax = pointer to C string
-func (fc *C67Compiler) emitStderrCString() {
+func (fc *Vibe67Compiler) emitStderrCString() {
 	fc.out.PushReg("rbx")
 	fc.out.MovRegToReg("rbx", "rax")
 	fc.out.XorRegWithReg("rdx", "rdx")
@@ -120,7 +120,7 @@ func (fc *C67Compiler) emitStderrCString() {
 
 // emitStderrInteger writes an integer to stderr
 // Input: rax = integer value
-func (fc *C67Compiler) emitStderrInteger() {
+func (fc *Vibe67Compiler) emitStderrInteger() {
 	fc.out.PushReg("rbx")
 	fc.out.PushReg("rcx")
 	fc.out.PushReg("rdx")

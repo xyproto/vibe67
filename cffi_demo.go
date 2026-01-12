@@ -11,7 +11,7 @@ import (
 
 // Demo program showing the C FFI manager capabilities
 func main() {
-	fmt.Println("=== c67 C FFI Manager Demo ===\n")
+	fmt.Println("=== vibe67 C FFI Manager Demo ===\n")
 
 	// Create a new CFFI manager
 	cffi := NewCFFIManager()
@@ -66,39 +66,39 @@ extern const char* SDL_GetError(void);
 	// Show functions
 	fmt.Println("\nExtracted functions:")
 	for name, fn := range cffi.functions {
-		returnType := cffi.MapCTypeToC67(fn.ReturnType)
+		returnType := cffi.MapCTypeToVibe67(fn.ReturnType)
 		fmt.Printf("  %s: ", name)
 		if fn.Library != "" {
 			fmt.Printf("[%s] ", fn.Library)
 		}
 		fmt.Printf("%s -> %s (", fn.ReturnType, returnType)
 		for i, param := range fn.Params {
-			c67Type := cffi.MapCTypeToC67(param.Type)
+			vibe67Type := cffi.MapCTypeToVibe67(param.Type)
 			if i > 0 {
 				fmt.Print(", ")
 			}
-			fmt.Printf("%s: %s->%s", param.Name, param.Type, c67Type)
+			fmt.Printf("%s: %s->%s", param.Name, param.Type, vibe67Type)
 		}
 		fmt.Println(")")
 	}
 
-	// Try to generate C67 bindings
-	fmt.Println("\nGenerated C67 bindings:")
+	// Try to generate Vibe67 bindings
+	fmt.Println("\nGenerated Vibe67 bindings:")
 	for name := range cffi.functions {
-		if binding, err := cffi.GenerateC67Binding(name); err == nil {
+		if binding, err := cffi.GenerateVibe67Binding(name); err == nil {
 			fmt.Printf("\n%s\n", binding)
 		}
 	}
 
 	// Show type mappings
-	fmt.Println("\n\nC to C67 type mappings:")
+	fmt.Println("\n\nC to Vibe67 type mappings:")
 	testTypes := []string{
 		"int", "unsigned int", "char*", "const char*", "void*",
 		"int64_t", "uint64_t", "float", "double",
 	}
 	for _, cType := range testTypes {
-		c67Type := cffi.MapCTypeToC67(cType)
-		fmt.Printf("  %-20s -> %s\n", cType, c67Type)
+		vibe67Type := cffi.MapCTypeToVibe67(cType)
+		fmt.Printf("  %-20s -> %s\n", cType, vibe67Type)
 	}
 
 	fmt.Println("\n=== Demo Complete ===")

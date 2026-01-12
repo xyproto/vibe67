@@ -9,15 +9,15 @@ import (
 	"strings"
 )
 
-// cli.go - User-friendly command-line interface for c67
+// cli.go - User-friendly command-line interface for vibe67
 //
 // This file implements a Go-like CLI interface with subcommands:
-// - c67 (default: compile current directory or show help)
-// - c67 build <file> (compile to executable)
-// - c67 run <file> (compile and run immediately)
-// - c67 <file.c67> (shorthand for build)
+// - vibe67 (default: compile current directory or show help)
+// - vibe67 build <file> (compile to executable)
+// - vibe67 run <file> (compile and run immediately)
+// - vibe67 <file.vibe67> (shorthand for build)
 //
-// Also supports shebang execution: #!/usr/bin/c67
+// Also supports shebang execution: #!/usr/bin/vibe67
 
 // CommandContext holds the execution context for a CLI command
 type CommandContext struct {
@@ -51,8 +51,8 @@ func RunCLI(args []string, platform Platform, verbose, quiet bool, optTimeout fl
 	}
 
 	// Check for shebang execution
-	// If first arg is a .c67 file and it starts with #!, we're in shebang mode
-	if len(args) > 0 && strings.HasSuffix(args[0], ".c67") {
+	// If first arg is a .vibe67 file and it starts with #!, we're in shebang mode
+	if len(args) > 0 && strings.HasSuffix(args[0], ".vibe67") {
 		content, err := os.ReadFile(args[0])
 		if err == nil && len(content) > 2 && content[0] == '#' && content[1] == '!' {
 			// Shebang mode - run the file with remaining args
@@ -66,13 +66,13 @@ func RunCLI(args []string, platform Platform, verbose, quiet bool, optTimeout fl
 	switch subcmd {
 	case "build":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: c67 build <file.c67> [-o output]")
+			return fmt.Errorf("usage: vibe67 build <file.vibe67> [-o output]")
 		}
 		return cmdBuild(ctx, args[1:])
 
 	case "run":
 		if len(args) < 2 {
-			return fmt.Errorf("usage: c67 run <file.c67> [args...]")
+			return fmt.Errorf("usage: vibe67 run <file.vibe67> [args...]")
 		}
 		return cmdRun(ctx, args[1:])
 
@@ -87,27 +87,27 @@ func RunCLI(args []string, platform Platform, verbose, quiet bool, optTimeout fl
 		return nil
 
 	default:
-		// Check if it's a .c67 file (shorthand for build)
-		if strings.HasSuffix(subcmd, ".c67") {
+		// Check if it's a .vibe67 file (shorthand for build)
+		if strings.HasSuffix(subcmd, ".vibe67") {
 			return cmdBuild(ctx, args)
 		}
 
-		// Check if it's a directory (compile all .c67 files)
+		// Check if it's a directory (compile all .vibe67 files)
 		info, err := os.Stat(subcmd)
 		if err == nil && info.IsDir() {
 			return cmdBuildDir(ctx, subcmd)
 		}
 
 		// Unknown command
-		return fmt.Errorf("unknown command: %s\n\nRun 'c67 help' for usage information", subcmd)
+		return fmt.Errorf("unknown command: %s\n\nRun 'vibe67 help' for usage information", subcmd)
 	}
 }
 
-// cmdBuild compiles a C67 source file to an executable
+// cmdBuild compiles a Vibe67 source file to an executable
 // Confidence that this function is working: 85%
 func cmdBuild(ctx *CommandContext, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: c67 build <file.c67> [-o output]")
+		return fmt.Errorf("usage: vibe67 build <file.vibe67> [-o output]")
 	}
 
 	// Collect input files (all non-flag arguments)
@@ -149,7 +149,7 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 
 	// If still no output path, use first input filename without extension
 	if outputPath == "" {
-		outputPath = strings.TrimSuffix(filepath.Base(inputFiles[0]), ".c67")
+		outputPath = strings.TrimSuffix(filepath.Base(inputFiles[0]), ".vibe67")
 		if ctx.Platform.OS == OSWindows {
 			outputPath += ".exe"
 		}
@@ -173,7 +173,7 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 	// Compile - if multiple files, concatenate and compile
 	var err error
 	if len(inputFiles) == 1 {
-		err = CompileC67WithOptions(inputFiles[0], outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+		err = CompileVibe67WithOptions(inputFiles[0], outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	} else {
 		// Multi-file: concatenate sources
 		var combinedSource strings.Builder
@@ -192,7 +192,7 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 		}
 
 		// Write combined source to temp file
-		tmpFile, tmpErr := os.CreateTemp("", "c67_multi_*.c67")
+		tmpFile, tmpErr := os.CreateTemp("", "vibe67_multi_*.vibe67")
 		if tmpErr != nil {
 			return fmt.Errorf("failed to create temp file: %v", tmpErr)
 		}
@@ -206,7 +206,7 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 		tmpFile.Close()
 
 		// Compile the combined file
-		err = CompileC67WithOptions(tmpPath, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+		err = CompileVibe67WithOptions(tmpPath, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	}
 
 	if err != nil {
@@ -220,10 +220,10 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 	return nil
 }
 
-// cmdRun compiles a C67 source file to /dev/shm and executes it
+// cmdRun compiles a Vibe67 source file to /dev/shm and executes it
 func cmdRun(ctx *CommandContext, args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: c67 run <file.c67> [args...]")
+		return fmt.Errorf("usage: vibe67 run <file.vibe67> [args...]")
 	}
 
 	inputFile := args[0]
@@ -237,8 +237,8 @@ func cmdRun(ctx *CommandContext, args []string) error {
 	}
 
 	// Create unique temporary filename
-	baseName := strings.TrimSuffix(filepath.Base(inputFile), ".c67")
-	tmpExec := filepath.Join(tmpDir, fmt.Sprintf("c67_run_%s_%d", baseName, os.Getpid()))
+	baseName := strings.TrimSuffix(filepath.Base(inputFile), ".vibe67")
+	tmpExec := filepath.Join(tmpDir, fmt.Sprintf("vibe67_run_%s_%d", baseName, os.Getpid()))
 
 	// Enable single-file mode when running a specific file
 	oldSingleFlag := SingleFlag
@@ -252,7 +252,7 @@ func cmdRun(ctx *CommandContext, args []string) error {
 	}
 
 	// Compile
-	err := CompileC67WithOptions(inputFile, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	err := CompileVibe67WithOptions(inputFile, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	if err != nil {
 		return fmt.Errorf("compilation failed: %v", err)
 	}
@@ -282,7 +282,7 @@ func cmdRun(ctx *CommandContext, args []string) error {
 	return nil
 }
 
-// cmdRunShebang handles shebang execution (#!/usr/bin/c67)
+// cmdRunShebang handles shebang execution (#!/usr/bin/vibe67)
 func cmdRunShebang(ctx *CommandContext, scriptPath string, scriptArgs []string) error {
 	// In shebang mode, we compile and run immediately
 	// This is similar to cmdRun but optimized for shebang use
@@ -292,8 +292,8 @@ func cmdRunShebang(ctx *CommandContext, scriptPath string, scriptArgs []string) 
 		tmpDir = os.TempDir()
 	}
 
-	baseName := strings.TrimSuffix(filepath.Base(scriptPath), ".c67")
-	tmpExec := filepath.Join(tmpDir, fmt.Sprintf("c67_shebang_%s_%d", baseName, os.Getpid()))
+	baseName := strings.TrimSuffix(filepath.Base(scriptPath), ".vibe67")
+	tmpExec := filepath.Join(tmpDir, fmt.Sprintf("vibe67_shebang_%s_%d", baseName, os.Getpid()))
 
 	// Enable single-file mode for shebang scripts
 	oldSingleFlag := SingleFlag
@@ -301,7 +301,7 @@ func cmdRunShebang(ctx *CommandContext, scriptPath string, scriptArgs []string) 
 	defer func() { SingleFlag = oldSingleFlag }()
 
 	// Compile (quietly unless verbose mode)
-	err := CompileC67WithOptions(scriptPath, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	err := CompileVibe67WithOptions(scriptPath, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	if err != nil {
 		return fmt.Errorf("compilation failed: %v", err)
 	}
@@ -325,12 +325,12 @@ func cmdRunShebang(ctx *CommandContext, scriptPath string, scriptArgs []string) 
 	return nil
 }
 
-// cmdBuildDir finds the main .c67 file in a directory and compiles it
+// cmdBuildDir finds the main .vibe67 file in a directory and compiles it
 // (does not compile test files or library files)
 func cmdBuildDir(ctx *CommandContext, dirPath string) error {
-	matches, err := filepath.Glob(filepath.Join(dirPath, "*.c67"))
+	matches, err := filepath.Glob(filepath.Join(dirPath, "*.vibe67"))
 	if err != nil {
-		return fmt.Errorf("failed to find .c67 files: %v", err)
+		return fmt.Errorf("failed to find .vibe67 files: %v", err)
 	}
 
 	// Filter out test files
@@ -343,7 +343,7 @@ func cmdBuildDir(ctx *CommandContext, dirPath string) error {
 	}
 
 	if len(nonTestFiles) == 0 {
-		return fmt.Errorf("no non-test .c67 files found in %s", dirPath)
+		return fmt.Errorf("no non-test .vibe67 files found in %s", dirPath)
 	}
 
 	// Find the file with main function
@@ -365,11 +365,11 @@ func cmdBuildDir(ctx *CommandContext, dirPath string) error {
 	}
 
 	if mainFile == "" {
-		return fmt.Errorf("no main function found in .c67 files in %s", dirPath)
+		return fmt.Errorf("no main function found in .vibe67 files in %s", dirPath)
 	}
 
 	// Compile the main file
-	outputPath := strings.TrimSuffix(filepath.Base(mainFile), ".c67")
+	outputPath := strings.TrimSuffix(filepath.Base(mainFile), ".vibe67")
 	if ctx.Platform.OS == OSWindows {
 		outputPath += ".exe"
 	}
@@ -383,7 +383,7 @@ func cmdBuildDir(ctx *CommandContext, dirPath string) error {
 	SingleFlag = false
 	defer func() { SingleFlag = oldSingleFlag }()
 
-	err = CompileC67WithOptions(mainFile, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	err = CompileVibe67WithOptions(mainFile, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	if err != nil {
 		return fmt.Errorf("compilation of %s failed: %v", mainFile, err)
 	}
@@ -395,7 +395,7 @@ func cmdBuildDir(ctx *CommandContext, dirPath string) error {
 	return nil
 }
 
-// cmdTest runs all test_*.c67 and *_test.c67 files in the current directory
+// cmdTest runs all test_*.vibe67 and *_test.vibe67 files in the current directory
 func cmdTest(ctx *CommandContext, args []string) error {
 	// Determine directory to search (only consider non-flag arguments)
 	searchDir := "."
@@ -406,13 +406,13 @@ func cmdTest(ctx *CommandContext, args []string) error {
 		}
 	}
 
-	// Find all test files: test_*.c67 and *_test.c67
-	matchesPrefix, err := filepath.Glob(filepath.Join(searchDir, "test_*.c67"))
+	// Find all test files: test_*.vibe67 and *_test.vibe67
+	matchesPrefix, err := filepath.Glob(filepath.Join(searchDir, "test_*.vibe67"))
 	if err != nil {
 		return fmt.Errorf("failed to find test files: %v", err)
 	}
 
-	matchesSuffix, err := filepath.Glob(filepath.Join(searchDir, "*_test.c67"))
+	matchesSuffix, err := filepath.Glob(filepath.Join(searchDir, "*_test.vibe67"))
 	if err != nil {
 		return fmt.Errorf("failed to find test files: %v", err)
 	}
@@ -475,12 +475,12 @@ func cmdTest(ctx *CommandContext, args []string) error {
 			tmpDir = os.TempDir()
 		}
 
-		baseName := strings.TrimSuffix(testName, ".c67")
-		tmpExec := filepath.Join(tmpDir, fmt.Sprintf("c67_test_%s_%d", baseName, os.Getpid()))
+		baseName := strings.TrimSuffix(testName, ".vibe67")
+		tmpExec := filepath.Join(tmpDir, fmt.Sprintf("vibe67_test_%s_%d", baseName, os.Getpid()))
 
 		// Generate a test runner in the same directory as the test file for proper imports
 		testDir := filepath.Dir(testFile)
-		testRunnerPath := filepath.Join(testDir, fmt.Sprintf("_test_runner_%d.c67", os.Getpid()))
+		testRunnerPath := filepath.Join(testDir, fmt.Sprintf("_test_runner_%d.vibe67", os.Getpid()))
 
 		// Parse test file to find test functions
 		testFunctions, parseErr := findTestFunctions(testFile)
@@ -516,7 +516,7 @@ func cmdTest(ctx *CommandContext, args []string) error {
 		SingleFlag = false // Allow importing from same directory
 
 		// Compile the test runner
-		err = CompileC67WithOptions(testRunnerPath, tmpExec, ctx.Platform, ctx.OptTimeout, false)
+		err = CompileVibe67WithOptions(testRunnerPath, tmpExec, ctx.Platform, ctx.OptTimeout, false)
 		SingleFlag = oldSingleFlag
 
 		if err != nil {
@@ -582,24 +582,24 @@ func cmdTest(ctx *CommandContext, args []string) error {
 
 // cmdHelp displays usage information
 func cmdHelp(ctx *CommandContext) error {
-	fmt.Printf(`c67 - The C67 Compiler (Version 1.5.0)
+	fmt.Printf(`vibe67 - The Vibe67 Compiler (Version 1.5.0)
 
 USAGE:
-    c67 <command> [arguments]
+    vibe67 <command> [arguments]
 
 COMMANDS:
-    build <file.c67>      Compile a C67 source file to an executable
-    run <file.c67>        Compile and run a C67 program immediately
-    test [directory]      Run all test_*.c67 files (default: current directory)
+    build <file.vibe67>      Compile a Vibe67 source file to an executable
+    run <file.vibe67>        Compile and run a Vibe67 program immediately
+    test [directory]      Run all test_*.vibe67 files (default: current directory)
     help                  Show this help message
     version               Show version information
 
 SHORTHAND:
-    c67 <file.c67>      Same as 'c67 build <file.c67>'
-    c67                  Show this help message (or build if .c67 files found)
+    vibe67 <file.vibe67>      Same as 'vibe67 build <file.vibe67>'
+    vibe67                  Show this help message (or build if .vibe67 files found)
 
 FLAGS (can be used with any command):
-    -o, --output <file>    Output executable filename (default: input name without .c67)
+    -o, --output <file>    Output executable filename (default: input name without .vibe67)
     -v, --verbose          Verbose mode (show detailed compilation info)
     -q, --quiet            Quiet mode (suppress progress messages)
     --arch <arch>          Target architecture: amd64, arm64, riscv64 (default: amd64)
@@ -611,27 +611,27 @@ FLAGS (can be used with any command):
 
 EXAMPLES:
     # Compile a program
-    c67 build hello.c67
-    c67 build hello.c67 -o hello
+    vibe67 build hello.vibe67
+    vibe67 build hello.vibe67 -o hello
 
     # Compile and run immediately
-    c67 run hello.c67
-    c67 run server.c67 --port 8080
+    vibe67 run hello.vibe67
+    vibe67 run server.vibe67 --port 8080
 
     # Shorthand compilation
-    c67 hello.c67
+    vibe67 hello.vibe67
 
     # Run tests
-    c67 test
-    c67 test ./tests
+    vibe67 test
+    vibe67 test ./tests
 
-    # Shebang execution (add #!/usr/bin/c67 to first line of .c67 file)
-    chmod +x script.c67
-    ./script.c67 arg1 arg2
+    # Shebang execution (add #!/usr/bin/vibe67 to first line of .vibe67 file)
+    chmod +x script.vibe67
+    ./script.vibe67 arg1 arg2
 
 DOCUMENTATION:
     For language documentation, see LANGUAGESPEC.md
-    For help or bug reports: https://github.com/anthropics/c67/issues
+    For help or bug reports: https://github.com/anthropics/vibe67/issues
 
 `)
 	return nil

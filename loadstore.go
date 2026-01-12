@@ -7,7 +7,7 @@ import (
 )
 
 // Load/Store instructions for memory access
-// Essential for implementing C67's variable and data access:
+// Essential for implementing Vibe67's variable and data access:
 //   - Variable access: me.health, me.x
 //   - Array element access: entities[i]
 //   - Map value access: map[key]

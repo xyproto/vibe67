@@ -536,7 +536,7 @@ func (o *Out) callSymbolX86(symbol string) {
 	callPos := o.eb.text.Len()
 	o.WriteUnsigned(0x12345678) // Match placeholder used in x86_64_codegen.go
 
-	if envBool("DEBUG") && (symbol == "_c67_arena_ensure_capacity" || symbol == "malloc$stub") {
+	if envBool("DEBUG") && (symbol == "_vibe67_arena_ensure_capacity" || symbol == "malloc$stub") {
 		fmt.Fprintf(os.Stderr, "DEBUG mov.go: CallSymbol(%s): posBeforeE8=%d, posAfterE8=%d, callPos=%d (recorded)\n",
 			symbol, posBeforeE8, posAfterE8, callPos)
 	}

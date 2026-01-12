@@ -7,7 +7,7 @@ import (
 )
 
 // CALL instruction for function calls
-// Essential for implementing C67's function system:
+// Essential for implementing Vibe67's function system:
 //   - Direct function calls: process_data(validated)
 //   - Recursive calls: me(n - 1) in factorial
 //   - Method calls: entity.update()

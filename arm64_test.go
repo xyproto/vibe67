@@ -28,7 +28,7 @@ func TestARM64BasicCompilation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpFile := filepath.Join(t.TempDir(), "test_arm64_"+tt.name+".c67")
+			tmpFile := filepath.Join(t.TempDir(), "test_arm64_"+tt.name+".vibe67")
 			outFile := filepath.Join(t.TempDir(), "test_arm64_"+tt.name)
 
 			// Write test program
@@ -38,7 +38,7 @@ func TestARM64BasicCompilation(t *testing.T) {
 
 			// Compile for ARM64 macOS
 			platform := Platform{Arch: ArchARM64, OS: OSDarwin}
-			err := CompileC67(tmpFile, outFile, platform)
+			err := CompileVibe67(tmpFile, outFile, platform)
 			if err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}

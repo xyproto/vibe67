@@ -7,7 +7,7 @@ import (
 )
 
 // VFMADD - Vector fused multiply-add for packed double-precision (float64)
-// Essential for C67's numerical operations with maximum precision:
+// Essential for Vibe67's numerical operations with maximum precision:
 //   - Dot products: sum of element-wise products
 //   - Polynomial evaluation: a*x^2 + b*x + c
 //   - Matrix operations: accumulating products

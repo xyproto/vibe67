@@ -749,7 +749,7 @@ func (eb *ExecutableBuilder) patchX86PLTCalls(textBytes []byte, ds *DynamicSecti
 						fmt.Fprintf(os.Stderr, "DEBUG: Patching PLT call to %s: plt=%d, targetAddr=%x\n", funcName, pltOffset, targetAddr)
 					}
 				} else if labelOffset, ok := eb.labels[funcName]; ok {
-					// Internal label (e.g., c67_arena_alloc, _c67_arena_ensure_capacity)
+					// Internal label (e.g., vibe67_arena_alloc, _vibe67_arena_ensure_capacity)
 					targetAddr = textAddr + uint64(labelOffset)
 					isInternal = true
 					if VerboseMode {

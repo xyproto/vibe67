@@ -8,13 +8,13 @@ import (
 
 // Mask register operations for AVX-512 k registers
 //
-// Essential for C67's predication and conditional operations:
+// Essential for Vibe67's predication and conditional operations:
 //   - Mask combination: k1 and k2, k1 or k2, k1 xor k2
 //   - Mask creation from vector comparisons
 //   - Conditional execution based on masks
 //   - Population count: count set bits in mask
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   m1: mask = values || (x -> x > 0.0)
 //   m2: mask = values || (x -> x < 100.0)
 //   m3: mask = m1 and m2

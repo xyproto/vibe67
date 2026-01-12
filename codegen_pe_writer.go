@@ -14,7 +14,7 @@ import (
 // for Windows systems on x86_64 architecture.
 
 // Confidence that this function is working: 80%
-func (fc *C67Compiler) writePE(program *Program, outputPath string) error {
+func (fc *Vibe67Compiler) writePE(program *Program, outputPath string) error {
 	if VerboseMode {
 		fmt.Fprintf(os.Stderr, "-> Generating Windows PE executable\n")
 	}
@@ -40,7 +40,7 @@ func (fc *C67Compiler) writePE(program *Program, outputPath string) error {
 			continue
 		}
 		// Skip internal runtime functions
-		if strings.HasPrefix(funcName, "_c67") || strings.HasPrefix(funcName, "c67_") {
+		if strings.HasPrefix(funcName, "_vibe67") || strings.HasPrefix(funcName, "vibe67_") {
 			continue
 		}
 

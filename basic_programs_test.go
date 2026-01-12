@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestBasicPrograms tests simple C67 programs (print, arithmetic, etc.)
+// TestBasicPrograms tests simple Vibe67 programs (print, arithmetic, etc.)
 func TestBasicPrograms(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -66,7 +66,7 @@ printf("The answer is %v\n", x)
 		},
 		{
 			name: "fstring_basic",
-			source: `name := "C67"
+			source: `name := "Vibe67"
 msg := f"Hello, {name}!"
 println(msg)
 `,
@@ -99,13 +99,13 @@ println(a != b)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testInlineC67(t, tt.name, tt.source, tt.expected)
+			testInlineVibe67(t, tt.name, tt.source, tt.expected)
 		})
 	}
 }
 
-// testInlineC67 compiles and runs inline C67 source code
-func testInlineC67(t *testing.T, name, source, expected string) {
+// testInlineVibe67 compiles and runs inline Vibe67 source code
+func testInlineVibe67(t *testing.T, name, source, expected string) {
 	// Check if this is a known issue that should be skipped
 	if strings.HasPrefix(expected, "SKIP:") {
 		t.Skip(strings.TrimPrefix(expected, "SKIP: "))
@@ -134,7 +134,7 @@ func TestExistingBasicPrograms(t *testing.T) {
 
 	for _, name := range tests {
 		t.Run(name, func(t *testing.T) {
-			srcPath := filepath.Join("testprograms", name+".c67")
+			srcPath := filepath.Join("testprograms", name+".vibe67")
 			resultPath := filepath.Join("testprograms", name+".result")
 
 			// Skip if source doesn't exist
@@ -154,7 +154,7 @@ func TestExistingBasicPrograms(t *testing.T) {
 
 			// Compile
 			platform := GetDefaultPlatform()
-			if err := CompileC67(srcPath, exePath, platform); err != nil {
+			if err := CompileVibe67(srcPath, exePath, platform); err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
 

@@ -8,7 +8,7 @@ import (
 
 // VRCP14PD/VRSQRT14PD - Vector reciprocal and reciprocal square root approximations
 //
-// Essential for C67's fast division and normalization:
+// Essential for Vibe67's fast division and normalization:
 //   - Fast division: a / b ≈ a * rcp(b)
 //   - Fast normalization: v / length(v) ≈ v * rsqrt(dot(v,v))
 //   - Graphics: inverse distance calculations
@@ -17,7 +17,7 @@ import (
 // Note: These are approximations with ~14 bits of precision
 // For exact results, use Newton-Raphson refinement
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   approx_inv = values || map(rcp)
 //   approx_inv_sqrt = values || map(rsqrt)
 //

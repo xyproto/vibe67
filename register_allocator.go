@@ -1,7 +1,7 @@
 // Completion: 90% - Register allocator working, optimizes register usage effectively
 package main
 
-// Register Allocator for c67
+// Register Allocator for vibe67
 //
 // Implements a linear-scan register allocation algorithm to replace the current
 // ad-hoc register usage. This provides:

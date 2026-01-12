@@ -13,7 +13,7 @@ import (
 // This file handles the generation of ELF executables for Linux
 // on ARM64 architecture.
 
-func (fc *C67Compiler) writeELFARM64(outputPath string) error {
+func (fc *Vibe67Compiler) writeELFARM64(outputPath string) error {
 	// Enable dynamic linking for ARM64 ELF
 	fc.eb.useDynamicLinking = true
 
@@ -49,7 +49,7 @@ func (fc *C67Compiler) writeELFARM64(outputPath string) error {
 			continue
 		}
 		// Skip internal runtime functions
-		if strings.HasPrefix(funcName, "_c67") || strings.HasPrefix(funcName, "c67_") {
+		if strings.HasPrefix(funcName, "_vibe67") || strings.HasPrefix(funcName, "vibe67_") {
 			continue
 		}
 		if !pltSet[funcName] {

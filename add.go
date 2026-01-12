@@ -7,7 +7,7 @@ import (
 )
 
 // ADD instruction implementation for all architectures
-// Essential for implementing C67's arithmetic foundation (map[float64]float64):
+// Essential for implementing Vibe67's arithmetic foundation (map[float64]float64):
 //   - Arithmetic expressions: n + 1, x + y
 //   - Array/pointer arithmetic: address + offset
 //   - Index calculations: me.entities + [i]

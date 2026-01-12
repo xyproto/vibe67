@@ -1,4 +1,4 @@
-// Printf runtime implementation for C67
+// Printf runtime implementation for Vibe67
 //
 // STATUS: The functions in this file are stubs for a syscall-based printf implementation.
 // Currently, printf is implemented inline in codegen.go by calling libc's printf function.
@@ -23,7 +23,7 @@ import (
 // See codegen.go case "printf" for the actual implementation.
 //
 // Planned function signature for syscall-based implementation:
-//   _c67_printf(format_str_ptr, arg1, arg2, arg3, ...)
+//   _vibe67_printf(format_str_ptr, arg1, arg2, arg3, ...)
 //
 // Calling convention (x86-64 System V ABI):
 //   rdi = format string pointer (C-style null-terminated)
@@ -71,10 +71,10 @@ type RISCV64PrintfBackend struct {
 // EmitPrintfRuntimeX86_64 generates the printf function for x86-64
 func EmitPrintfRuntimeX86_64(eb *ExecutableBuilder, out *Out) error {
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: Emitting _c67_printf for x86-64\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: Emitting _vibe67_printf for x86-64\n")
 	}
 
-	eb.MarkLabel("_c67_printf")
+	eb.MarkLabel("_vibe67_printf")
 
 	// Prologue: set up stack frame and preserve callee-saved registers
 	// We need significant stack space for:
@@ -103,7 +103,7 @@ func EmitPrintfRuntimeX86_64(eb *ExecutableBuilder, out *Out) error {
 		out.MovXmmToMem(fmt.Sprintf("xmm%d", i), "rsp", offset)
 	}
 
-	// rdi = format string pointer (C67 map)
+	// rdi = format string pointer (Vibe67 map)
 	// Convert map pointer to actual character data
 	// Map format: [count:f64][key0:f64][val0:f64]...
 	// For strings, keys are indices, values are character codes
@@ -237,7 +237,7 @@ func EmitPrintfRuntimeX86_64(eb *ExecutableBuilder, out *Out) error {
 	out.Ret()
 
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: _c67_printf emitted successfully\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: _vibe67_printf emitted successfully\n")
 	}
 
 	return nil
@@ -246,7 +246,7 @@ func EmitPrintfRuntimeX86_64(eb *ExecutableBuilder, out *Out) error {
 // EmitPrintfRuntimeARM64 generates the printf function for ARM64
 func EmitPrintfRuntimeARM64(eb *ExecutableBuilder, out *Out) error {
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: Emitting _c67_printf for ARM64\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: Emitting _vibe67_printf for ARM64\n")
 	}
 
 	// ARM64 printf implementation
@@ -258,7 +258,7 @@ func EmitPrintfRuntimeARM64(eb *ExecutableBuilder, out *Out) error {
 	// TODO: Implement ARM64-specific assembly
 	// For now, emit a stub that returns 0
 
-	eb.MarkLabel("_c67_printf")
+	eb.MarkLabel("_vibe67_printf")
 
 	// Stub: just return 0
 	// MOV x0, #0
@@ -274,7 +274,7 @@ func EmitPrintfRuntimeARM64(eb *ExecutableBuilder, out *Out) error {
 	out.Write(0xD6)
 
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: ARM64 _c67_printf stub emitted\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: ARM64 _vibe67_printf stub emitted\n")
 	}
 
 	return nil
@@ -283,7 +283,7 @@ func EmitPrintfRuntimeARM64(eb *ExecutableBuilder, out *Out) error {
 // EmitPrintfRuntimeRISCV64 generates the printf function for RISC-V 64
 func EmitPrintfRuntimeRISCV64(eb *ExecutableBuilder, out *Out) error {
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: Emitting _c67_printf for RISC-V 64\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: Emitting _vibe67_printf for RISC-V 64\n")
 	}
 
 	// RISC-V printf implementation
@@ -295,7 +295,7 @@ func EmitPrintfRuntimeRISCV64(eb *ExecutableBuilder, out *Out) error {
 	// TODO: Implement RISC-V-specific assembly
 	// For now, emit a stub that returns 0
 
-	eb.MarkLabel("_c67_printf")
+	eb.MarkLabel("_vibe67_printf")
 
 	// Stub: just return 0
 	// li a0, 0
@@ -311,7 +311,7 @@ func EmitPrintfRuntimeRISCV64(eb *ExecutableBuilder, out *Out) error {
 	out.Write(0x00)
 
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: RISC-V _c67_printf stub emitted\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: RISC-V _vibe67_printf stub emitted\n")
 	}
 
 	return nil

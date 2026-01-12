@@ -100,7 +100,7 @@ println("Done!")
 
 	// Just verify it compiles for Windows - don't run with Wine
 	// (Wine with SDL3 may not work in all environments and SDL3 may not be installed)
-	tmpFile, err := os.CreateTemp("", "sdl3_windows_test_*.c67")
+	tmpFile, err := os.CreateTemp("", "sdl3_windows_test_*.vibe67")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -122,7 +122,7 @@ println("Done!")
 		OS:   OSWindows,
 	}
 
-	err = CompileC67(tmpPath, outputPath, platform)
+	err = CompileVibe67(tmpPath, outputPath, platform)
 	if err != nil {
 		t.Errorf("Windows SDL3 compilation failed: %v", err)
 		return
@@ -238,10 +238,10 @@ println("Done!")
 }
 
 func TestSDL3ExampleCompiles(t *testing.T) {
-	// Just verify sdl3example.c67 compiles for both targets
-	data, err := os.ReadFile("sdl3example.c67")
+	// Just verify sdl3example.vibe67 compiles for both targets
+	data, err := os.ReadFile("sdl3example.vibe67")
 	if err != nil {
-		t.Skipf("sdl3example.c67 not found: %v", err)
+		t.Skipf("sdl3example.vibe67 not found: %v", err)
 	}
 
 	source := string(data)
@@ -260,7 +260,7 @@ func TestSDL3ExampleCompiles(t *testing.T) {
 
 			// Don't run it since it needs the BMP file, just verify it compiles
 			tmpDir := t.TempDir()
-			srcFile := tmpDir + "/test.c67"
+			srcFile := tmpDir + "/test.vibe67"
 			exePath := tmpDir + "/test"
 
 			if err := os.WriteFile(srcFile, []byte(source), 0644); err != nil {
@@ -273,7 +273,7 @@ func TestSDL3ExampleCompiles(t *testing.T) {
 				OS:   osType,
 				Arch: archType,
 			}
-			if err := CompileC67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
+			if err := CompileVibe67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
 
@@ -284,14 +284,14 @@ func TestSDL3ExampleCompiles(t *testing.T) {
 			if info.Size() == 0 {
 				t.Errorf("Executable is empty")
 			}
-			t.Logf("Successfully compiled sdl3example.c67 for Linux: %d bytes", info.Size())
+			t.Logf("Successfully compiled sdl3example.vibe67 for Linux: %d bytes", info.Size())
 		})
 	}
 
 	// Test Windows compilation
 	t.Run("Windows", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		srcFile := tmpDir + "/test.c67"
+		srcFile := tmpDir + "/test.vibe67"
 		exePath := tmpDir + "/test.exe"
 
 		if err := os.WriteFile(srcFile, []byte(source), 0644); err != nil {
@@ -304,7 +304,7 @@ func TestSDL3ExampleCompiles(t *testing.T) {
 			OS:   osType,
 			Arch: archType,
 		}
-		if err := CompileC67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
+		if err := CompileVibe67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
 			t.Fatalf("Compilation failed: %v", err)
 		}
 
@@ -317,6 +317,6 @@ func TestSDL3ExampleCompiles(t *testing.T) {
 		if len(data) < 2 || data[0] != 'M' || data[1] != 'Z' {
 			t.Errorf("Expected PE executable (MZ header)")
 		}
-		t.Logf("Successfully compiled sdl3example.c67 for Windows: %d bytes", len(data))
+		t.Logf("Successfully compiled sdl3example.vibe67 for Windows: %d bytes", len(data))
 	})
 }

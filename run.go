@@ -43,7 +43,7 @@ func needsMainWrapper(code string) bool {
 	return true
 }
 
-// compileAndRun is a helper function that compiles and runs C67 code,
+// compileAndRun is a helper function that compiles and runs Vibe67 code,
 // returning the output
 func compileAndRun(t *testing.T, code string) string {
 	t.Helper()
@@ -68,7 +68,7 @@ func compileAndRun(t *testing.T, code string) string {
 	}
 
 	// Write source file
-	srcFile := filepath.Join(tmpDir, "test.c67")
+	srcFile := filepath.Join(tmpDir, "test.vibe67")
 	if err := os.WriteFile(srcFile, []byte(code), 0644); err != nil {
 		t.Fatalf("Failed to write source file: %v", err)
 	}
@@ -81,7 +81,7 @@ func compileAndRun(t *testing.T, code string) string {
 		OS:   osType,
 		Arch: archType,
 	}
-	if err := CompileC67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
+	if err := CompileVibe67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
 		t.Fatalf("Compilation failed: %v", err)
 	}
 
@@ -89,10 +89,10 @@ func compileAndRun(t *testing.T, code string) string {
 	cmd := exec.Command(exePath)
 	cmd.Env = os.Environ()
 	runOutput, err := cmd.CombinedOutput()
-	// Note: C67 programs may return non-zero exit codes as their result value
+	// Note: Vibe67 programs may return non-zero exit codes as their result value
 	// We only fail if there's an actual execution error (not just non-zero exit)
 	if err != nil {
-		// Check if it's just a non-zero exit code (which is normal for C67)
+		// Check if it's just a non-zero exit code (which is normal for Vibe67)
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			// Non-zero exit but program ran successfully - return output
 			_ = exitErr
@@ -105,7 +105,7 @@ func compileAndRun(t *testing.T, code string) string {
 	return string(runOutput)
 }
 
-// compileAndRunWindows is a helper function that compiles and runs C67 code for Windows
+// compileAndRunWindows is a helper function that compiles and runs Vibe67 code for Windows
 // under Wine (on non-Windows platforms), with a 3-second timeout
 func compileAndRunWindows(t *testing.T, code string) string {
 	t.Helper()
@@ -135,7 +135,7 @@ func compileAndRunWindows(t *testing.T, code string) string {
 	}
 
 	// Write source file
-	srcFile := filepath.Join(tmpDir, "test.c67")
+	srcFile := filepath.Join(tmpDir, "test.vibe67")
 	if err := os.WriteFile(srcFile, []byte(code), 0644); err != nil {
 		t.Fatalf("Failed to write source file: %v", err)
 	}
@@ -148,7 +148,7 @@ func compileAndRunWindows(t *testing.T, code string) string {
 		OS:   osType,
 		Arch: archType,
 	}
-	if err := CompileC67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
+	if err := CompileVibe67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
 		t.Fatalf("Compilation failed: %v", err)
 	}
 

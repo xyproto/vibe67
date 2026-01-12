@@ -1,9 +1,0 @@
-import sdl3 as sdl
-
-println("About to init SDL")
-sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
-    exitf("SDL_Init failed\n")
-}
-println("SDL initialized successfully")
-sdl.SDL_Quit()
-println("SDL quit successfully")

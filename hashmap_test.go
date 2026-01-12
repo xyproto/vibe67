@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func TestC67HashMapBasicOperations(t *testing.T) {
-	m := NewC67HashMap(16)
+func TestVibe67HashMapBasicOperations(t *testing.T) {
+	m := NewVibe67HashMap(16)
 
 	// Test Set and Get
 	m.Set(1, 10.5)
@@ -30,8 +30,8 @@ func TestC67HashMapBasicOperations(t *testing.T) {
 	}
 }
 
-func TestC67HashMapUpdate(t *testing.T) {
-	m := NewC67HashMap(16)
+func TestVibe67HashMapUpdate(t *testing.T) {
+	m := NewVibe67HashMap(16)
 
 	m.Set(1, 10.5)
 	m.Set(1, 99.9) // Update
@@ -45,8 +45,8 @@ func TestC67HashMapUpdate(t *testing.T) {
 	}
 }
 
-func TestC67HashMapDelete(t *testing.T) {
-	m := NewC67HashMap(16)
+func TestVibe67HashMapDelete(t *testing.T) {
+	m := NewVibe67HashMap(16)
 
 	m.Set(1, 10.5)
 	m.Set(2, 20.5)
@@ -71,8 +71,8 @@ func TestC67HashMapDelete(t *testing.T) {
 	}
 }
 
-func TestC67HashMapCollision(t *testing.T) {
-	m := NewC67HashMap(4) // Small size to force collisions
+func TestVibe67HashMapCollision(t *testing.T) {
+	m := NewVibe67HashMap(4) // Small size to force collisions
 
 	// Add many entries to force collisions
 	for i := uint64(1); i <= 20; i++ {
@@ -91,8 +91,8 @@ func TestC67HashMapCollision(t *testing.T) {
 	}
 }
 
-func TestC67HashMapResize(t *testing.T) {
-	m := NewC67HashMap(4)
+func TestVibe67HashMapResize(t *testing.T) {
+	m := NewVibe67HashMap(4)
 
 	// Add entries to trigger resize
 	for i := uint64(1); i <= 100; i++ {
@@ -111,8 +111,8 @@ func TestC67HashMapResize(t *testing.T) {
 	}
 }
 
-func TestC67HashMapKeys(t *testing.T) {
-	m := NewC67HashMap(16)
+func TestVibe67HashMapKeys(t *testing.T) {
+	m := NewVibe67HashMap(16)
 
 	m.Set(1, 10.5)
 	m.Set(2, 20.5)
@@ -136,8 +136,8 @@ func TestC67HashMapKeys(t *testing.T) {
 	}
 }
 
-func TestC67HashMapValues(t *testing.T) {
-	m := NewC67HashMap(16)
+func TestVibe67HashMapValues(t *testing.T) {
+	m := NewVibe67HashMap(16)
 
 	m.Set(1, 10.5)
 	m.Set(2, 20.5)
@@ -161,8 +161,8 @@ func TestC67HashMapValues(t *testing.T) {
 	}
 }
 
-func TestC67HashMapEmpty(t *testing.T) {
-	m := NewC67HashMap(16)
+func TestVibe67HashMapEmpty(t *testing.T) {
+	m := NewVibe67HashMap(16)
 
 	if m.Count() != 0 {
 		t.Errorf("Expected count 0 for empty map, got %d", m.Count())

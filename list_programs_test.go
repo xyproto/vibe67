@@ -52,7 +52,7 @@ println(#empty)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testInlineC67(t, tt.name, tt.source, tt.expected)
+			testInlineVibe67(t, tt.name, tt.source, tt.expected)
 		})
 	}
 }
@@ -73,7 +73,7 @@ func TestExistingListPrograms(t *testing.T) {
 
 	for _, name := range tests {
 		t.Run(name, func(t *testing.T) {
-			srcPath := filepath.Join("testprograms", name+".c67")
+			srcPath := filepath.Join("testprograms", name+".vibe67")
 			resultPath := filepath.Join("testprograms", name+".result")
 
 			if _, err := os.Stat(srcPath); os.IsNotExist(err) {
@@ -90,7 +90,7 @@ func TestExistingListPrograms(t *testing.T) {
 			exePath := filepath.Join(tmpDir, name)
 
 			platform := GetDefaultPlatform()
-			if err := CompileC67(srcPath, exePath, platform); err != nil {
+			if err := CompileVibe67(srcPath, exePath, platform); err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
 
@@ -149,7 +149,7 @@ println(ys[2])
 println(ys[3])
 println(#ys)
 `
-	testInlineC67(t, "append_method", source, "1\n2\n3\n4\n4\n")
+	testInlineVibe67(t, "append_method", source, "1\n2\n3\n4\n4\n")
 }
 
 // TestAppendFunctionBasic tests the append() function directly
@@ -161,7 +161,7 @@ println(ys[1])
 println(ys[2])
 println(#ys)
 `
-	testInlineC67(t, "append_function", source, "10\n20\n30\n3\n")
+	testInlineVibe67(t, "append_function", source, "10\n20\n30\n3\n")
 }
 
 // TestPopMethod tests the .pop() method syntax sugar
@@ -175,7 +175,7 @@ println(new_list[2])
 println(popped_value)
 println(#new_list)
 `
-	testInlineC67(t, "pop_method", source, "1\n2\n3\n4\n3\n")
+	testInlineVibe67(t, "pop_method", source, "1\n2\n3\n4\n3\n")
 }
 
 // TestPopFunction tests the pop() function directly
@@ -188,7 +188,7 @@ println(new_list[1])
 println(popped)
 println(#new_list)
 `
-	testInlineC67(t, "pop_function", source, "10\n20\n30\n2\n")
+	testInlineVibe67(t, "pop_function", source, "10\n20\n30\n2\n")
 }
 
 // TestPopEmptyList tests pop() on an empty list
@@ -199,7 +199,7 @@ new_list, popped = pop(xs)
 println(#new_list)
 println(is_nan(popped))
 `
-	testInlineC67(t, "pop_empty", source, "0\n1\n")
+	testInlineVibe67(t, "pop_empty", source, "0\n1\n")
 }
 
 // TestAppendChaining tests method chaining with append
@@ -211,5 +211,5 @@ println(ys[1])
 println(ys[2])
 println(#ys)
 `
-	testInlineC67(t, "append_chaining", source, "1\n2\n3\n3\n")
+	testInlineVibe67(t, "append_chaining", source, "1\n2\n3\n3\n")
 }

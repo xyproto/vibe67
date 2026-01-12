@@ -9,7 +9,7 @@ import (
 // VSCATTERDPD/VSCATTERQPD - Vector scatter stores of packed double-precision floats
 // using indices
 //
-// CRITICAL counterpart to VGATHER for C67's map[uint64]float64:
+// CRITICAL counterpart to VGATHER for Vibe67's map[uint64]float64:
 //   - Sparse map writes: scatter values to indices [i1, i2, i3, i4]
 //   - Indirect storage: map_values[indices[0..7]] := values
 //   - Non-linear writes: storing map with computed offsets

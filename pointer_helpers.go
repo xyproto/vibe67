@@ -1,9 +1,9 @@
 // Completion: 100% - Helper module complete
 package main
 
-// pointer_helpers.go - Helper functions for pointer/float64 conversions in C67
+// pointer_helpers.go - Helper functions for pointer/float64 conversions in Vibe67
 //
-// C67 stores all values as float64 (in XMM registers), including pointers.
+// Vibe67 stores all values as float64 (in XMM registers), including pointers.
 // Pointers must be reinterpreted as raw bit patterns, NOT converted numerically.
 //
 // These helpers ensure consistent and correct pointer handling throughout the compiler.

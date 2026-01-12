@@ -7,7 +7,7 @@ import (
 )
 
 // MUL instruction for multiplication
-// Essential for implementing C67's arithmetic operations:
+// Essential for implementing Vibe67's arithmetic operations:
 //   - Arithmetic expressions: n * 2
 //   - Recursive multiplication: n * me(n - 1) in factorial
 //   - Array size calculations: rows * columns

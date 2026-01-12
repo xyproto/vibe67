@@ -8,13 +8,13 @@ import (
 
 // VMINPD/VMAXPD - Vector minimum/maximum of packed double-precision floats
 //
-// Essential for C67's numerical operations:
+// Essential for Vibe67's numerical operations:
 //   - Reductions: find min/max in array
 //   - Clamping: clamp values to range [min, max]
 //   - Comparisons: element-wise min/max selection
 //   - Statistics: finding extrema
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   maximum = values ||> max    // reduction
 //   clamped = values || map(x -> min(max(x, lower), upper))
 //

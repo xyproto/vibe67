@@ -1,4 +1,4 @@
-// Completion: 95% - Core lexer complete, supports all C67 3.0 tokens
+// Completion: 95% - Core lexer complete, supports all Vibe67 3.0 tokens
 package main
 
 import (
@@ -6,7 +6,7 @@ import (
 	"unicode"
 )
 
-// Token types for C67 language
+// Token types for Vibe67 language
 type TokenType int
 
 const (
@@ -109,7 +109,7 @@ const (
 	TOKEN_F64  // f64
 	TOKEN_CSTR // cstr
 	TOKEN_CPTR // cptr (C pointer)
-	// C67 type keywords
+	// Vibe67 type keywords
 	TOKEN_NUM      // num (number type)
 	TOKEN_STR      // str (string type)
 	TOKEN_LIST     // list (type)
@@ -203,7 +203,7 @@ func processEscapeSequences(s string) string {
 	return result.String()
 }
 
-// Lexer for C67 language
+// Lexer for Vibe67 language
 type Lexer struct {
 	input     string
 	pos       int
@@ -215,7 +215,7 @@ type Lexer struct {
 func NewLexer(input string) *Lexer {
 	l := &Lexer{input: input, pos: 0, line: 1, column: 1, lineStart: 0}
 
-	// Skip shebang line if present (#!/usr/bin/c67)
+	// Skip shebang line if present (#!/usr/bin/vibe67)
 	if len(input) >= 2 && input[0] == '#' && input[1] == '!' {
 		// Skip until newline
 		for l.pos < len(l.input) && l.input[l.pos] != '\n' {
@@ -667,7 +667,7 @@ func (l *Lexer) NextToken() Token {
 			l.pos += 2
 			return Token{Type: TOKEN_RANDOM, Value: "??", Line: l.line, Column: tokenColumn}
 		}
-		// Single ? is not a valid token in C67
+		// Single ? is not a valid token in Vibe67
 		return Token{Type: TOKEN_EOF, Value: "", Line: l.line, Column: tokenColumn}
 	case '~':
 		// Check for ~> first, then ~b

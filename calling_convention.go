@@ -1,7 +1,7 @@
 // Completion: 100% - Helper module complete
 package main
 
-// Calling Convention Manager for c67
+// Calling Convention Manager for vibe67
 //
 // Handles platform-specific calling conventions:
 // - System V AMD64 ABI (Linux, macOS, BSD)
@@ -11,7 +11,7 @@ package main
 //
 // Integrates with the register allocator to prevent register clobbering.
 //
-// ARCHITECTURE NOTE: C67 uses 3-block unsafe syntax (x86_64, arm64, riscv64)
+// ARCHITECTURE NOTE: Vibe67 uses 3-block unsafe syntax (x86_64, arm64, riscv64)
 // based on ISA, not target (arch+OS). This file bridges the gap by mapping
 // ISA registers to the correct calling convention based on the target OS.
 // See PLATFORM_ARCHITECTURE.md for the full design rationale.
@@ -171,7 +171,7 @@ func NewCallSiteManager(cc CallingConvention) *CallSiteManager {
 
 // PrepareCall saves caller-saved registers that are currently in use
 // Returns the total stack space allocated (including shadow space)
-func (csm *CallSiteManager) PrepareCall(fc *C67Compiler, liveRegs []string) int {
+func (csm *CallSiteManager) PrepareCall(fc *Vibe67Compiler, liveRegs []string) int {
 	// Determine which caller-saved registers need saving
 	callerSaved := csm.cc.GetCallerSavedRegs()
 	callerSavedMap := make(map[string]bool)
@@ -220,7 +220,7 @@ func (csm *CallSiteManager) PrepareCall(fc *C67Compiler, liveRegs []string) int 
 }
 
 // RestoreAfterCall restores saved registers and deallocates stack space
-func (csm *CallSiteManager) RestoreAfterCall(fc *C67Compiler) {
+func (csm *CallSiteManager) RestoreAfterCall(fc *Vibe67Compiler) {
 	// Restore registers
 	for _, reg := range csm.savedRegs {
 		offset := csm.savedOffsets[reg]

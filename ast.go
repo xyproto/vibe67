@@ -36,11 +36,11 @@ type Statement interface {
 type AssignStmt struct {
 	Name           string
 	Value          Expression
-	Mutable        bool     // true for := or <-, false for =
-	IsUpdate       bool     // true for <-, false for = and :=
-	IsReuseMutable bool     // true when = is used to update existing mutable variable
-	Precision      string   // Legacy type annotation: "b64", "f32", etc. (empty if none)
-	TypeAnnotation *C67Type // Type annotation: num, str, cstring, cptr, etc. (nil if none)
+	Mutable        bool        // true for := or <-, false for =
+	IsUpdate       bool        // true for <-, false for = and :=
+	IsReuseMutable bool        // true when = is used to update existing mutable variable
+	Precision      string      // Legacy type annotation: "b64", "f32", etc. (empty if none)
+	TypeAnnotation *Vibe67Type // Type annotation: num, str, cstring, cptr, etc. (nil if none)
 }
 
 type MultipleAssignStmt struct {
@@ -93,7 +93,7 @@ func (m *MapUpdateStmt) String() string {
 func (m *MapUpdateStmt) statementNode() {}
 
 type UseStmt struct {
-	Path string // Import path: "./file.c67" or "package_name"
+	Path string // Import path: "./file.vibe67" or "package_name"
 }
 
 func (u *UseStmt) String() string { return "use " + u.Path }
@@ -733,9 +733,9 @@ func (s *StructLiteralExpr) expressionNode() {}
 
 type LambdaExpr struct {
 	Params           []string
-	ParamTypes       map[string]*C67Type // Type annotations for parameters (nil if none)
-	VariadicParam    string              // Name of variadic parameter (if any), empty if none
-	ReturnType       *C67Type            // Return type annotation (nil if none)
+	ParamTypes       map[string]*Vibe67Type // Type annotations for parameters (nil if none)
+	VariadicParam    string                 // Name of variadic parameter (if any), empty if none
+	ReturnType       *Vibe67Type            // Return type annotation (nil if none)
 	Body             Expression
 	IsPure           bool              // Automatically detected: true if function has no side effects
 	CapturedVars     []string          // Variables captured from outer scope (for closures)
@@ -950,7 +950,7 @@ func (r *RegisterAssignStmt) statementNode() {}
 
 type UnsafeReturnStmt struct {
 	Register string // Register to return (e.g., "rax", "xmm0")
-	AsType   string // Optional type cast (e.g., "cstr", "pointer", empty for C67 value)
+	AsType   string // Optional type cast (e.g., "cstr", "pointer", empty for Vibe67 value)
 }
 
 func (u *UnsafeReturnStmt) String() string {
@@ -1099,7 +1099,7 @@ type DeferStmt struct {
 func (d *DeferStmt) String() string { return "defer " + d.Call.String() }
 func (d *DeferStmt) statementNode() {}
 
-// SpawnStmt represents a c67ped process: c67 expr [ | params | block ]
+// SpawnStmt represents a vibe67ped process: vibe67 expr [ | params | block ]
 // Creates a new process via fork() and optionally waits for result
 type SpawnStmt struct {
 	Expr   Expression // Expression to execute in child process
@@ -1108,7 +1108,7 @@ type SpawnStmt struct {
 }
 
 func (s *SpawnStmt) String() string {
-	result := "c67 " + s.Expr.String()
+	result := "vibe67 " + s.Expr.String()
 	if s.Block != nil {
 		result += " | "
 		for i, param := range s.Params {

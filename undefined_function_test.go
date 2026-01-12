@@ -16,7 +16,7 @@ func compileTestCodeAllowError(t *testing.T, code string) (string, error) {
 	tmpDir := t.TempDir()
 
 	// Write source file
-	srcFile := filepath.Join(tmpDir, "test.c67")
+	srcFile := filepath.Join(tmpDir, "test.vibe67")
 	if err := os.WriteFile(srcFile, []byte(code), 0644); err != nil {
 		t.Fatalf("Failed to write source file: %v", err)
 	}
@@ -29,7 +29,7 @@ func compileTestCodeAllowError(t *testing.T, code string) (string, error) {
 		OS:   osType,
 		Arch: archType,
 	}
-	err := CompileC67WithOptions(srcFile, exePath, platform, 0, false)
+	err := CompileVibe67WithOptions(srcFile, exePath, platform, 0, false)
 	if err != nil {
 		return "", err
 	}

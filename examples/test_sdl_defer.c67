@@ -1,8 +1,0 @@
-import sdl3 as sdl
-
-sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
-    exitf("SDL_Init failed\n")
-}
-defer sdl.SDL_Quit()
-
-println("After defer")

@@ -21,7 +21,7 @@
 - ✅ Properly handle lambdas returned as values (closures)
 - ✅ Fixed Windows PE compilation issue with arena functions
 - ✅ All tests passing including Windows PE
-- ✅ Multi-file compilation now works correctly (add.c67 + hello.c67)
+- ✅ Multi-file compilation now works correctly (add.vibe67 + hello.vibe67)
 - ✅ Added DCE guards to all runtime helper functions
 - ✅ Binary size: Minimal programs now **609 bytes** (was 21KB)
 - ✅ Printf/println still 21KB due to syscall runtime (~10KB)
@@ -29,17 +29,17 @@
 ## DCE Implementation Status
 
 ### Runtime Helpers with Guards (All Complete):
-- ✅ `_c67_string_concat` - only if string concatenation used
-- ✅ `_c67_string_to_cstr` - only if C FFI or println/printf used  
-- ✅ `_c67_cstr_to_string` - only if C string conversion used
-- ✅ `_c67_slice_string` - only if string slicing used
-- ✅ `_c67_list_concat` - only if list concatenation used
-- ✅ `_c67_list_repeat` - only if list repeat used
-- ✅ `_c67_string_eq` - only if string comparison used
+- ✅ `_vibe67_string_concat` - only if string concatenation used
+- ✅ `_vibe67_string_to_cstr` - only if C FFI or println/printf used  
+- ✅ `_vibe67_cstr_to_string` - only if C string conversion used
+- ✅ `_vibe67_slice_string` - only if string slicing used
+- ✅ `_vibe67_list_concat` - only if list concatenation used
+- ✅ `_vibe67_list_repeat` - only if list repeat used
+- ✅ `_vibe67_string_eq` - only if string comparison used
 - ✅ `upper_string`, `lower_string`, `trim_string` - only if used
-- ✅ `_c67_string_println` - only if println used
-- ✅ `_c67_string_print` - only if print used
-- ✅ `_c67_itoa` - only if number to string conversion used
+- ✅ `_vibe67_string_println` - only if println used
+- ✅ `_vibe67_string_print` - only if print used
+- ✅ `_vibe67_itoa` - only if number to string conversion used
 - ✅ Printf syscall runtime - only if printf/println used on Linux
 - ✅ Arena functions - only if `fc.usesArenas` is true
 - ✅ List functions - only if arenas enabled (they require arenas)
@@ -105,7 +105,7 @@
 
 1. [ ] Generate DWARF v5 debug info (enable GDB/LLDB debugging)
 2. [ ] Implement basic LSP (go-to-definition, completions)
-3. [ ] Add `c67 fmt` formatter
+3. [ ] Add `vibe67 fmt` formatter
 4. [ ] Fuzz test parser to prevent crashes
 
 ## Priority 4: Platform Support
@@ -119,7 +119,7 @@
 1. [ ] Benchmark suite vs C (gcc -O2) and Go
 2. [ ] Upgrade register allocator to linear scan
 3. [ ] Optimize O(n²) string iteration to O(n)
-# C67 Production Readiness Analysis
+# Vibe67 Production Readiness Analysis
 
 **Date**: 2026-01-05
 **Status**: Prototype → Production path defined
@@ -184,7 +184,7 @@ Enables competitive 64k demos
 ### Improvement 1: Jump Tables for Dense Matches
 **Problem**: Current linear compare chain for value matches
 **Solution**: Generate switch/jump table for 10+ consecutive integer cases
-```c67
+```vibe67
 // Before (linear):
 x { 0 => "zero", 1 => "one", 2 => "two", ... }
 // Generates: if x==0 goto L0; if x==1 goto L1; ...
@@ -198,7 +198,7 @@ x { 0 => "zero", 1 => "one", 2 => "two", ... }
 ### Improvement 2: Range Patterns
 **Problem**: No way to match ranges elegantly
 **Solution**: Add range syntax in match arms
-```c67
+```vibe67
 grade = score {
     0..59 => "F"
     60..69 => "D"
@@ -213,7 +213,7 @@ grade = score {
 ### Improvement 3: Tuple Destructuring in Matches
 **Problem**: Can't pattern match on structure
 **Solution**: Allow destructuring in match patterns
-```c67
+```vibe67
 point = (3, 4)
 result = point {
     (0, 0) => "origin"
@@ -265,7 +265,7 @@ result = point {
 
 ## Conclusion
 
-C67 is **90% there** for demoscene/gamedev/osdev. The remaining 10% is:
+Vibe67 is **90% there** for demoscene/gamedev/osdev. The remaining 10% is:
 - Size optimization (technical debt)
 - ARM64 bugs (platform coverage)
 - Tooling (developer experience)
@@ -293,7 +293,7 @@ Current state: All functionality working, tests passing, but binary sizes not ye
 
 ## CRITICAL: Demoscene & Game Development Readiness
 
-**Mission:** Make C67 production-ready for releasing cross-platform games on Steam and creating competitive demoscene productions (64k intros, demos).
+**Mission:** Make Vibe67 production-ready for releasing cross-platform games on Steam and creating competitive demoscene productions (64k intros, demos).
 
 **Status as of 2026-01-07:** Tests passing, examples work, core compiler solid. Need production-level features below.
 
@@ -433,10 +433,10 @@ Current state: All functionality working, tests passing, but binary sizes not ye
 
 **Nice-To-Have:**
 - [ ] **MEDIUM:** DWARF debug info generation (enable GDB/LLDB)
-- [ ] **MEDIUM:** Source-level debugging (step through C67 code, not assembly)
+- [ ] **MEDIUM:** Source-level debugging (step through Vibe67 code, not assembly)
 - [ ] **LOW:** Basic LSP (go-to-definition, find-references)
 - [ ] **LOW:** Syntax highlighting for popular editors (VSCode, Vim, Emacs)
-- [ ] **LOW:** Code formatter (`c67 fmt`)
+- [ ] **LOW:** Code formatter (`vibe67 fmt`)
 
 **Why This Matters:** Debugging is painful without tools. Good tools = faster development.
 

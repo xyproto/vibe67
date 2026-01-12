@@ -114,7 +114,7 @@ func TestMachOSegments(t *testing.T) {
 		t.Skip("Mach-O tests only run on macOS")
 	}
 
-	tmpfile, err := os.CreateTemp("", "c67_macho_seg_test")
+	tmpfile, err := os.CreateTemp("", "vibe67_macho_seg_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -176,7 +176,7 @@ func TestMachOPageZero(t *testing.T) {
 		t.Skip("Mach-O tests only run on macOS")
 	}
 
-	tmpfile, err := os.CreateTemp("", "c67_macho_zero_test")
+	tmpfile, err := os.CreateTemp("", "vibe67_macho_zero_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -240,7 +240,7 @@ func TestMachOTextSegment(t *testing.T) {
 		t.Skip("Mach-O tests only run on macOS")
 	}
 
-	tmpfile, err := os.CreateTemp("", "c67_macho_text_test")
+	tmpfile, err := os.CreateTemp("", "vibe67_macho_text_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestMachOMinimalSize(t *testing.T) {
 		t.Skip("Mach-O tests only run on macOS")
 	}
 
-	tmpfile, err := os.CreateTemp("", "c67_macho_size_test")
+	tmpfile, err := os.CreateTemp("", "vibe67_macho_size_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -366,7 +366,7 @@ func TestMachOExecutable(t *testing.T) {
 		t.Skip("Mach-O execution tests only run on macOS")
 	}
 
-	tmpfile, err := os.CreateTemp("", "c67_macho_exec_test")
+	tmpfile, err := os.CreateTemp("", "vibe67_macho_exec_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -429,9 +429,9 @@ func TestMachOExecutable(t *testing.T) {
 		t.Logf("After write, bytes at offset 816 in file: %x", writtenBytes[816:824])
 	}
 
-	// Binary is now self-signed by c67's generateCodeSignature()
+	// Binary is now self-signed by vibe67's generateCodeSignature()
 	// No external codesign tool needed!
-	t.Logf("Binary self-signed by c67")
+	t.Logf("Binary self-signed by vibe67")
 
 	// KNOWN ISSUE: macOS dyld doesn't honor stacksize in LC_MAIN, giving only ~5.6KB stack
 	// This causes crashes even in simple programs. Skip execution test until resolved.
@@ -460,7 +460,7 @@ func TestMachOFileCommand(t *testing.T) {
 		t.Skip("Mach-O tests only run on macOS")
 	}
 
-	tmpfile, err := os.CreateTemp("", "c67_macho_file_test")
+	tmpfile, err := os.CreateTemp("", "vibe67_macho_file_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -503,7 +503,7 @@ func TestMachOPermissions(t *testing.T) {
 		t.Skip("Mach-O tests only run on macOS")
 	}
 
-	tmpfile, err := os.CreateTemp("", "c67_macho_perms_test")
+	tmpfile, err := os.CreateTemp("", "vibe67_macho_perms_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}

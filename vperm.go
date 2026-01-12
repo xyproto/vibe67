@@ -8,13 +8,13 @@ import (
 
 // VPERMILPD/VPERMPD - Vector permutation of packed double-precision floats
 //
-// Essential for C67's data reorganization:
+// Essential for Vibe67's data reorganization:
 //   - Swapping elements within vectors
 //   - Reversing vector order
 //   - Broadcasting specific elements
 //   - Implementing shuffles for FFT, matrix transpose
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   reversed = reverse_vector(values)
 //   swapped = swap_pairs(values)
 //   broadcast = duplicate_element(values, index)

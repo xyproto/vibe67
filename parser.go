@@ -1,13 +1,13 @@
-// parser.go - C67 Language Parser (Version 1.5.0)
+// parser.go - Vibe67 Language Parser (Version 1.5.0)
 // Completion: 95%
 //
 // Status: Canonical Implementation of GRAMMAR.md and LANGUAGESPEC.md v1.5.0
 //
 // This parser is the authoritative implementation of GRAMMAR.md and LANGUAGESPEC.md v1.5.0.
-// It implements a complete recursive descent parser for the C67 programming
+// It implements a complete recursive descent parser for the Vibe67 programming
 // language with direct machine code generation for x86_64, ARM64, and RISCV64.
 //
-// Key Features (C67 3.0):
+// Key Features (Vibe67 3.0):
 // - Universal type system: map[uint64]float64
 // - Block disambiguation: maps vs matches vs statements
 // - Value match (with expression) and guard match (with |)
@@ -26,12 +26,12 @@
 // - Guard syntax (| at line start)
 // - C FFI and syscall support
 //
-// This file contains the core parser that transforms C67 source code
+// This file contains the core parser that transforms Vibe67 source code
 // into an Abstract Syntax Tree (AST). It handles:
 // - Tokenization and lexical analysis via Lexer
 // - Recursive descent parsing with operator precedence
 // - Expression parsing with proper precedence climbing
-// - Statement parsing for all C67 constructs
+// - Statement parsing for all Vibe67 constructs
 // - AST node construction with semantic validation
 
 package main
@@ -277,7 +277,7 @@ func (p *Parser) synchronize() {
 // speculativeError is used to signal parse failure during speculative parsing
 type speculativeError struct{}
 
-// compilerError prints an error message and panics (to be recovered by CompileC67)
+// compilerError prints an error message and panics (to be recovered by CompileVibe67)
 // Use this instead of fmt.Fprintf + os.Exit in code generation
 func compilerError(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
@@ -561,7 +561,7 @@ func (p *Parser) parseSpawnStmt() *SpawnStmt {
 		// For now, only support simple identifiers, not map destructuring
 		for {
 			if p.current.Type != TOKEN_IDENT {
-				p.error("expected identifier in c67 pipe parameters")
+				p.error("expected identifier in vibe67 pipe parameters")
 			}
 			params = append(params, p.current.Value)
 			p.nextToken()
@@ -571,7 +571,7 @@ func (p *Parser) parseSpawnStmt() *SpawnStmt {
 			} else if p.current.Type == TOKEN_PIPE {
 				break
 			} else {
-				p.error("expected ',' or '|' in c67 pipe parameters")
+				p.error("expected ',' or '|' in vibe67 pipe parameters")
 			}
 		}
 
@@ -579,7 +579,7 @@ func (p *Parser) parseSpawnStmt() *SpawnStmt {
 
 		// Parse block
 		if p.current.Type != TOKEN_LBRACE {
-			p.error("expected block after c67 pipe parameters")
+			p.error("expected block after vibe67 pipe parameters")
 		}
 
 		// Parse as BlockExpr
@@ -597,7 +597,7 @@ func (p *Parser) parseSpawnStmt() *SpawnStmt {
 		}
 
 		if p.current.Type != TOKEN_RBRACE {
-			p.error("expected '}' at end of c67 block")
+			p.error("expected '}' at end of vibe67 block")
 		}
 	}
 
@@ -1337,7 +1337,7 @@ func (p *Parser) parseAssignment() *AssignStmt {
 
 	// Check for type annotation: name: type
 	var precision string
-	var typeAnnotation *C67Type
+	var typeAnnotation *Vibe67Type
 	if p.current.Type == TOKEN_COLON && p.peek.Type == TOKEN_IDENT {
 		p.nextToken() // skip ':'
 
@@ -3751,7 +3751,7 @@ func (p *Parser) parsePostfix() Expression {
 						"float": true, "float32": true, "float64": true, "double": true,
 						// C string/pointer types
 						"cstr": true, "cstring": true, "ptr": true, "pointer": true,
-						// C67 types
+						// Vibe67 types
 						"number": true, "num": true, "string": true, "str": true,
 						"list": true, "map": true, "address": true, "addr": true,
 						"bool": true, "boolean": true,
@@ -3842,7 +3842,7 @@ func (p *Parser) parsePostfix() Expression {
 							expr = &CallExpr{Function: namespacedName, Args: args}
 						}
 					} else {
-						// Ambiguous: could be method call (xs.append) or C67 namespace (lib.hello)
+						// Ambiguous: could be method call (xs.append) or Vibe67 namespace (lib.hello)
 						// Parse as namespaced call and let compiler resolve
 						namespacedName := ident.Name + "." + fieldName
 						p.nextToken() // skip second identifier
@@ -3877,7 +3877,7 @@ func (p *Parser) parsePostfix() Expression {
 							expr = &NamespacedIdentExpr{Namespace: ident.Name, Name: fieldName}
 						}
 					} else {
-						// Regular field access on a C67 variable
+						// Regular field access on a Vibe67 variable
 						if fieldName == "error" {
 							// .error property - extract error code from Result type
 							expr = &CallExpr{
@@ -3922,7 +3922,7 @@ func (p *Parser) parsePostfix() Expression {
 					}
 				} else {
 					// Regular field access - use FieldAccessExpr
-					// Codegen will decide if it's C struct access or C67 map access
+					// Codegen will decide if it's C struct access or Vibe67 map access
 					expr = &FieldAccessExpr{
 						Object:    expr,
 						FieldName: fieldName,
@@ -5098,34 +5098,34 @@ func (p *Parser) parseUnsafeValue() interface{} {
 
 // parseTypeAnnotation parses a type annotation (after :)
 // Returns nil if no valid type annotation found
-func (p *Parser) parseTypeAnnotation() *C67Type {
-	// Native C67 types
+func (p *Parser) parseTypeAnnotation() *Vibe67Type {
+	// Native Vibe67 types
 	switch p.current.Value {
 	case "num":
-		return &C67Type{Kind: TypeNumber}
+		return &Vibe67Type{Kind: TypeNumber}
 	case "str":
-		return &C67Type{Kind: TypeString}
+		return &Vibe67Type{Kind: TypeString}
 	case "list":
-		return &C67Type{Kind: TypeList}
+		return &Vibe67Type{Kind: TypeList}
 	case "map":
-		return &C67Type{Kind: TypeMap}
+		return &Vibe67Type{Kind: TypeMap}
 	// Foreign C types
 	case "cstring":
-		return &C67Type{Kind: TypeCString, CType: "char*"}
+		return &Vibe67Type{Kind: TypeCString, CType: "char*"}
 	case "cptr":
-		return &C67Type{Kind: TypeCPointer, CType: "void*"}
+		return &Vibe67Type{Kind: TypeCPointer, CType: "void*"}
 	case "cint":
-		return &C67Type{Kind: TypeCInt, CType: "int"}
+		return &Vibe67Type{Kind: TypeCInt, CType: "int"}
 	case "clong":
-		return &C67Type{Kind: TypeCLong, CType: "long"}
+		return &Vibe67Type{Kind: TypeCLong, CType: "long"}
 	case "cfloat":
-		return &C67Type{Kind: TypeCFloat, CType: "float"}
+		return &Vibe67Type{Kind: TypeCFloat, CType: "float"}
 	case "cdouble":
-		return &C67Type{Kind: TypeCDouble, CType: "double"}
+		return &Vibe67Type{Kind: TypeCDouble, CType: "double"}
 	case "cbool":
-		return &C67Type{Kind: TypeCBool, CType: "bool"}
+		return &Vibe67Type{Kind: TypeCBool, CType: "bool"}
 	case "cvoid":
-		return &C67Type{Kind: TypeCVoid}
+		return &Vibe67Type{Kind: TypeCVoid}
 	default:
 		return nil
 	}

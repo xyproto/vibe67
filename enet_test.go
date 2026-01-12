@@ -33,7 +33,7 @@ println(42)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			srcPath := filepath.Join(tmpDir, tt.name+".c67")
+			srcPath := filepath.Join(tmpDir, tt.name+".vibe67")
 			outPath := filepath.Join(tmpDir, tt.name)
 
 			// Write source file
@@ -42,16 +42,16 @@ println(42)
 			}
 
 			// Try to compile
-			err := CompileC67(srcPath, outPath, platform)
+			err := CompileVibe67(srcPath, outPath, platform)
 
 			// We expect compilation to succeed (generates assembly/binary)
 			// It may fail at link time if ENet is not installed, which is acceptable
-			// The key is that the C67 code compiles and generates valid assembly
+			// The key is that the Vibe67 code compiles and generates valid assembly
 			if err != nil {
 				// Check if it's a link error (expected if ENet not installed)
 				if isLinkError(err) {
 					t.Logf("%s: Compilation successful, link failed (ENet not installed): %v", tt.name, err)
-					// This is OK - the C67 code compiled successfully
+					// This is OK - the Vibe67 code compiled successfully
 					return
 				}
 				// Other errors are test failures
@@ -148,14 +148,14 @@ func TestENetWithLibraryIfAvailable(t *testing.T) {
 	source := `// Simple test
 println("ENet test")
 `
-	srcPath := filepath.Join(tmpDir, "enet_server.c67")
+	srcPath := filepath.Join(tmpDir, "enet_server.vibe67")
 	serverBin := filepath.Join(tmpDir, "enet_server")
 
 	if err := os.WriteFile(srcPath, []byte(source), 0644); err != nil {
 		t.Fatalf("Failed to write source: %v", err)
 	}
 
-	err := CompileC67(srcPath, serverBin, platform)
+	err := CompileVibe67(srcPath, serverBin, platform)
 
 	if err != nil {
 		t.Fatalf("Failed to compile ENet server with library available: %v", err)

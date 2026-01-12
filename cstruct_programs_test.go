@@ -43,7 +43,7 @@ println(Data.size)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testInlineC67(t, tt.name, tt.source, tt.expected)
+			testInlineVibe67(t, tt.name, tt.source, tt.expected)
 		})
 	}
 }
@@ -60,7 +60,7 @@ func TestExistingCStructPrograms(t *testing.T) {
 
 	for _, name := range tests {
 		t.Run(name, func(t *testing.T) {
-			srcPath := filepath.Join("testprograms", name+".c67")
+			srcPath := filepath.Join("testprograms", name+".vibe67")
 			resultPath := filepath.Join("testprograms", name+".result")
 
 			if _, err := os.Stat(srcPath); os.IsNotExist(err) {
@@ -77,7 +77,7 @@ func TestExistingCStructPrograms(t *testing.T) {
 			exePath := filepath.Join(tmpDir, name)
 
 			platform := GetDefaultPlatform()
-			if err := CompileC67(srcPath, exePath, platform); err != nil {
+			if err := CompileVibe67(srcPath, exePath, platform); err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
 

@@ -7,7 +7,7 @@ import (
 )
 
 // VDIVPD - Vector division for packed double-precision (float64) values
-// Essential for C67's division operations:
+// Essential for Vibe67's division operations:
 //   - Vectorized division: values |> map(x -> x / divisor)
 //   - Normalization: data |> map(x -> x / total)
 //   - Ratio calculations in parallel

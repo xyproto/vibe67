@@ -8,13 +8,13 @@ import (
 
 // VHADDPD - Horizontal add of packed double-precision floats
 //
-// Essential for C67's reduction operations:
+// Essential for Vibe67's reduction operations:
 //   - Tree-based parallel reductions
 //   - Sum across vector lanes
 //   - Dot product accumulation
 //   - Fast aggregation operations
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   total = values ||> hadd ||> hadd ||> hadd  # Reduce to scalar
 //   partial_sums = hadd(vec1, vec2)             # Pairwise sums
 //

@@ -34,7 +34,7 @@ func TestParallelPrograms(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpDir := t.TempDir()
-			srcPath := filepath.Join(tmpDir, tt.name+".c67")
+			srcPath := filepath.Join(tmpDir, tt.name+".vibe67")
 			exePath := filepath.Join(tmpDir, tt.name)
 
 			if err := os.WriteFile(srcPath, []byte(tt.source), 0644); err != nil {
@@ -42,7 +42,7 @@ func TestParallelPrograms(t *testing.T) {
 			}
 
 			platform := GetDefaultPlatform()
-			if err := CompileC67(srcPath, exePath, platform); err != nil {
+			if err := CompileVibe67(srcPath, exePath, platform); err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
 
@@ -71,7 +71,7 @@ func TestExistingParallelPrograms(t *testing.T) {
 
 	for _, name := range tests {
 		t.Run(name, func(t *testing.T) {
-			srcPath := filepath.Join("testprograms", name+".c67")
+			srcPath := filepath.Join("testprograms", name+".vibe67")
 
 			if _, err := os.Stat(srcPath); os.IsNotExist(err) {
 				t.Skipf("Source file %s not found", srcPath)
@@ -82,7 +82,7 @@ func TestExistingParallelPrograms(t *testing.T) {
 			exePath := filepath.Join(tmpDir, name)
 
 			platform := GetDefaultPlatform()
-			if err := CompileC67(srcPath, exePath, platform); err != nil {
+			if err := CompileVibe67(srcPath, exePath, platform); err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
 

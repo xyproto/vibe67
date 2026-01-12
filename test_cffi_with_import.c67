@@ -1,8 +1,0 @@
-import sdl3 as sdl
-
-x := c.sin(1.0)
-printf("sin(1.0) = %.6f\n", x)
-
-ptr := c.malloc(100)
-printf("malloc(100) = %.0f\n", ptr)
-c.free(ptr)

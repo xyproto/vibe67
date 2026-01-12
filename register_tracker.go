@@ -425,7 +425,7 @@ func (rs *RegisterSpiller) GetTotalSpillSpace() int {
 }
 
 // GetAllocatedCalleeSavedRegs returns a list of callee-saved registers currently in use
-// Callee-saved registers on x86-64: rbx, r12, r13, r14, r15 (r15 is reserved in C67)
+// Callee-saved registers on x86-64: rbx, r12, r13, r14, r15 (r15 is reserved in Vibe67)
 func (rt *RegisterTracker) GetAllocatedCalleeSavedRegs() []string {
 	var allocated []string
 	calleeSaved := []string{"rbx", "r12", "r13", "r14"}

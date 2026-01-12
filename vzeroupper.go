@@ -8,13 +8,13 @@ import (
 
 // VZEROUPPER - Zero upper 128 bits of YMM/ZMM registers
 //
-// Essential for C67's AVX ↔ SSE transition:
+// Essential for Vibe67's AVX ↔ SSE transition:
 //   - Prevents AVX-SSE transition penalties on older CPUs
 //   - Clears upper bits of vector registers before function calls
 //   - Required when mixing AVX and non-AVX code
 //   - Performance optimization for legacy compatibility
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   // Before calling non-AVX function
 //   vzeroupper()
 //   call_external_function()

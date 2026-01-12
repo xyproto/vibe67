@@ -1,6 +1,0 @@
-test = (n) {
-  n <= 5 ~> 100 | 200
-}
-
-println(test(3))
-println(test(10))

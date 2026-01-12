@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestBasicCompilation tests that c67 can compile and generate an executable
+// TestBasicCompilation tests that vibe67 can compile and generate an executable
 func TestBasicCompilation(t *testing.T) {
 	eb, err := New("x86_64-linux")
 	if err != nil {
@@ -141,7 +141,7 @@ func TestPLTGOT(t *testing.T) {
 // TestExecutableGeneration tests full executable generation
 func TestExecutableGeneration(t *testing.T) {
 	// Only run if we have write permissions
-	tmpfile, err := os.CreateTemp("", "c67_test_output")
+	tmpfile, err := os.CreateTemp("", "vibe67_test_output")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -228,9 +228,9 @@ func testParallelSimpleCompilesOLD(t *testing.T) {
 	tmpDir := t.TempDir()
 	output := filepath.Join(tmpDir, "parallel_simple.bin")
 
-	cmd := exec.Command("go", "run", ".", "-o", output, "testprograms/parallel_simple.c67")
+	cmd := exec.Command("go", "run", ".", "-o", output, "testprograms/parallel_simple.vibe67")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to compile parallel_simple.c67: %v\n%s", err, string(out))
+		t.Fatalf("failed to compile parallel_simple.vibe67: %v\n%s", err, string(out))
 	}
 
 	info, err := os.Stat(output)
@@ -277,7 +277,7 @@ println(double(5))
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create temp file with test code
-			tmpFile, err := os.CreateTemp("", "c67_error_test_*.c67")
+			tmpFile, err := os.CreateTemp("", "vibe67_error_test_*.vibe67")
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
@@ -291,7 +291,7 @@ println(double(5))
 			tmpFile.Close()
 
 			// Create temp output file
-			tmpOutput, err := os.CreateTemp("", "c67_error_output_*")
+			tmpOutput, err := os.CreateTemp("", "vibe67_error_output_*")
 			if err != nil {
 				t.Fatalf("Failed to create temp output file: %v", err)
 			}
@@ -312,7 +312,7 @@ println(double(5))
 
 			// Try to compile - should fail
 			platform := GetDefaultPlatform()
-			err = CompileC67(tmpFilePath, tmpOutputPath, platform)
+			err = CompileVibe67(tmpFilePath, tmpOutputPath, platform)
 
 			// Restore stderr before checking results
 			if devNull != nil {

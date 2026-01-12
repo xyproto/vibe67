@@ -8,13 +8,13 @@ import (
 
 // VABS - Vector absolute value of packed double-precision floats
 //
-// Essential for C67's numerical operations:
+// Essential for Vibe67's numerical operations:
 //   - Distance calculations: abs(x1 - x2)
 //   - Error metrics: abs(actual - expected)
 //   - Magnitude: abs(value)
 //   - Normalization: handling negative values
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   errors = diffs || map(abs)
 //   distances = deltas || map(x -> abs(x))
 //

@@ -24,7 +24,7 @@ func NewRiscvCodeGen(eb *ExecutableBuilder) *RiscvCodeGen {
 	}
 }
 
-// CompileProgram compiles a C67 program to RISC-V64
+// CompileProgram compiles a Vibe67 program to RISC-V64
 func (rcg *RiscvCodeGen) CompileProgram(program *Program) error {
 	// Function prologue
 	// addi sp, sp, -32  # Allocate stack frame

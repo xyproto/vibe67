@@ -7,7 +7,7 @@ import (
 )
 
 // CMP instruction implementation for all architectures
-// This is fundamental for implementing the C67 language's comparison operators:
+// This is fundamental for implementing the Vibe67 language's comparison operators:
 //   - Pattern matching guards: n <= 1 -> 1
 //   - Filter expressions: [x in rest]{x < pivot}
 //   - Loop conditions: @ entity in entities{health > 0}
@@ -16,7 +16,7 @@ import (
 
 // CmpRegToReg generates a comparison instruction between two registers
 // This sets flags that can be used by conditional branches
-// Essential for implementing C67's comparison operators: >=, <=, >, <, ==, !=
+// Essential for implementing Vibe67's comparison operators: >=, <=, >, <, ==, !=
 func (o *Out) CmpRegToReg(src1, src2 string) {
 	if o.backend != nil {
 		o.backend.CmpRegToReg(src1, src2)

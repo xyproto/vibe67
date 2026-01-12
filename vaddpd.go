@@ -7,7 +7,7 @@ import (
 )
 
 // VADDPD - Vector addition for packed double-precision (float64) values
-// Essential for C67's map operations over collections:
+// Essential for Vibe67's map operations over collections:
 //   - Vectorized arithmetic: values |> map(x -> x + offset)
 //   - Parallel addition: [a, b, c, d] + [e, f, g, h]
 //   - Pipeline operations with SIMD acceleration

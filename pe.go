@@ -256,7 +256,7 @@ func (eb *ExecutableBuilder) WritePE(outputPath string) error {
 	// For Windows, we need to generate import tables for C runtime
 	// Build import directory for msvcrt.dll (C runtime)
 
-	// Standard C runtime functions needed by C67 programs
+	// Standard C runtime functions needed by Vibe67 programs
 	libraries := map[string][]string{
 		"msvcrt.dll": {
 			"printf", "exit", "malloc", "free", "realloc", "getenv",

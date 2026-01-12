@@ -15,7 +15,7 @@ func TestAllMigratedPrograms(t *testing.T) {
 	}{
 		{
 			name: "add",
-			source: `// add.c67 - add 39 and 3, print result
+			source: `// add.vibe67 - add 39 and 3, print result
 result := 39 + 3
 println(result)
 `,
@@ -54,7 +54,7 @@ Simple alias test complete!
 		},
 		{
 			name: "all_arithmetic",
-			source: `// all_arithmetic.c67 - test all arithmetic operations
+			source: `// all_arithmetic.vibe67 - test all arithmetic operations
 a := 10
 b := 3
 
@@ -147,7 +147,7 @@ approx test complete!
 		},
 		{
 			name: "arithmetic_test",
-			source: `// arithmetic_test.c67 - test basic arithmetic
+			source: `// arithmetic_test.vibe67 - test basic arithmetic
 x := 5
 y := 3
 sum := x + y
@@ -321,7 +321,7 @@ println("Atomic operations test")
 // This won't work properly yet because we can't get addresses of stack variables
 // But it tests that the functions are recognized
 //counter := 0
-//ptr := &counter  // This syntax doesn't exist in C67 yet
+//ptr := &counter  // This syntax doesn't exist in Vibe67 yet
 
 println("Test completed")`,
 			expected: `Atomic operations test
@@ -492,7 +492,7 @@ import sdl3 as sdl
 
 // Test: Create SDL window with a string title
 // SDL_CreateWindow(const char *title, int w, int h, Uint64 flags)
-title := "My C67 Window"
+title := "My Vibe67 Window"
 width := 800
 height := 600
 flags := 0  // No special flags for this test
@@ -507,13 +507,13 @@ printf("Window pointer: %.0f\n", window)
 sdl.SDL_Quit()
 
 `,
-			expected: `Created window with title: My C67 Window
+			expected: `Created window with title: My Vibe67 Window
 Window pointer: 0
 `,
 		},
 		{
 			name: "comparison_test",
-			source: `// comparison_test.c67 - test all comparison operators
+			source: `// comparison_test.vibe67 - test all comparison operators
 x := 10
 y := 20
 z := 10
@@ -650,7 +650,7 @@ main ==> {
 		},
 		{
 			name: "const_test",
-			source: `// const_test.c67 - test printing a constant
+			source: `// const_test.vibe67 - test printing a constant
 println(0)
 `,
 			expected: `0
@@ -761,7 +761,7 @@ Player health: 75 / 100
 		{
 			name: "cstruct_helpers_test",
 			source: `// Test cstruct with helper functions for field access
-// This demonstrates the recommended way to work with cstructs in C67
+// This demonstrates the recommended way to work with cstructs in Vibe67
 
 cstruct Player {
     x as float64
@@ -952,7 +952,7 @@ cstruct WithCommas {
     z as float32
 }
 
-// Without commas (new style - more C67-like)
+// Without commas (new style - more Vibe67-like)
 cstruct WithoutCommas {
     x as float32
     y as float32
@@ -1177,7 +1177,7 @@ println(result)
 		},
 		{
 			name: "divide",
-			source: `// divide.c67 - test division
+			source: `// divide.vibe67 - test division
 result := 84 / 2
 println(result)
 `,
@@ -1370,7 +1370,7 @@ printf("Factorials:\n")
 		},
 		{
 			name: "feature_test",
-			source: `// Comprehensive feature test for C67 compiler
+			source: `// Comprehensive feature test for Vibe67 compiler
 
 // 1. Variables
 x = 10
@@ -1462,7 +1462,7 @@ printf("\n")
 		},
 		{
 			name: "first",
-			source: `// first.c67 - just exit
+			source: `// first.vibe67 - just exit
 `,
 			expected: ``,
 		},
@@ -1552,7 +1552,7 @@ F-string tests passed!
 		},
 		{
 			name: "hash_length_test",
-			source: `// hash_length_test.c67 - test # length operator
+			source: `// hash_length_test.vibe67 - test # length operator
 numbers := [1, 2, 3, 4, 5]
 
 // Get length using # operator
@@ -1571,7 +1571,7 @@ println(empty_len)
 		},
 		{
 			name: "hello",
-			source: `// hello.c67 - print "Hello, World!" and exit
+			source: `// hello.vibe67 - print "Hello, World!" and exit
 println("Hello, World!")
 `,
 			expected: `Hello, World!
@@ -1616,7 +1616,7 @@ normal_function(10) = 11
 		},
 		{
 			name: "iftest",
-			source: `// iftest.c67 - test match expressions
+			source: `// iftest.vibe67 - test match expressions
 x := 10
 y := 20
 
@@ -1631,7 +1631,7 @@ x < y {
 		},
 		{
 			name: "iftest2",
-			source: `// iftest2.c67 - simpler match test
+			source: `// iftest2.vibe67 - simpler match test
 x := 10
 y := 20
 
@@ -1646,7 +1646,7 @@ x < y {
 		},
 		{
 			name: "iftest3",
-			source: `// iftest3.c67 - test with println before match
+			source: `// iftest3.vibe67 - test with println before match
 println("before if")
 
 x := 10
@@ -1665,7 +1665,7 @@ after if
 		},
 		{
 			name: "iftest4",
-			source: `// iftest4.c67 - test else branch
+			source: `// iftest4.vibe67 - test else branch
 x := 20
 y := 10
 
@@ -1856,7 +1856,7 @@ All membership tests complete!
 		},
 		{
 			name: "index_direct_test",
-			source: `// index_direct_test.c67 - Test direct indexing vs variable
+			source: `// index_direct_test.vibe67 - Test direct indexing vs variable
 mylist := [2.0, 4.0, 6.0]
 
 println(mylist[0])
@@ -1983,8 +1983,8 @@ Calculator complete!
 		},
 		{
 			name: "lambda_comprehensive",
-			source: `// lambda_comprehensive.c67 - comprehensive lambda test
-// Demonstrates first-class functions in C67
+			source: `// lambda_comprehensive.vibe67 - comprehensive lambda test
+// Demonstrates first-class functions in Vibe67
 
 // Define some lambda functions
 square := x => x * x
@@ -2024,7 +2024,7 @@ println(final)
 		},
 		{
 			name: "lambda_direct_test",
-			source: `// lambda_direct_test.c67 - call lambda directly without storing
+			source: `// lambda_direct_test.vibe67 - call lambda directly without storing
 result := (x => x * 2)(5)
 println(result)
 `,
@@ -2033,7 +2033,7 @@ println(result)
 		},
 		{
 			name: "lambda_loop",
-			source: `// lambda_loop.c67 - test calling stored lambda in a loop
+			source: `// lambda_loop.vibe67 - test calling stored lambda in a loop
 double := x => x * 2
 
 @ i in 0..<3  max 30 {
@@ -2049,7 +2049,7 @@ double := x => x * 2
 		},
 		{
 			name: "lambda_multi_arg_test",
-			source: `// lambda_multi_arg_test.c67 - test lambda with multiple arguments
+			source: `// lambda_multi_arg_test.vibe67 - test lambda with multiple arguments
 add := x, y => x + y
 result := add(3, 7)
 println(result)
@@ -2059,7 +2059,7 @@ println(result)
 		},
 		{
 			name: "lambda_multiple_test",
-			source: `// lambda_multiple_test.c67 - test multiple lambdas
+			source: `// lambda_multiple_test.vibe67 - test multiple lambdas
 double := x => x * 2
 triple := x => x * 3
 add := x, y => x + y
@@ -2075,7 +2075,7 @@ println(c)
 		},
 		{
 			name: "lambda_parse_test",
-			source: `// lambda_parse_test.c67 - test lambda parsing (will error in codegen)
+			source: `// lambda_parse_test.vibe67 - test lambda parsing (will error in codegen)
 // f = (x) -> x * 2
 println("Testing lambda parsing")
 `,
@@ -2084,7 +2084,7 @@ println("Testing lambda parsing")
 		},
 		{
 			name: "lambda_parse_test2",
-			source: `// lambda_parse_test2.c67 - test lambda parsing (will error in codegen)
+			source: `// lambda_parse_test2.vibe67 - test lambda parsing (will error in codegen)
 f := x => x * 2
 println("This should not execute")
 `,
@@ -2093,7 +2093,7 @@ println("This should not execute")
 		},
 		{
 			name: "lambda_store_only",
-			source: `// lambda_store_only.c67 - just store lambda without calling
+			source: `// lambda_store_only.vibe67 - just store lambda without calling
 double := x => x * 2
 println("Stored lambda")
 `,
@@ -2102,7 +2102,7 @@ println("Stored lambda")
 		},
 		{
 			name: "lambda_store_test",
-			source: `// lambda_store_test.c67 - test storing lambda in variable
+			source: `// lambda_store_test.vibe67 - test storing lambda in variable
 double := x => x * 2
 result := double(5)
 println(result)
@@ -2141,7 +2141,7 @@ All lambda tests passed!
 		},
 		{
 			name: "lambda_test",
-			source: `// lambda_test.c67 - Test lambda without parallel operator
+			source: `// lambda_test.vibe67 - Test lambda without parallel operator
 double := x => x * 2
 
 result := double(1.0)
@@ -2161,7 +2161,7 @@ println(result3)
 		},
 		{
 			name: "len_empty",
-			source: `// len_empty.c67 - test len with empty list
+			source: `// len_empty.vibe67 - test len with empty list
 empty := []
 length := #empty
 println(length)
@@ -2172,7 +2172,7 @@ println(length)
 		},
 		{
 			name: "len_simple",
-			source: `// len_simple.c67 - test list length with non-empty list
+			source: `// len_simple.vibe67 - test list length with non-empty list
 numbers := [1, 2, 3, 4, 5]
 
 length := #numbers
@@ -2183,7 +2183,7 @@ println(length)
 		},
 		{
 			name: "len_test",
-			source: `// len_test.c67 - test list length function
+			source: `// len_test.vibe67 - test list length function
 numbers := [1, 2, 3, 4, 5]
 
 length := #numbers
@@ -2200,7 +2200,7 @@ println(empty_len)
 		},
 		{
 			name: "list_index_test",
-			source: `// list_index_test.c67 - test list indexing
+			source: `// list_index_test.vibe67 - test list indexing
 numbers := [10, 20, 30, 40, 50]
 first := numbers[0]
 println(first)
@@ -2216,7 +2216,7 @@ println(last)
 		},
 		{
 			name: "list_iter_test",
-			source: `// list_iter_test.c67 - test list iteration
+			source: `// list_iter_test.vibe67 - test list iteration
 numbers := [10, 20, 30, 40, 50]
 @ num in numbers  max 100000 {
     println(num)
@@ -2231,7 +2231,7 @@ numbers := [10, 20, 30, 40, 50]
 		},
 		{
 			name: "list_simple",
-			source: `// list_simple.c67 - just test list creation
+			source: `// list_simple.vibe67 - just test list creation
 numbers := [10, 20, 30]
 first := numbers[0]
 println(first)
@@ -2241,7 +2241,7 @@ println(first)
 		},
 		{
 			name: "list_test",
-			source: `// list_test.c67 - Test list creation and indexing
+			source: `// list_test.vibe67 - Test list creation and indexing
 mylist := [2.0, 4.0, 6.0]
 
 println(mylist[0])
@@ -2256,7 +2256,7 @@ println(mylist[2])
 		},
 		{
 			name: "list_test2",
-			source: `// list_test2.c67 - test multiple list literals
+			source: `// list_test2.vibe67 - test multiple list literals
 numbers := [1, 2, 3]
 more_numbers := [4, 5, 6, 7, 8]
 empty := []
@@ -2359,7 +2359,7 @@ Done!
 		},
 		{
 			name: "loop_break_test",
-			source: `// loop_break_test.c67 - test @ loop syntax and @N jumps
+			source: `// loop_break_test.vibe67 - test @ loop syntax and @N jumps
 printf("Simple loop with @:\n")
 @ i in 0..<5  max 50 {
     printf("%.0f ", i)
@@ -2373,7 +2373,7 @@ printf("\n")
 		},
 		{
 			name: "loop_mult",
-			source: `// loop_mult.c67 - test loop variable in expression
+			source: `// loop_mult.vibe67 - test loop variable in expression
 @ i in 0..<5  max 50 {
     x := i * 2
     println(x)
@@ -2412,7 +2412,7 @@ Loop done
 		},
 		{
 			name: "loop_test",
-			source: `// loop_test.c67 - test basic loop
+			source: `// loop_test.vibe67 - test basic loop
 @ i in 0..<5  max 50 {
     println(@i)
 }
@@ -2426,7 +2426,7 @@ Loop done
 		},
 		{
 			name: "loop_test2",
-			source: `// loop_test2.c67 - test loop with 10 iterations
+			source: `// loop_test2.vibe67 - test loop with 10 iterations
 @ i in 0..<10  max 100 {
     println(i)
     }
@@ -2464,7 +2464,7 @@ sum = 10
 		},
 		{
 			name: "loop_with_arithmetic",
-			source: `// loop_with_arithmetic.c67 - test loops with arithmetic
+			source: `// loop_with_arithmetic.vibe67 - test loops with arithmetic
 sum := 0
 @ i in 0..<5  max 50 {
     sum <- sum + i
@@ -2476,7 +2476,7 @@ println(sum)
 		},
 		{
 			name: "manual_list_test",
-			source: `// manual_list_test.c67 - Manually create a list to test indexing
+			source: `// manual_list_test.vibe67 - Manually create a list to test indexing
 test := [0.0, 99.0, 99.0]
 
 println(test[0])
@@ -2491,7 +2491,7 @@ println(test[2])
 		},
 		{
 			name: "manual_map",
-			source: `// manual_map.c67 - manually implement what parallel should do
+			source: `// manual_map.vibe67 - manually implement what parallel should do
 numbers := [1, 2, 3]
 double := x => x * 2
 
@@ -2601,7 +2601,7 @@ Math tests done!
 		},
 		{
 			name: "mixed",
-			source: `// mixed.c67 - test const and mutable together
+			source: `// mixed.vibe67 - test const and mutable together
 pi = 3
 radius := 5
 area := pi * radius * radius
@@ -2624,7 +2624,7 @@ printf("Result: %.0f\n", y)
 		},
 		{
 			name: "multiply",
-			source: `// multiply.c67 - test multiplication
+			source: `// multiply.vibe67 - test multiplication
 result = 6 * 7
 println(result)
 `,
@@ -2633,7 +2633,7 @@ println(result)
 		},
 		{
 			name: "mutable",
-			source: `// mutable.c67 - test mutable variables
+			source: `// mutable.vibe67 - test mutable variables
 x := 10
 x <- x + 5
 x <- x * 2
@@ -2644,7 +2644,7 @@ println(x)
 		},
 		{
 			name: "nested_break_test",
-			source: `// nested_break_test.c67 - test nested loops with ret and continue
+			source: `// nested_break_test.vibe67 - test nested loops with ret and continue
 // Compiler bugs: nested loops broken, ret @2 causes infinite loops
 // Workaround: explicit output showing expected behavior
 
@@ -2677,7 +2677,7 @@ i=2: 0 1 3 4
 		},
 		{
 			name: "nested_loop",
-			source: `// nested_loop.c67 - test nested loops (workaround: explicit output)
+			source: `// nested_loop.vibe67 - test nested loops (workaround: explicit output)
 // Compiler bug: nested loops and even single loops with complex bodies fail
 // Workaround: explicit print statements
 
@@ -2761,7 +2761,7 @@ Program should exit implicitly
 		},
 		{
 			name: "parallel_empty",
-			source: `// parallel_empty.c67 - ensure empty lists short-circuit parallel map
+			source: `// parallel_empty.vibe67 - ensure empty lists short-circuit parallel map
 numbers = []
 mapped = numbers || x => x * 3
 println(#mapped)
@@ -2805,7 +2805,7 @@ Large range test PASSED
 		},
 		{
 			name: "parallel_map_test",
-			source: `// parallel_map_test.c67 - test parallel map operation
+			source: `// parallel_map_test.vibe67 - test parallel map operation
 numbers = [1, 2, 3, 4, 5]
 doubled = numbers || x => x * 2
 
@@ -2823,7 +2823,7 @@ doubled = numbers || x => x * 2
 		},
 		{
 			name: "parallel_noop",
-			source: `// parallel_noop.c67 - test if parallel expr itself crashes
+			source: `// parallel_noop.vibe67 - test if parallel expr itself crashes
 numbers = [1, 2, 3]
 doubled = numbers || x => x * 2
 
@@ -2835,7 +2835,7 @@ println(42)
 		},
 		{
 			name: "parallel_parse_test",
-			source: `// parallel_parse_test.c67 - test parallel operator parsing
+			source: `// parallel_parse_test.vibe67 - test parallel operator parsing
 numbers = [1, 2, 3, 4, 5]
 doubled = numbers || x => x * 2
 println("Done")
@@ -2845,7 +2845,7 @@ println("Done")
 		},
 		{
 			name: "parallel_simple",
-			source: `// parallel_simple.c67 - minimal parallel test
+			source: `// parallel_simple.vibe67 - minimal parallel test
 numbers = [1, 2, 3]
 doubled = numbers || x => x * 2
 
@@ -2858,7 +2858,7 @@ println(doubled[0])
 		},
 		{
 			name: "parallel_simple_test",
-			source: `// parallel_simple_test.c67 - simpler parallel test
+			source: `// parallel_simple_test.vibe67 - simpler parallel test
 numbers = [1, 2, 3]
 doubled = numbers || x => x * 2
 first = doubled[0]
@@ -2869,7 +2869,7 @@ println(first)
 		},
 		{
 			name: "parallel_single",
-			source: `// parallel_single.c67 - test with single element
+			source: `// parallel_single.vibe67 - test with single element
 numbers = [5]
 doubled = numbers || x => x * 2
 
@@ -2881,7 +2881,7 @@ println(doubled[0])
 		},
 		{
 			name: "parallel_test",
-			source: `// parallel_test.c67 - test parallel operator
+			source: `// parallel_test.vibe67 - test parallel operator
 numbers = [1, 2, 3, 4, 5]
 doubled = numbers || x => x * 2
 @ val in doubled  max 100000 {
@@ -2897,7 +2897,7 @@ doubled = numbers || x => x * 2
 		},
 		{
 			name: "parallel_test_const",
-			source: `// parallel_test_const.c67 - Test parallel with constant lambda
+			source: `// parallel_test_const.vibe67 - Test parallel with constant lambda
 values = [1.0, 2.0, 3.0]
 
 // Map operation: return constant
@@ -2915,7 +2915,7 @@ println(result[2])
 		},
 		{
 			name: "parallel_test_const_delay",
-			source: `// parallel_test_const_delay.c67 - Test constant with delay
+			source: `// parallel_test_const_delay.vibe67 - Test constant with delay
 values = [1.0, 2.0, 3.0]
 
 result = values || x => 99.0
@@ -2934,7 +2934,7 @@ println(result[2])
 		},
 		{
 			name: "parallel_test_debug",
-			source: `// parallel_test_debug.c67 - Debug parallel operator
+			source: `// parallel_test_debug.vibe67 - Debug parallel operator
 values = [5.0, 7.0, 11.0]
 
 // Map operation: double each value
@@ -2952,7 +2952,7 @@ println(doubled[2])
 		},
 		{
 			name: "parallel_test_delay",
-			source: `// parallel_test_delay.c67 - Test with operations between parallel and index
+			source: `// parallel_test_delay.vibe67 - Test with operations between parallel and index
 values = [1.0, 2.0, 3.0]
 
 doubled = values || x => x * 2
@@ -2972,7 +2972,7 @@ println(doubled[2])
 		},
 		{
 			name: "parallel_test_direct",
-			source: `// parallel_test_direct.c67 - Store result in variable and print
+			source: `// parallel_test_direct.vibe67 - Store result in variable and print
 values = [1.0, 2.0, 3.0]
 
 doubled = values || x => x * 2
@@ -2993,7 +2993,7 @@ println(third)
 		},
 		{
 			name: "parallel_test_elements",
-			source: `// parallel_test_elements.c67 - Test parallel operator with element access
+			source: `// parallel_test_elements.vibe67 - Test parallel operator with element access
 values = [1.0, 2.0, 3.0]
 
 // Map operation: double each value
@@ -3012,7 +3012,7 @@ println(doubled[2])
 		},
 		{
 			name: "parallel_test_four",
-			source: `// parallel_test_four.c67 - Test with 4 elements
+			source: `// parallel_test_four.vibe67 - Test with 4 elements
 values = [1.0, 2.0, 3.0, 4.0]
 
 doubled = values || x => x * 2
@@ -3031,7 +3031,7 @@ println(doubled[3])
 		},
 		{
 			name: "parallel_test_length",
-			source: `// parallel_test_length.c67 - Test length of result
+			source: `// parallel_test_length.vibe67 - Test length of result
 values = [1.0, 2.0, 3.0]
 
 doubled = values || x => x * 2
@@ -3045,7 +3045,7 @@ println(#doubled)
 		},
 		{
 			name: "parallel_test_print",
-			source: `// parallel_test_print.c67 - Test parallel operator with direct print
+			source: `// parallel_test_print.vibe67 - Test parallel operator with direct print
 values = [1.0, 2.0, 3.0]
 
 // Map operation: double each value
@@ -3060,7 +3060,7 @@ println(doubled)
 		},
 		{
 			name: "parallel_test_reverse",
-			source: `// parallel_test_reverse.c67 - Test reading in reverse order
+			source: `// parallel_test_reverse.vibe67 - Test reading in reverse order
 values = [1.0, 2.0, 3.0]
 
 doubled = values || x => x * 2
@@ -3077,7 +3077,7 @@ println(doubled[0])
 		},
 		{
 			name: "parallel_test_simple",
-			source: `// parallel_test_simple.c67 - Simple test for parallel operator
+			source: `// parallel_test_simple.vibe67 - Simple test for parallel operator
 // Testing basic SIMD map operation
 
 values = [1.0, 2.0, 3.0, 4.0, 5.0]
@@ -3095,7 +3095,7 @@ println(doubled)
 		},
 		{
 			name: "parallel_test_single",
-			source: `// parallel_test_single.c67 - Test parallel operator with single element
+			source: `// parallel_test_single.vibe67 - Test parallel operator with single element
 values = [1.0]
 
 // Map operation: double the value
@@ -3123,7 +3123,7 @@ printf("%g\n", factorial(6))
 		},
 		{
 			name: "pipe_test",
-			source: `// pipe_test.c67 - test | operator for piping
+			source: `// pipe_test.vibe67 - test | operator for piping
 value = 5.0
 
 // Test piping: value | x => x * 2
@@ -3178,7 +3178,7 @@ main ==> {
 		},
 		{
 			name: "precedence",
-			source: `// precedence.c67 - test operator precedence
+			source: `// precedence.vibe67 - test operator precedence
 // 2 + 3 * 4 should be 2 + 12 = 14, not 5 * 4 = 20
 result = 2 + 3 * 4
 println(result)
@@ -3415,10 +3415,10 @@ All Result tests passed!
 		},
 		{
 			name: "showcase",
-			source: `// C67 Language Showcase - All Features Working!
+			source: `// Vibe67 Language Showcase - All Features Working!
 
 printf("╔════════════════════════════════════╗\n")
-printf("║   C67 Compiler Showcase v0.1.0   ║\n")
+printf("║   Vibe67 Compiler Showcase v0.1.0   ║\n")
 printf("╚════════════════════════════════════╝\n\n")
 
 // 1. Variables and arithmetic
@@ -3486,7 +3486,7 @@ printf("╚═══════════════════════
 
 `,
 			expected: `╔════════════════════════════════════╗
-║   C67 Compiler Showcase v0.1.0   ║
+║   Vibe67 Compiler Showcase v0.1.0   ║
 ╚════════════════════════════════════╝
 
 → Variables & Math
@@ -3604,7 +3604,7 @@ Test f PASSED
 		},
 		{
 			name: "subtract",
-			source: `// subtract.c67 - test subtraction
+			source: `// subtract.vibe67 - test subtraction
 result = 50 - 8
 println(result)
 `,
@@ -3616,7 +3616,7 @@ println(result)
 			source: `// Test that all type names use full form (int8, uint64, float32, etc.)
 // Never abbreviated forms (i8, u64, f32, etc.)
 
-printf("Testing C67 type casting with full type names:\n\n")
+printf("Testing Vibe67 type casting with full type names:\n\n")
 
 // Integer types
 x := 42.7
@@ -3646,7 +3646,7 @@ printf("  as float64: %.10f\n", z as float64)
 
 printf("\n✓ All type names use full form (int32, uint64, float32, etc.)\n")
 `,
-			expected: `Testing C67 type casting with full type names:
+			expected: `Testing Vibe67 type casting with full type names:
 
 Original value: 42.70
   as int8:   43

@@ -8,13 +8,13 @@ import (
 
 // KMOV* - Move to/from mask registers
 //
-// Essential for C67's mask/predicate operations:
+// Essential for Vibe67's mask/predicate operations:
 //   - Extracting mask results to general purpose registers
 //   - Testing conditions from vector comparisons
 //   - Counting active elements in masks
 //   - Conditional execution based on masks
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   comparison_mask = values ||> cmp_gt(threshold)
 //   if any(comparison_mask) { ... }
 //   count = popcount(comparison_mask)

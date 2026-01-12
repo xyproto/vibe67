@@ -8,13 +8,13 @@ import (
 
 // VROUNDPD - Vector rounding of packed double-precision floats
 //
-// Essential for C67's numerical operations:
+// Essential for Vibe67's numerical operations:
 //   - Floor: round down to nearest integer
 //   - Ceil: round up to nearest integer
 //   - Trunc: round toward zero
 //   - Round to nearest: standard rounding
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   floored = values || map(floor)
 //   ceiled = values || map(ceil)
 //   truncated = values || map(trunc)

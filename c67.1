@@ -1,24 +1,24 @@
-.TH FLAPC 1 "2025-12-17" "c67 1.5.3" "User Commands"
+.TH FLAPC 1 "2025-12-17" "vibe67 1.5.3" "User Commands"
 .SH NAME
-c67 \- compile C67 source to native executables
+vibe67 \- compile Vibe67 source to native executables
 .SH SYNOPSIS
-.B c67
+.B vibe67
 .RI [ options ]
-.RI [ file .c67 ...]
+.RI [ file .vibe67 ...]
 .br
-.B c67
+.B vibe67
 .BR -c " " code
 .RI [ options ]
 .SH DESCRIPTION
-.B c67
-is the reference compiler for the C67 programming language. It reads C67
+.B vibe67
+is the reference compiler for the Vibe67 programming language. It reads Vibe67
 source files and produces a native executable for the selected target
 platform without relying on external toolchains such as GCC or LLVM. When no
 input files or inline code are provided the compiler emits a dynamically
 linked "Hello, world" binary in the system temporary directory.
 .PP
 Arguments that do not end in
-.BR .c67
+.BR .vibe67
 are ignored during compilation. The first source file found is compiled and
 subsequent files are not processed.
 .SH OPTIONS
@@ -62,9 +62,9 @@ and
 Write the generated executable to
 .I file
 instead of the default. When no output file is given,
-.B c67
+.B vibe67
 writes into the current directory using the input filename without the
-.BR .c67
+.BR .vibe67
 suffix. For inline code the default output path is printed and lives in the
 system temporary directory.
 .TP
@@ -72,7 +72,7 @@ system temporary directory.
 Compile the string
 .I code
 as if it were the contents of a temporary
-.B .c67
+.B .vibe67
 file. Unless
 .BR -o
 or
@@ -89,7 +89,7 @@ dependency handling details are written to standard error.
 .B -u
 .TP
 .B --update-deps
-Update cached Git repositories used for imported C67 modules before
+Update cached Git repositories used for imported Vibe67 modules before
 compilation. Without this flag existing caches are reused as-is.
 .TP
 .B -V
@@ -103,7 +103,7 @@ Print version information and exit.
 Show a summary of the available options and exit.
 .SH OUTPUT
 On successful compilation and without verbose mode,
-.B c67
+.B vibe67
 prints the path of the generated executable to standard output whenever the
 output filename was not explicitly provided.
 .SH ENVIRONMENT
@@ -111,27 +111,27 @@ output filename was not explicitly provided.
 .B XDG_CACHE_HOME
 If set, the directory used to cache imported Git repositories. The cache is
 stored in
-.I $XDG_CACHE_HOME/c67
+.I $XDG_CACHE_HOME/vibe67
 .
 .TP
 .B HOME
 When
 .B XDG_CACHE_HOME
 is unset, cached repositories are stored in
-.I $HOME/.cache/c67
+.I $HOME/.cache/vibe67
 .
 .SH FILES
 .TP
-.I $XDG_CACHE_HOME/c67
+.I $XDG_CACHE_HOME/vibe67
 .TQ
-.I $HOME/.cache/c67
+.I $HOME/.cache/vibe67
 Location of cached Git repositories used for module imports.
 .SH EXAMPLES
 Compile a program for the current platform:
 .PP
 .nf
 .RS
-$ c67 hello.c67
+$ vibe67 hello.vibe67
 $ ./hello
 .RE
 .fi
@@ -140,7 +140,7 @@ Compile inline code for macOS on arm64:
 .PP
 .nf
 .RS
-$ c67 -target arm64-darwin -c 'println("hi");exit(0)'
+$ vibe67 -target arm64-darwin -c 'println("hi");exit(0)'
 .RE
 .fi
 .PP
@@ -148,7 +148,7 @@ Refresh all cached dependencies before compiling:
 .PP
 .nf
 .RS
-$ c67 -u project.c67
+$ vibe67 -u project.vibe67
 .RE
 .fi
 .SH EXIT STATUS

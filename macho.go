@@ -664,7 +664,7 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 	numDefinedSyms++
 
 	// 2.5. Add internal labels (runtime helpers, etc.) as defined symbols
-	// These are functions like _c67_itoa, _c67_string_concat that are in the text section
+	// These are functions like _vibe67_itoa, _vibe67_string_concat that are in the text section
 	for labelName, labelOffset := range eb.labels {
 		// Skip lambda functions (they're internal and don't need to be in symbol table)
 		// Skip special labels that aren't function entry points
@@ -679,7 +679,7 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 		// Add as defined symbol
 		strOffset := uint32(strtab.Len())
 		// On Mach-O, C symbols get an extra underscore prepended
-		// Our labels have one underscore (_c67_itoa), but Mach-O needs two (__c67_itoa)
+		// Our labels have one underscore (_vibe67_itoa), but Mach-O needs two (__vibe67_itoa)
 		strtab.WriteString("_" + labelName)
 		strtab.WriteByte(0)
 

@@ -1,13 +1,13 @@
-# C67 Programming Language
+# Vibe67 Programming Language
 
-[![Go CI](https://github.com/xyproto/c67/actions/workflows/ci.yml/badge.svg)](https://github.com/xyproto/c67/actions/workflows/ci.yml)
+[![Go CI](https://github.com/xyproto/vibe67/actions/workflows/ci.yml/badge.svg)](https://github.com/xyproto/vibe67/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
 
-**C67** is a high-performance systems programming language that compiles directly to machine code (x86_64) for Linux and Windows. It combines the minimalism of functional programming with the raw power of C.
+**Vibe67** is a high-performance systems programming language that compiles directly to machine code (x86_64) for Linux and Windows. It combines the minimalism of functional programming with the raw power of C.
 
-## 🚀 Why C67?
+## 🚀 Why Vibe67?
 
-C67 is designed for developers who value performance, simplicity, and transparency.
+Vibe67 is designed for developers who value performance, simplicity, and transparency.
 
 *   **Blazing Fast Compilation**: Compiles directly to machine code. No LLVM, no intermediate steps, sub-second build times.
 *   **Highly Optimized**:
@@ -24,31 +24,31 @@ C67 is designed for developers who value performance, simplicity, and transparen
 ## 📦 Installation
 
 ```bash
-go install github.com/xyproto/c67@latest
+go install github.com/xyproto/vibe67@latest
 ```
 
 Ensure `~/go/bin` is in your PATH.
 
 ## ⚡ Quick Start
 
-Create `hello.c67`:
+Create `hello.vibe67`:
 
-```c67
-println("Hello, C67!")
+```vibe67
+println("Hello, Vibe67!")
 ```
 
 Compile and run:
 
 ```bash
-c67 hello.c67 -o hello
+vibe67 hello.vibe67 -o hello
 ./hello
 ```
 
 ## 📘 Language Tour
 
 ### 1. Everything is a Map
-C67 has one runtime type.
-```c67
+Vibe67 has one runtime type.
+```vibe67
 42              // {0: 42.0}
 "Hi"            // {0: 72.0, 1: 105.0} (ASCII codes)
 [1, 2]          // {0: 1.0, 1: 2.0}
@@ -56,7 +56,7 @@ C67 has one runtime type.
 ```
 
 ### 2. Variables & Functions
-```c67
+```vibe67
 // Immutable (default)
 x = 42
 add = (a, b) -> a + b
@@ -72,7 +72,7 @@ run = { println("Running...") }
 ### 3. Unified Control Flow
 Pattern matching and lambdas share syntax.
 
-```c67
+```vibe67
 // Value matching
 sign = x {
     | x > 0 => "positive"
@@ -94,7 +94,7 @@ sign = x {
 ### 4. Error Handling (`or!`)
 The `or!` operator handles errors (encoded as NaN) or nulls (0.0).
 
-```c67
+```vibe67
 // Returns 42 if risky() fails
 val = risky() or! 42
 
@@ -108,7 +108,7 @@ file = open("data.txt") or! {
 ### 5. Memory & Resources
 Use `defer` for LIFO cleanup and `arena` for high-performance temporary allocations.
 
-```c67
+```vibe67
 arena {
     data = allocate(1024)
     // ... use data ...
@@ -119,9 +119,9 @@ defer c.free(ptr)
 ```
 
 ### 6. C Interop (FFI)
-Call C libraries directly. C67 parses headers and links dynamically.
+Call C libraries directly. Vibe67 parses headers and links dynamically.
 
-```c67
+```vibe67
 import sdl3 as sdl
 
 sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
@@ -133,7 +133,7 @@ defer sdl.SDL_Quit()
 * Requires `img/grumpy-cat.bmp`.
 * When compiling for Windows, this also requires `SDL3.dll` and the `include/SDL3` folder (with SDL3 header files).
 
-```c67
+```vibe67
 // Import the SDL3 library (auto detect header files and library files with pkg-config on Linux, use SDL3.dll and include/* on Windows)
 import sdl3 as sdl
 
@@ -220,7 +220,7 @@ defer sdl.SDL_DestroyTexture(tex)
 
 We welcome contributions from the open source community!
 
-1.  Clone the repo: `git clone https://github.com/xyproto/c67`
+1.  Clone the repo: `git clone https://github.com/xyproto/vibe67`
 2.  Run tests: `go test ./...`
 3.  Submit a PR!
 

@@ -12,20 +12,20 @@
 
 **Evidence**:
 ```
-DEBUG MarkLabel: _c67_arena_create at offset 2413
-DEBUG MarkLabel: _c67_arena_alloc at offset 2603
+DEBUG MarkLabel: _vibe67_arena_create at offset 2413
+DEBUG MarkLabel: _vibe67_arena_alloc at offset 2603
 DEBUG MarkLabel: _arena_alloc_grow at offset 2730
 ... (7 arena functions, ~2.5KB)
 ```
 
-**Root Cause**: SDL_GetError() returns `const char*`, which gets converted to C67 string format using `_c67_cstr_to_string()`. This function calls `fc.callArenaAlloc()` (line 8372 in codegen.go), which sets `usesArenas = true`.
+**Root Cause**: SDL_GetError() returns `const char*`, which gets converted to Vibe67 string format using `_vibe67_cstr_to_string()`. This function calls `fc.callArenaAlloc()` (line 8372 in codegen.go), which sets `usesArenas = true`.
 
 **Fix Strategy**:
-- Don't convert C strings to C67 format if they're only used in format strings (%s)
+- Don't convert C strings to Vibe67 format if they're only used in format strings (%s)
 - Pass `char*` directly to printf/exitf instead of converting
-- Only convert when C string is stored in a C67 variable
+- Only convert when C string is stored in a Vibe67 variable
 
-**Code Location**: codegen.go:8336-8430 (_c67_cstr_to_string generation)
+**Code Location**: codegen.go:8336-8430 (_vibe67_cstr_to_string generation)
 
 **Estimated Savings**: 2-3KB
 
@@ -86,8 +86,8 @@ U sdl.SDL_CreateWindow
 
 ### Next Steps:
 1. **Fix arena conversion** (HIGHEST IMPACT):
-   - Modify C FFI call handling to NOT convert char* to C67 string when used in format strings
-   - Check if result is used in %s context before calling _c67_cstr_to_string
+   - Modify C FFI call handling to NOT convert char* to Vibe67 string when used in format strings
+   - Check if result is used in %s context before calling _vibe67_cstr_to_string
    
 2. **Implement exitf syscall** (HIGH IMPACT):
    - Create compileExitfSyscall() function properly (without heredoc issues)
@@ -110,6 +110,6 @@ U sdl.SDL_CreateWindow
 The main bloat is NOT from the compiler's code generation, but from:
 1. **Unnecessary runtime inclusion** (arenas when not needed)
 2. **libc dependencies** (dprintf for exitf)
-3. **Defensive conversions** (C string → C67 string even when unnecessary)
+3. **Defensive conversions** (C string → Vibe67 string even when unnecessary)
 
 All three are fixable with targeted changes to reduce "just in case" overhead.

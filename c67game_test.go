@@ -8,46 +8,46 @@ import (
 	"testing"
 )
 
-// TestC67GameLibraryCompiles tests that c67game library compiles
-func TestC67GameLibraryCompiles(t *testing.T) {
-	c67gameDir := filepath.Join(os.Getenv("HOME"), "clones", "c67game")
-	gamePath := filepath.Join(c67gameDir, "game.c67")
+// TestVibe67GameLibraryCompiles tests that vibe67game library compiles
+func TestVibe67GameLibraryCompiles(t *testing.T) {
+	vibe67gameDir := filepath.Join(os.Getenv("HOME"), "clones", "vibe67game")
+	gamePath := filepath.Join(vibe67gameDir, "game.vibe67")
 
 	if _, err := os.Stat(gamePath); os.IsNotExist(err) {
-		t.Skip("c67game library not found at ~/clones/c67game")
+		t.Skip("vibe67game library not found at ~/clones/vibe67game")
 	}
 
 	tmpDir := t.TempDir()
 	binary := filepath.Join(tmpDir, "game_lib")
-	cmd := exec.Command("./c67", gamePath, "-o", binary)
+	cmd := exec.Command("./vibe67", gamePath, "-o", binary)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
 		t.Logf("Compilation output: %s", output)
-		t.Fatalf("Failed to compile c67game: %v", err)
+		t.Fatalf("Failed to compile vibe67game: %v", err)
 	}
 
-	t.Log("c67game library compiled successfully")
+	t.Log("vibe67game library compiled successfully")
 }
 
-// TestC67GameTest tests that c67 test works in c67game directory
-func TestC67GameTest(t *testing.T) {
-	c67gameDir := filepath.Join(os.Getenv("HOME"), "clones", "c67game")
-	testPath := filepath.Join(c67gameDir, "c67game_test.c67")
+// TestVibe67GameTest tests that vibe67 test works in vibe67game directory
+func TestVibe67GameTest(t *testing.T) {
+	vibe67gameDir := filepath.Join(os.Getenv("HOME"), "clones", "vibe67game")
+	testPath := filepath.Join(vibe67gameDir, "vibe67game_test.vibe67")
 
 	if _, err := os.Stat(testPath); os.IsNotExist(err) {
-		t.Skip("c67game_test.c67 not found")
+		t.Skip("vibe67game_test.vibe67 not found")
 	}
 
-	// Run c67 test in the c67game directory
-	c67Binary := filepath.Join(filepath.Dir(c67gameDir), "c67", "c67")
-	cmd := exec.Command(c67Binary, "test")
-	cmd.Dir = c67gameDir
+	// Run vibe67 test in the vibe67game directory
+	vibe67Binary := filepath.Join(filepath.Dir(vibe67gameDir), "vibe67", "vibe67")
+	cmd := exec.Command(vibe67Binary, "test")
+	cmd.Dir = vibe67gameDir
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
 		t.Logf("Test output: %s", output)
-		t.Fatalf("c67 test failed: %v", err)
+		t.Fatalf("vibe67 test failed: %v", err)
 	}
 
 	outputStr := string(output)
@@ -55,39 +55,39 @@ func TestC67GameTest(t *testing.T) {
 		t.Errorf("Expected PASS in output, got: %s", outputStr)
 	}
 
-	t.Log("c67game tests passed")
+	t.Log("vibe67game tests passed")
 }
 
-// TestC67GameSimpleProgram tests that a simple program using c67game compiles
-func TestC67GameSimpleProgram(t *testing.T) {
+// TestVibe67GameSimpleProgram tests that a simple program using vibe67game compiles
+func TestVibe67GameSimpleProgram(t *testing.T) {
 	cmd := exec.Command("pkg-config", "--exists", "sdl3")
 	if err := cmd.Run(); err != nil {
 		t.Skip("SDL3 not installed")
 	}
 
-	c67gameDir := filepath.Join(os.Getenv("HOME"), "clones", "c67game")
-	gamePath := filepath.Join(c67gameDir, "game.c67")
+	vibe67gameDir := filepath.Join(os.Getenv("HOME"), "clones", "vibe67game")
+	gamePath := filepath.Join(vibe67gameDir, "game.vibe67")
 
 	if _, err := os.Stat(gamePath); os.IsNotExist(err) {
-		t.Skip("c67game library not found")
+		t.Skip("vibe67game library not found")
 	}
 
-	// Create a simple program that uses c67game
+	// Create a simple program that uses vibe67game
 	source := `import "` + gamePath + `"
 
 main = {
-    println("Testing c67game import")
+    println("Testing vibe67game import")
 }
 `
 
 	tmpDir := t.TempDir()
-	srcFile := filepath.Join(tmpDir, "test.c67")
+	srcFile := filepath.Join(tmpDir, "test.vibe67")
 	if err := os.WriteFile(srcFile, []byte(source), 0644); err != nil {
 		t.Fatal(err)
 	}
 
 	binary := filepath.Join(tmpDir, "test")
-	cmd = exec.Command("./c67", srcFile, "-o", binary)
+	cmd = exec.Command("./vibe67", srcFile, "-o", binary)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -104,9 +104,9 @@ main = {
 		t.Fatalf("Failed to run: %v", err)
 	}
 
-	if !strings.Contains(string(output), "Testing c67game import") {
-		t.Errorf("Expected 'Testing c67game import' in output, got: %s", output)
+	if !strings.Contains(string(output), "Testing vibe67game import") {
+		t.Errorf("Expected 'Testing vibe67game import' in output, got: %s", output)
 	}
 
-	t.Log("Simple c67game program works")
+	t.Log("Simple vibe67game program works")
 }

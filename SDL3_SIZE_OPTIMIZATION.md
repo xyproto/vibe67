@@ -1,8 +1,8 @@
 # SDL3 Binary Size Optimization: Low-Hanging Fruit
 
 ## Executive Summary
-**Current**: C67 produces 22KB for SDL3 example vs GCC's 15KB (47% overhead)
-**Target**: 16KB (matching GCC + reasonable C67 runtime overhead)
+**Current**: Vibe67 produces 22KB for SDL3 example vs GCC's 15KB (47% overhead)
+**Target**: 16KB (matching GCC + reasonable Vibe67 runtime overhead)
 **Savings**: 6KB reduction (27% smaller)
 
 ---
@@ -13,13 +13,13 @@
 **Current Problem**: Arena allocation code included even when not used
 **Evidence**: 
 ```
-DEBUG MarkLabel: _c67_arena_create at offset 2413
-DEBUG MarkLabel: _c67_arena_alloc at offset 2603
+DEBUG MarkLabel: _vibe67_arena_create at offset 2413
+DEBUG MarkLabel: _vibe67_arena_alloc at offset 2603
 DEBUG MarkLabel: _arena_alloc_fast at offset 2709
 DEBUG MarkLabel: _arena_alloc_grow at offset 2730
-DEBUG MarkLabel: _c67_arena_destroy at offset 2932
-DEBUG MarkLabel: _c67_arena_reset at offset 2978
-DEBUG MarkLabel: _c67_arena_ensure_capacity at offset 3460
+DEBUG MarkLabel: _vibe67_arena_destroy at offset 2932
+DEBUG MarkLabel: _vibe67_arena_reset at offset 2978
+DEBUG MarkLabel: _vibe67_arena_ensure_capacity at offset 3460
 ```
 
 **SDL3 example analysis**:
@@ -121,7 +121,7 @@ if fc.usesSIMD || fc.usesFMA {
 
 ### 🍏 #5: Optimize String-to-C Conversions (1-2KB)
 **Problem**: Each SDL string arg might inline conversion code
-**Solution**: Generate single `_c67_string_to_cstr` helper, call it
+**Solution**: Generate single `_vibe67_string_to_cstr` helper, call it
 **Note**: May already be implemented, needs verification
 
 ---
@@ -161,7 +161,7 @@ Same optimizations apply:
 
 ```bash
 # Check if arena is used:
-./c67 -v examples/sdl3example.c67 2>&1 | grep -c arena
+./vibe67 -v examples/sdl3example.vibe67 2>&1 | grep -c arena
 
 # Check symbol duplication:
 nm -D sdl3example | grep SDL | sort | uniq -d

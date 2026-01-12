@@ -17,9 +17,9 @@ echo "Setting the version to $VERSION"
 d=$(LC_ALL=C date +'%d %b %Y')
 
 # macOS
-sed -E -i '' "s/\"[0-9]* [A-Z][a-z]* [0-9]*\"/\"$d\"/g" c67.1 2> /dev/null || true
-sed -E -i '' "s/2\.[[:digit:]]+\.[[:digit:]]+/$VERSION/g" c67.1 README.md "$0" main.go 2> /dev/null || true
+sed -E -i '' "s/\"[0-9]* [A-Z][a-z]* [0-9]*\"/\"$d\"/g" vibe67.1 2> /dev/null || true
+sed -E -i '' "s/2\.[[:digit:]]+\.[[:digit:]]+/$VERSION/g" vibe67.1 README.md "$0" main.go 2> /dev/null || true
 
 # Linux
-sed -r -i "s/\"[0-9]* [A-Z][a-z]* [0-9]*\"/\"$d\"/g" c67.1 2> /dev/null || true
-sed -r -i "s/2\.[[:digit:]]+\.[[:digit:]]+/$VERSION/g" c67.1 README.md "$0" main.go 2> /dev/null || true
+sed -r -i "s/\"[0-9]* [A-Z][a-z]* [0-9]*\"/\"$d\"/g" vibe67.1 2> /dev/null || true
+sed -r -i "s/2\.[[:digit:]]+\.[[:digit:]]+/$VERSION/g" vibe67.1 README.md "$0" main.go 2> /dev/null || true

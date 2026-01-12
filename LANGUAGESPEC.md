@@ -1,18 +1,18 @@
-# C67 Language Specification
+# Vibe67 Language Specification
 
 **Version:** 1.5.0
 **Date:** 2025-12-03
-**Status:** Canonical Language Reference for the C67 1.5.0 Release
+**Status:** Canonical Language Reference for the Vibe67 1.5.0 Release
 
-This document describes the complete semantics, behavior, and design philosophy of the C67 programming language. For the formal grammar, see [GRAMMAR.md](GRAMMAR.md).
+This document describes the complete semantics, behavior, and design philosophy of the Vibe67 programming language. For the formal grammar, see [GRAMMAR.md](GRAMMAR.md).
 
 ## ⚠️ CRITICAL: The Universal Type
 
-C67 has exactly ONE type: `map[uint64]float64`
+Vibe67 has exactly ONE type: `map[uint64]float64`
 
 Not "represented as" or "backed by" — every value IS this map:
 
-```c67
+```vibe67
 42              // {0: 42.0}
 "Hello"         // {0: 72.0, 1: 101.0, 2: 108.0, 3: 108.0, 4: 111.0}
 [1, 2, 3]       // {0: 1.0, 1: 2.0, 2: 3.0}
@@ -23,11 +23,11 @@ Not "represented as" or "backed by" — every value IS this map:
 There are NO special types, NO primitives, NO exceptions.
 Everything is a map from uint64 to float64.
 
-This is not an implementation detail — this IS C67.
+This is not an implementation detail — this IS Vibe67.
 
 ## Table of Contents
 
-- [What Makes C67 Unique](#what-makes-c67-unique)
+- [What Makes Vibe67 Unique](#what-makes-vibe67-unique)
 - [Design Philosophy](#design-philosophy)
 - [Type System](#type-system)
 - [Variables and Assignment](#variables-and-assignment)
@@ -45,9 +45,9 @@ This is not an implementation detail — this IS C67.
 - [Error Handling](#error-handling)
 - [Examples](#examples)
 
-## What Makes C67 Unique
+## What Makes Vibe67 Unique
 
-C67 brings together several novel or rare features that distinguish it from other systems programming languages:
+Vibe67 brings together several novel or rare features that distinguish it from other systems programming languages:
 
 ### 1. Universal Map Type System
 
@@ -70,7 +70,7 @@ The compiler emits x86_64, ARM64, and RISCV64 machine code directly from the AST
 
 Blocks `{ ... }` are disambiguated by their contents:
 
-```c67
+```vibe67
 // Map literal: contains key: value
 config = { port: 8080, host: "localhost" }
 
@@ -102,7 +102,7 @@ classify = x -> {
 3. Otherwise → Statement block
 
 **Mixed blocks** contain both statements and guard clauses:
-```c67
+```vibe67
 process = x -> {
     println("Processing:", x)  // Statement
     | x == 0 => "zero"          // Guard clause
@@ -118,7 +118,7 @@ This unifies maps, pattern matching, guards, and function bodies into one syntax
 
 All blocks that return a value are valid expressions. The value of a block is the value of its last expression:
 
-```c67
+```vibe67
 // Block as expression in assignment
 result = {
     temp = compute()
@@ -165,7 +165,7 @@ This design enables:
 
 All functions use `->` for lambda definitions and `=>` for match arms. Define with `=` (immutable) not `:=` unless reassignment needed:
 
-```c67
+```vibe67
 // Use = for functions (standard) with -> for lambdas
 square = x -> x * 2
 add = (x, y) -> x + y
@@ -190,7 +190,7 @@ handler <- x -> println("DEBUG:", x)  // reassignment with <-
 
 Avoid parentheses unless needed for precedence or grouping:
 
-```c67
+```vibe67
 // Good: no unnecessary parens
 x > 0 { 1 => "positive" ~> "negative" }
 result = x + y * z
@@ -209,7 +209,7 @@ add = (x, y) -> x + y             // multiple lambda parameters
 
 All bitwise operations are suffixed with `b` to eliminate ambiguity:
 
-```c67
+```vibe67
 <<b >>b <<<b >>>b    // Shifts and rotates
 &b |b ^b !b ~b          // Bitwise logic
 ?b                   // Bit test (tests if bit at position is set)
@@ -217,7 +217,7 @@ All bitwise operations are suffixed with `b` to eliminate ambiguity:
 
 ### 7. Explicit String Encoding
 
-```c67
+```vibe67
 text = "Hello"
 bytes = text.bytes   // Map of byte values {0: byte0, 1: byte1, ...}
 runes = text.runes   // Map of Unicode code points {0: rune0, 1: rune1, ...}
@@ -227,7 +227,7 @@ runes = text.runes   // Map of Unicode code points {0: rune0, 1: rune1, ...}
 
 Network-style message passing for concurrency:
 
-```c67
+```vibe67
 &8080 <- "Hello"     // Send to channel
 msg <= &8080         // Receive from channel
 ```
@@ -236,7 +236,7 @@ msg <= &8080         // Receive from channel
 
 Parallel loops use `fork()` for true isolation:
 
-```c67
+```vibe67
 || i in 0..10 {      // Each iteration in separate process
     compute(i)
 }
@@ -244,21 +244,21 @@ Parallel loops use `fork()` for true isolation:
 
 ### 10. Pipe Operators for Data Flow
 
-```c67
+```vibe67
 |    Pipe (transform)
 ||   Parallel map
 ```
 
 ### 11. List Access Functions
 
-```c67
+```vibe67
 head(xs)   // Get first element
 tail(xs)   // Get all but first element
 #xs        // Length (prefix or postfix)
 ```
 
 **Semantics:**
-```c67
+```vibe67
 // Lists and maps
 xs = [1, 2, 3]
 head(xs)     // 1.0 (first element)
@@ -281,13 +281,13 @@ tail([])     // [] (no tail)
 
 Parse C headers automatically using DWARF debug info:
 
-```c67
+```vibe67
 result = c_function(arg1, arg2)  // Direct C calls
 ```
 
 ### 13. CStruct with Direct Memory Access
 
-```c67
+```vibe67
 cstruct Point {
     x as float64,
     y as float64
@@ -298,7 +298,7 @@ p.x  // Direct memory offset access
 
 ### 14. Tail-Call Optimization Always On
 
-```c67
+```vibe67
 factorial = (n, acc) -> (n == 0) {
     1 => acc
     ~> factorial(n - 1, acc * n)    // Optimized to loop
@@ -307,26 +307,26 @@ factorial = (n, acc) -> (n == 0) {
 
 ### 15. Cryptographically Secure Random
 
-```c67
+```vibe67
 x = ??  // Uses OS CSPRNG
 ```
 
 ### 16. Memory Ownership Operator `µ` (Prefix)
 
-```c67
+```vibe67
 new_owner = µold_owner  // Transfer ownership
 ```
 
 ### 17. Result Type with NaN Error Encoding
 
-```c67
+```vibe67
 result = risky_operation()
 result.error { != "" -> println("Error:", result.error) }
 ```
 
 ### 18. Immutable-by-Default
 
-```c67
+```vibe67
 x = 42      // Immutable
 y := 100    // Mutable (explicit)
 ```
@@ -364,9 +364,9 @@ y := 100    // Mutable (explicit)
 
 ## Type System
 
-C67 uses a **universal map type**: `map[uint64]float64`
+Vibe67 uses a **universal map type**: `map[uint64]float64`
 
-Every value in C67 IS `map[uint64]float64`:
+Every value in Vibe67 IS `map[uint64]float64`:
 
 - **Numbers**: `{0: number_value}`
 - **Strings**: `{0: char0, 1: char1, 2: char2, ...}`
@@ -380,8 +380,8 @@ There are no special cases. No "single entry maps", no "byte indices", no "field
 
 Type annotations are **optional metadata** that specify semantic intent and guide FFI conversions. They do NOT change the runtime representation (always `map[uint64]float64`).
 
-**Native C67 types:**
-```c67
+**Native Vibe67 types:**
+```vibe67
 num    // number (default type)
 str    // string (map of character codes)
 list   // list (map with sequential keys)
@@ -389,7 +389,7 @@ map    // explicit map
 ```
 
 **Foreign C types:**
-```c67
+```vibe67
 cstring   // C char* (null-terminated string pointer)
 cptr      // C pointer (e.g., SDL_Window*, void*)
 cint      // C int/int32_t
@@ -402,7 +402,7 @@ cvoid     // C void (return type only)
 
 **Usage:**
 
-```c67
+```vibe67
 // Variable declarations
 x: num = 42
 name: str = "Alice"
@@ -417,22 +417,22 @@ window: cptr = sdl.SDL_CreateWindow("Game", 800, 600, 0)
 error: cstring = sdl.SDL_GetError()
 result: cint = sdl.SDL_Init(0x00000020)
 
-// Without annotations, C67 uses heuristics (may be imprecise)
+// Without annotations, Vibe67 uses heuristics (may be imprecise)
 window := sdl.SDL_CreateWindow("Game", 800, 600, 0)  // Inferred as map
 ```
 
 **When to use type annotations:**
-- **Optional** for pure C67 code (types inferred from usage)
+- **Optional** for pure Vibe67 code (types inferred from usage)
 - **Recommended** for FFI code (enables precise marshalling)
 - **Required** for complex FFI (pointer types, structs, proper error handling)
 
-Without annotations, C67 uses heuristics at FFI boundaries. With annotations, C67 marshalls precisely.
+Without annotations, Vibe67 uses heuristics at FFI boundaries. With annotations, Vibe67 marshalls precisely.
 
 ### Type Conversions
 
 Use `as` for explicit type casts at FFI boundaries:
 
-```c67
+```vibe67
 x as int32      // Cast to C int32
 ptr as cstr     // Cast to C string pointer
 val as float64  // Cast to C double
@@ -448,9 +448,9 @@ ptr cstr
 
 ### Duck Typing
 
-Since everything is a map, C67 has structural typing:
+Since everything is a map, Vibe67 has structural typing:
 
-```c67
+```vibe67
 point = { x: 10, y: 20 }
 point.x  // Works - map has "x" key
 
@@ -460,7 +460,7 @@ person.x  // Also works - different map, same key
 
 Type annotations are contextual keywords - you can use them as identifiers:
 
-```c67
+```vibe67
 num = 100              // OK - variable named num
 x: num = num * 2       // OK - type annotation vs variable
 ```
@@ -472,7 +472,7 @@ x: num = num * 2       // OK - type annotation vs variable
 **Shadow Keyword Requirement:**
 When declaring a variable that would shadow (hide) a variable from an outer scope, the `shadow` keyword is **required**. This prevents accidental shadowing bugs while allowing intentional shadowing.
 
-```c67
+```vibe67
 // Module level
 port = 8080
 config = { host: "localhost" }
@@ -516,7 +516,7 @@ compute = {
 
 Creates immutable binding (cannot reassign variable or modify contents):
 
-```c67
+```vibe67
 x = 42
 x = 100  // ERROR: cannot reassign immutable variable
 
@@ -533,7 +533,7 @@ nums[0] = 99  // ERROR: cannot modify immutable value
 
 Creates mutable binding (can reassign variable and modify contents):
 
-```c67
+```vibe67
 x := 42
 x := 100  // OK: reassign mutable variable
 x <- 200  // OK: update with <-
@@ -552,7 +552,7 @@ nums[0] <- 99  // OK: modify mutable value
 
 Updates mutable variables or map elements:
 
-```c67
+```vibe67
 x := 10
 x <- 20      // Update variable
 
@@ -567,7 +567,7 @@ config.port <- 9000  // Update map field
 
 Multiple variables can be assigned from a list in a single statement:
 
-```c67
+```vibe67
 // Unpack function return (list)
 new_list, popped_value = pop([1, 2, 3])
 println(new_list)      // [1, 2]
@@ -589,7 +589,7 @@ a, b, c = [1, 2, 3, 4, 5]  // a=1, b=2, c=3 (extras ignored)
 - Can use `=`, `:=`, or `<-` (with mutable vars)
 
 **Common patterns:**
-```c67
+```vibe67
 // Swap values
 a, b := 1, 2
 a, b <- [b, a]  // Swap using list literal
@@ -605,7 +605,7 @@ quotient, remainder = divmod(17, 5)
 
 **Always use `=` for functions** unless the function variable needs reassignment:
 
-```c67
+```vibe67
 // Standard (use =)
 add = (x, y) -> x + y
 factorial = n -> n { 0 => 1 ~> n * factorial(n-1) }
@@ -626,7 +626,7 @@ The assignment operator determines both **variable mutability** and **value muta
 
 **Examples:**
 
-```c67
+```vibe67
 // Immutable binding, immutable value
 nums = [1, 2, 3]
 nums <- [4, 5, 6]     // ERROR: can't reassign
@@ -648,7 +648,7 @@ Match blocks have two forms: **value match** and **guard match**.
 
 Evaluates expression, then matches its result against patterns:
 
-```c67
+```vibe67
 // Match on literal values
 x = 5
 result = x {
@@ -675,7 +675,7 @@ result = (x > 10) {
 
 Each branch evaluates its own condition:
 
-```c67
+```vibe67
 // Guard branches with | at line start
 classify = x -> {
     | x == 0 => "zero"
@@ -696,7 +696,7 @@ category = age -> {
 **Important:** The `|` is only a guard marker when at the start of a line/clause.
 Otherwise `|` is the pipe operator:
 
-```c67
+```vibe67
 // This is a guard (| at start)
 x -> { | x > 0 => "positive" }
 
@@ -714,7 +714,7 @@ result = data | transform | filter
 
 The compiler automatically optimizes tail calls to loops:
 
-```c67
+```vibe67
 // Explicit tail call with => in match arms
 factorial = (n, acc) -> (n == 0) {
     1 => acc
@@ -739,7 +739,7 @@ sum_list = (list, acc) -> (list.length) {
 
 Functions are defined using `=` (immutable by default) with `->` for lambdas:
 
-```c67
+```vibe67
 // Named function with -> for lambda
 square = x -> x * x
 
@@ -775,7 +775,7 @@ cleanup = -> release_all()              // Cleanup callback
 
 Blocks behave differently based on context:
 
-```c67
+```vibe67
 // Expression context: immediate evaluation
 println({ 10 })                    // Prints: 10
 println({ x = 5; x * 2 })          // Prints: 10
@@ -808,7 +808,7 @@ println(m.x)                       // Prints: 10
 
 Lambdas can be defined with or without the `->` arrow, depending on syntax:
 
-```c67
+```vibe67
 // Inline lambda with arrow (required for expressions)
 [1, 2, 3] | x -> x * 2
 
@@ -857,7 +857,7 @@ init = {
 
 Lambdas capture their environment:
 
-```c67
+```vibe67
 make_counter = start -> {
     count := start
     () -> {
@@ -875,7 +875,7 @@ counter()  // 2
 
 Functions can take and return functions:
 
-```c67
+```vibe67
 apply_twice = (f, x) -> f(f(x))
 
 increment = x -> x + 1
@@ -886,7 +886,7 @@ result = apply_twice(increment, 10)  // 12
 
 The `<>` operator composes two functions, creating a new function that applies the right operand first, then the left:
 
-```c67
+```vibe67
 // Basic composition
 double = x -> x * 2
 add_ten = x -> x + 10
@@ -912,7 +912,7 @@ The composition operator provides a concise way to build complex transformations
 
 Functions can accept a variable number of arguments using the `...` suffix on the last parameter:
 
-```c67
+```vibe67
 // Simple variadic function
 sum = (first, rest...) -> {
     total := first
@@ -954,7 +954,7 @@ When calling a variadic function, you can:
 2. Spread a list with `...`: `sum(values...)`
 3. Mix both: `sum(1, 2, values...)`
 
-```c67
+```vibe67
 // Define variadic function
 max = (nums...) -> {
     result := nums[0]
@@ -979,7 +979,7 @@ max(1, 2, values..., 99)  // 99
 
 ### Infinite Loop
 
-```c67
+```vibe67
 @ {
     println("Forever")
 }
@@ -987,7 +987,7 @@ max(1, 2, values..., 99)  // 99
 
 ### Counted Loop
 
-```c67
+```vibe67
 @ 10 {
     println("Hello")
 }
@@ -995,7 +995,7 @@ max(1, 2, values..., 99)  // 99
 
 ### Range Loop
 
-```c67
+```vibe67
 @ i in 0..10 {
     println(i)
 }
@@ -1008,7 +1008,7 @@ max(1, 2, values..., 99)  // 99
 
 ### Collection Loop
 
-```c67
+```vibe67
 nums = [1, 2, 3, 4, 5]
 @ n in nums {
     println(n)
@@ -1017,9 +1017,9 @@ nums = [1, 2, 3, 4, 5]
 
 ### Loop Control
 
-C67 uses `ret @` with loop labels instead of `break`/`continue`:
+Vibe67 uses `ret @` with loop labels instead of `break`/`continue`:
 
-```c67
+```vibe67
 // Exit current loop
 @ i in 0..<100 {
     i > 50 { ret @ }      // Exit current loop
@@ -1065,7 +1065,7 @@ Loops are automatically numbered from **outermost to innermost**:
 
 Loops with unknown bounds or modified counters require `max`:
 
-```c67
+```vibe67
 // Counter modified in loop
 @ i in 0..<10 max 20 {
     i++  // Modified counter - needs max
@@ -1088,7 +1088,7 @@ Loops with unknown bounds or modified counters require `max`:
 
 Use `||` for parallel iteration (each iteration in separate process):
 
-```c67
+```vibe67
 || i in 0..10 {
     // Runs in separate forked process
     expensive_computation(i)
@@ -1099,7 +1099,7 @@ Use `||` for parallel iteration (each iteration in separate process):
 
 ### Parallel Map
 
-```c67
+```vibe67
 // Sequential map
 results = [1, 2, 3] | x => x * 2
 
@@ -1111,25 +1111,25 @@ results = [1, 2, 3] || x => expensive(x)
 
 ## ENet Channels
 
-C67 uses **ENet-style message passing** for concurrency:
+Vibe67 uses **ENet-style message passing** for concurrency:
 
 ### Send Messages
 
-```c67
+```vibe67
 &8080 <- "Hello"          // Send to port 8080
 &"host:9000" <- data      // Send to remote host
 ```
 
 ### Receive Messages
 
-```c67
+```vibe67
 msg <= &8080              // Receive from port 8080
 data <= &"server:9000"    // Receive from remote
 ```
 
 ### Channel Patterns
 
-```c67
+```vibe67
 // Worker pattern
 worker = -> {
     @ {
@@ -1149,7 +1149,7 @@ stage3 = -> @ { result <= &8081; save(result) }
 
 ## Classes and Object-Oriented Programming
 
-C67 supports classes as syntactic sugar over maps and closures, following the philosophy that everything is `map[uint64]float64`.
+Vibe67 supports classes as syntactic sugar over maps and closures, following the philosophy that everything is `map[uint64]float64`.
 
 ### Design Philosophy
 
@@ -1163,7 +1163,7 @@ C67 supports classes as syntactic sugar over maps and closures, following the ph
 
 Classes group data and methods together:
 
-```c67
+```vibe67
 class Point {
     init = (x, y) -> {
         .x = x
@@ -1195,7 +1195,7 @@ p1.move(5, 5)
 
 A class declaration creates a constructor function:
 
-```c67
+```vibe67
 // This class:
 class Counter {
     init = start -> {
@@ -1222,7 +1222,7 @@ Counter := start -> {
 
 Inside methods, `.field` accesses instance fields. The `. ` expression (dot followed by space or newline) means "this":
 
-```c67
+```vibe67
 class List {
     init = () => {
         .items = []
@@ -1247,7 +1247,7 @@ println(list.size())  // 3
 - Outside methods, use `instance.field` explicitly
 - No `this` keyword - use `. ` instead
 
-```c67
+```vibe67
 class Account {
     init = balance -> {
         .balance = balance
@@ -1277,7 +1277,7 @@ println(acc.get_balance())  // 150
 
 Class fields are shared across all instances:
 
-```c67
+```vibe67
 class Entity {
     Entity.count = 0
     Entity.all = []
@@ -1302,7 +1302,7 @@ println(Entity.count)    // 2
 
 Extend classes with behavior maps using the `<>` composition operator:
 
-```c67
+```vibe67
 // Define behavior map
 Serializable := {
     to_json: () -> {
@@ -1331,7 +1331,7 @@ json := user.to_json()
 
 **Multiple composition** - chain `<>` operators:
 
-```c67
+```vibe67
 class Product <> Serializable <> Validatable <> Timestamped {
     init = (name, price) -> {
         .name = name
@@ -1347,7 +1347,7 @@ class Product <> Serializable <> Validatable <> Timestamped {
 
 **Instance methods** close over the instance:
 
-```c67
+```vibe67
 class Box {
     init = value -> {
         .value = value
@@ -1364,7 +1364,7 @@ println(getter())  // 42
 
 **Class methods** don't capture instances:
 
-```c67
+```vibe67
 class Math {
     Math.PI = 3.14159
 
@@ -1379,7 +1379,7 @@ area := Math.circle_area(10)
 
 Use underscore prefix for "private" methods:
 
-```c67
+```vibe67
 class Parser {
     init = input -> {
         .input = input
@@ -1412,7 +1412,7 @@ class Parser {
 
 Return `. ` (this) to enable chaining:
 
-```c67
+```vibe67
 class StringBuilder {
     init = () => {
         .parts = []
@@ -1445,7 +1445,7 @@ println(str)  // "Hello World"
 
 Combine classes and CStruct for high performance:
 
-```c67
+```vibe67
 cstruct Vec3Data {
     x as float64,
     y as float64,
@@ -1491,9 +1491,9 @@ v2.free()
 
 ### No Inheritance
 
-C67 does not support classical inheritance. Use composition:
+Vibe67 does not support classical inheritance. Use composition:
 
-```c67
+```vibe67
 // Instead of:
 // class Dog extends Animal { ... }
 
@@ -1533,7 +1533,7 @@ dog.bark()   // From Dog
 
 **Stack data structure:**
 
-```c67
+```vibe67
 class Stack {
     init = () => {
         .items = []
@@ -1564,7 +1564,7 @@ println(s.pop())  // 3
 
 **Simple ORM-like class:**
 
-```c67
+```vibe67
 class Model {
     Model.table = ""
 
@@ -1598,11 +1598,11 @@ user.save()
 
 ## C FFI
 
-C67 can call C functions directly using DWARF debug information and automatic header parsing:
+Vibe67 can call C functions directly using DWARF debug information and automatic header parsing:
 
 ### Calling C Functions
 
-```c67
+```vibe67
 // Standard C library functions (automatically available)
 result = c.malloc(1024)
 c.free(result)
@@ -1626,32 +1626,32 @@ window := sdl.SDL_CreateWindow("Title", 640, 480, flags)
 
 ## Import and Export System
 
-C67 provides a unified import system for libraries, git repositories, and local files. The export system controls function visibility and namespace requirements.
+Vibe67 provides a unified import system for libraries, git repositories, and local files. The export system controls function visibility and namespace requirements.
 
 ### Export Control
 
-The `export` statement at the top of a C67 file controls which functions are available to importers:
+The `export` statement at the top of a Vibe67 file controls which functions are available to importers:
 
 **Three export modes:**
 
 1. **`export *`** - All functions exported to global namespace (no prefix needed)
-   ```c67
-   // gamelib.c67
+   ```vibe67
+   // gamelib.vibe67
    export *
    
    init = (w, h) -> { ... }
    draw_rect = (x, y, w, h) -> { ... }
    ```
    Usage:
-   ```c67
+   ```vibe67
    import "gamelib" as game
    init(800, 600)      // No prefix
    draw_rect(10, 20, 50, 50)
    ```
 
 2. **`export func1 func2`** - Only listed functions exported (prefix required)
-   ```c67
-   // api.c67
+   ```vibe67
+   // api.vibe67
    export public_func another_func
    
    public_func = { ... }       // Exported
@@ -1659,7 +1659,7 @@ The `export` statement at the top of a C67 file controls which functions are ava
    internal_helper = { ... }   // Not exported
    ```
    Usage:
-   ```c67
+   ```vibe67
    import "api" as api
    api.public_func()        // OK
    api.another_func()       // OK
@@ -1667,15 +1667,15 @@ The `export` statement at the top of a C67 file controls which functions are ava
    ```
 
 3. **No export** - All functions available (prefix required)
-   ```c67
-   // utils.c67
+   ```vibe67
+   // utils.vibe67
    // No export statement
    
    helper1 = { ... }
    helper2 = { ... }
    ```
    Usage:
-   ```c67
+   ```vibe67
    import "utils" as utils
    utils.helper1()   // Prefix required
    utils.helper2()   // Prefix required
@@ -1694,7 +1694,7 @@ The `export` statement at the top of a C67 file controls which functions are ava
 
 ### Library Imports
 
-```c67
+```vibe67
 // System library (uses pkg-config on Linux/macOS)
 import "sdl3" as sdl
 import "raylib" as rl
@@ -1715,18 +1715,18 @@ import "C:\\Windows\\System32\\user32.dll" as user32
 
 ### Git Repository Imports
 
-```c67
+```vibe67
 // HTTPS format (recommended)
-import "github.com/xyproto/c67-math" as math
+import "github.com/xyproto/vibe67-math" as math
 
 // With version specifier
-import "github.com/xyproto/c67-math@v1.0.0" as math
-import "github.com/xyproto/c67-math@v2.1.3" as math
-import "github.com/xyproto/c67-math@latest" as math
-import "github.com/xyproto/c67-math@main" as math
+import "github.com/xyproto/vibe67-math@v1.0.0" as math
+import "github.com/xyproto/vibe67-math@v2.1.3" as math
+import "github.com/xyproto/vibe67-math@latest" as math
+import "github.com/xyproto/vibe67-math@main" as math
 
 // SSH format
-import "git@github.com:xyproto/c67-math.git" as math
+import "git@github.com:xyproto/vibe67-math.git" as math
 
 // GitLab and other providers
 import "gitlab.com/user/project" as proj
@@ -1734,8 +1734,8 @@ import "bitbucket.org/user/repo" as repo
 ```
 
 **Git repository behavior:**
-- Clones to `~/.cache/c67/` (respects `XDG_CACHE_HOME`)
-- Imports all top-level `.c67` files from the repository
+- Clones to `~/.cache/vibe67/` (respects `XDG_CACHE_HOME`)
+- Imports all top-level `.vibe67` files from the repository
 - Version specifiers:
   - `@v1.0.0` - Specific tag
   - `@main` / `@master` - Specific branch
@@ -1744,7 +1744,7 @@ import "bitbucket.org/user/repo" as repo
 
 ### Directory Imports
 
-```c67
+```vibe67
 // Current directory
 import "." as local
 
@@ -1753,21 +1753,21 @@ import "./lib" as lib
 import "../shared" as shared
 
 // Absolute paths
-import "/opt/c67lib" as c67lib
+import "/opt/vibe67lib" as vibe67lib
 import "C:\\Projects\\mylib" as mylib
 ```
 
 **Directory behavior:**
-- Imports all top-level `.c67` files from the directory
+- Imports all top-level `.vibe67` files from the directory
 - Relative paths resolved from current working directory
 - Allows organizing code into modules
 
 ### Import Examples
 
-```c67
+```vibe67
 // Complete application setup
 import "sdl3" as sdl                           // System library
-import "github.com/xyproto/c67-math" as math  // Git repo
+import "github.com/xyproto/vibe67-math" as math  // Git repo
 import "./game_logic" as game                  // Local directory
 
 main = {
@@ -1779,9 +1779,9 @@ main = {
 
 ### Header Parsing and Constants
 
-C67 automatically parses C header files using pkg-config and library introspection:
+Vibe67 automatically parses C header files using pkg-config and library introspection:
 
-```c67
+```vibe67
 import sdl3 as sdl  // Parses SDL3 headers, extracts constants and function signatures
 
 // Constants are available with the namespace prefix
@@ -1801,7 +1801,7 @@ window := sdl.SDL_CreateWindow("Title", 640, 480, window_flags)
 
 ### Type Mapping
 
-| C67 | C |
+| Vibe67 | C |
 |------|---|
 | `x as int32` | `int32_t` |
 | `x as float64` | `double` |
@@ -1812,7 +1812,7 @@ window := sdl.SDL_CreateWindow("Title", 640, 480, window_flags)
 
 When calling C functions, you can use any of these as null pointer (0):
 
-```c67
+```vibe67
 // All of these represent null pointer when used in C FFI context
 c.some_function(0)           // Number literal 0
 c.some_function([])          // Empty list
@@ -1822,7 +1822,7 @@ c.some_function([] as ptr)   // Empty list cast
 c.some_function({} as ptr)   // Empty map cast
 ```
 
-This makes C67's null pointer representation flexible and intuitive:
+This makes Vibe67's null pointer representation flexible and intuitive:
 - `0` is the traditional null pointer value
 - `[]` and `{}` represent "empty" or "nothing", which conceptually maps to null
 - Explicit casts make the intent clear in code
@@ -1831,7 +1831,7 @@ This makes C67's null pointer representation flexible and intuitive:
 
 C functions that return pointers return 0 (null) on failure. Use `or!` for clean error handling:
 
-```c67
+```vibe67
 // Old style: manual null check
 window := sdl.SDL_CreateWindow("Title", 640, 480, 0)
 window == 0 {
@@ -1863,7 +1863,7 @@ ptr := c.malloc(1024) or! 0
 
 Chain multiple C calls with `or!` for clean error handling:
 
-```c67
+```vibe67
 init_graphics = () => {
     // Each call handles its own error with or!
     sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
@@ -1893,10 +1893,10 @@ init_graphics = () => {
 The compiler links with `-lc` by default. Additional libraries:
 
 ```bash
-c67 program.c67 -o program -L/path/to/libs -lmylib
+vibe67 program.vibe67 -o program -L/path/to/libs -lmylib
 
 # SDL3 example
-c67 sdl_demo.c67 -o sdl_demo $(pkg-config --libs sdl3)
+vibe67 sdl_demo.vibe67 -o sdl_demo $(pkg-config --libs sdl3)
 ```
 
 ## CStruct
@@ -1905,7 +1905,7 @@ Define C-compatible structures with explicit memory layout:
 
 ### Declaration
 
-```c67
+```vibe67
 cstruct Point {
     x as float64,
     y as float64
@@ -1920,7 +1920,7 @@ cstruct Rect {
 
 ### Usage
 
-```c67
+```vibe67
 // Create struct
 p = Point(3.0, 4.0)
 
@@ -1946,7 +1946,7 @@ CStructs have C-compatible memory layout:
 Field access using `.` works for both cstructs and C FFI pointers:
 
 **With cstruct declaration (known layout):**
-```c67
+```vibe67
 cstruct SDL_Event {
     type as uint32,
     timestamp as uint64
@@ -1960,7 +1960,7 @@ event_type = event.type  // Reads uint32 at offset 0
 ```
 
 **Without struct declaration (fallback to map):**
-```c67
+```vibe67
 // Compiler doesn't know struct layout
 event = c.malloc(192)
 sdl.SDL_PollEvent(event)
@@ -1980,7 +1980,7 @@ event_type = event.type
 
 When you allocate memory but the compiler doesn't know the structure type, use the `as` keyword to provide type information:
 
-```c67
+```vibe67
 cstruct SDL_Event {
     type as uint32,
     timestamp as uint64
@@ -2006,8 +2006,8 @@ arena {
 4. Zero runtime cost - pure compile-time feature
 
 **Type casting syntax:**
-```c67
-// Arena allocation (idiomatic C67)
+```vibe67
+// Arena allocation (idiomatic Vibe67)
 event := alloc(size) as TypeName
 
 // Manual allocation (when needed)
@@ -2026,11 +2026,11 @@ typed_ptr := raw_ptr as TypeName
 
 ## Memory Management
 
-### The C67 Way: Arena Blocks
+### The Vibe67 Way: Arena Blocks
 
 **CRITICAL:** Always prefer arena blocks over manual allocation!
 
-```c67
+```vibe67
 // ✓ CORRECT: Arena allocation (automatic cleanup)
 arena {
     buffer = alloc(1024)
@@ -2048,7 +2048,7 @@ defer c.free(ptr)  // Easy to forget!
 2. **Performance** - Faster allocation, no fragmentation
 3. **Simplicity** - No manual free() calls
 4. **Locality** - Better cache performance
-5. **Idiomatic C67** - The language is designed around arenas
+5. **Idiomatic Vibe67** - The language is designed around arenas
 
 **When to use c.malloc:**
 - Interop with C libraries that expect malloc'd pointers
@@ -2057,14 +2057,14 @@ defer c.free(ptr)  // Easy to forget!
 
 ### Arena Allocators and Minimal Builtins
 
-**CRITICAL DESIGN PRINCIPLE:** C67 keeps builtin functions to an ABSOLUTE MINIMUM.
+**CRITICAL DESIGN PRINCIPLE:** Vibe67 keeps builtin functions to an ABSOLUTE MINIMUM.
 
 **Memory management:**
 - NO `malloc`, `free`, `realloc`, or `calloc` as builtins
 - Use arena allocators (recommended): `allocate()` within `arena {}` blocks
 - Or use C FFI (explicit): `c.malloc`, `c.free`, `c.realloc`, `c.calloc`
 
-```c67
+```vibe67
 // Recommended: arena allocator
 result = arena {
     data = allocate(1024)
@@ -2109,7 +2109,7 @@ This keeps the language core minimal and forces clarity at call sites.
 The `defer` statement schedules cleanup code to execute when the current scope exits, enabling automatic resource management similar to Go's defer or C++'s RAII.
 
 **Syntax:**
-```c67
+```vibe67
 defer expression
 ```
 
@@ -2120,7 +2120,7 @@ defer expression
 - Multiple defers in same scope form a cleanup stack
 
 **Basic Example:**
-```c67
+```vibe67
 open_file = filename -> {
     file := c.fopen(filename, "r") or! {
         println("Failed to open:", filename)
@@ -2137,7 +2137,7 @@ open_file = filename -> {
 ```
 
 **LIFO Execution Order:**
-```c67
+```vibe67
 process = () => {
     defer println("First")   // Executes last (3rd)
     defer println("Second")  // Executes second (2nd)
@@ -2147,7 +2147,7 @@ process = () => {
 ```
 
 **With C FFI (SDL3 Example):**
-```c67
+```vibe67
 init_sdl = () => {
     sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
         println("SDL init failed")
@@ -2176,7 +2176,7 @@ init_sdl = () => {
 ```
 
 **Railway-Oriented Pattern:**
-```c67
+```vibe67
 // Combine defer with or! for clean error handling
 acquire_resources = () => {
     db := connect_db() or! {
@@ -2204,7 +2204,7 @@ acquire_resources = () => {
 5. **C FFI resources:** Perfect for file handles, sockets, SDL objects, etc.
 
 **When NOT to use defer:**
-- For C67 data structures (use arena allocators instead)
+- For Vibe67 data structures (use arena allocators instead)
 - When cleanup must happen immediately, not at scope exit
 - When cleanup order must be explicit (just call cleanup functions directly)
 
@@ -2212,7 +2212,7 @@ acquire_resources = () => {
 
 Transfer ownership with postfix `!`:
 
-```c67
+```vibe67
 large_data := [1, 2, 3, /* ... */, 1000000]
 new_owner = large_data!  // Move, don't copy
 // large_data now invalid
@@ -2220,9 +2220,9 @@ new_owner = large_data!  // Move, don't copy
 
 ### Manual Memory (C FFI)
 
-C67 does NOT provide `malloc`/`free` as builtins. Use C FFI:
+Vibe67 does NOT provide `malloc`/`free` as builtins. Use C FFI:
 
-```c67
+```vibe67
 unsafe ptr {
     ptr = c.malloc(1024)
     // Use ptr
@@ -2232,11 +2232,11 @@ unsafe ptr {
 
 ## Unsafe Blocks
 
-For direct machine code access, C67 provides architecture-specific unsafe blocks. The compiler selects the appropriate block based on the target ISA (instruction set architecture).
+For direct machine code access, Vibe67 provides architecture-specific unsafe blocks. The compiler selects the appropriate block based on the target ISA (instruction set architecture).
 
 ### Architecture Model
 
-C67's platform support separates **ISA** from **OS**:
+Vibe67's platform support separates **ISA** from **OS**:
 - **ISA** (x86_64, arm64, riscv64) → determines registers and instructions
 - **OS** (Linux, Windows, macOS) → determines binary format and calling conventions
 - **Target** = ISA + OS (e.g., arm64-darwin, x86_64-windows)
@@ -2261,7 +2261,7 @@ See [PLATFORM_ARCHITECTURE.md](PLATFORM_ARCHITECTURE.md) for the full design rat
 
 ### Syntax
 
-```c67
+```vibe67
 unsafe {
     # x86_64 block
 } {
@@ -2282,7 +2282,7 @@ unsafe return_type {
 
 ### Examples
 
-```c67
+```vibe67
 // Direct memory access (3 ISA variants) - new syntax
 value = unsafe {
     rax <- ptr           # x86_64
@@ -2355,7 +2355,7 @@ While you write ISA-specific code, the compiler handles these OS differences:
 
 ### I/O
 
-```c67
+```vibe67
 // Standard output (stdout)
 println(x)           // Print with newline to stdout
 print(x)            // Print without newline to stdout
@@ -2386,7 +2386,7 @@ exitf(fmt, ...)     // Formatted print to stderr and exit(1)
 
 **Usage examples:**
 
-```c67
+```vibe67
 // Basic error printing
 eprintln("Warning: low memory")
 eprintf("Error: invalid value %v\n", x)
@@ -2418,7 +2418,7 @@ x < 0 {
 
 ### String Operations
 
-```c67
+```vibe67
 s = "Hello"
 s.length            // 5 (number of entries in the map)
 s.bytes             // Map of byte values {0: 72.0, 1: 101.0, ...}
@@ -2430,7 +2430,7 @@ s + " World"        // Concatenation (merges maps)
 
 F-strings provide powerful string interpolation with full expression support:
 
-```c67
+```vibe67
 // Basic interpolation
 name = "Alice"
 greeting = f"Hello, {name}!"  // "Hello, Alice!"
@@ -2464,11 +2464,11 @@ inner = "world"
 outer = f"Hello, {f"{inner}"}!"  // "Hello, world!"
 ```
 
-**Implementation Note:** F-strings are evaluated at runtime, allowing dynamic expressions within `{}`. Any valid C67 expression can be used, including function calls, arithmetic, map access, and nested interpolations.
+**Implementation Note:** F-strings are evaluated at runtime, allowing dynamic expressions within `{}`. Any valid Vibe67 expression can be used, including function calls, arithmetic, map access, and nested interpolations.
 
 ### List Operations
 
-```c67
+```vibe67
 nums = [1, 2, 3]
 nums.length         // 3
 nums[0]             // 1
@@ -2478,7 +2478,7 @@ nums + [4, 5]       // [1, 2, 3, 4, 5]
 
 ### Map Operations
 
-```c67
+```vibe67
 m = { x: 10, y: 20 }
 m.x                 // 10
 m.z <- 30           // Add field
@@ -2489,7 +2489,7 @@ keys = m.keys()     // Get all keys
 
 All standard math via C FFI:
 
-```c67
+```vibe67
 sin(x)
 cos(x)
 sqrt(x)
@@ -2499,7 +2499,7 @@ abs(x)
 
 ### Type Introspection
 
-```c67
+```vibe67
 // Get size in bytes of a cstruct type
 cstruct Point {
     x as int32
@@ -2519,7 +2519,7 @@ arena {
 
 ### Result Type Design
 
-C67 uses **NaN-boxing** to encode errors within float64 values. This elegant approach, inspired by ENet's use of bit patterns for encoding flags and types, keeps everything as `map[uint64]float64` while enabling robust error handling.
+Vibe67 uses **NaN-boxing** to encode errors within float64 values. This elegant approach, inspired by ENet's use of bit patterns for encoding flags and types, keeps everything as `map[uint64]float64` while enabling robust error handling.
 
 **Encoding Scheme:**
 - **Success values:** Regular float64 (standard IEEE 754 representation)
@@ -2566,11 +2566,11 @@ Error codes are exactly 4 bytes (null-padded if shorter), encoded as 32-bit inte
 "udf\0" (0x75646600) - Undefined
 ```
 
-**Note:** The `.error` accessor extracts the code and converts it to a C67 string, stripping null bytes.
+**Note:** The `.error` accessor extracts the code and converts it to a Vibe67 string, stripping null bytes.
 
 ### Operations That Return Results
 
-```c67
+```vibe67
 // Arithmetic errors
 x = 10 / 0              // Error: "dv0 " (division by zero)
 y = 2 ** 1000           // Error: "ovf " (overflow)
@@ -2593,7 +2593,7 @@ Every value has a `.error` accessor that:
 - Returns `""` (empty string) for success values
 - Returns the error code string (spaces stripped) for error values
 
-```c67
+```vibe67
 x = 10 / 2              // Success: returns 5.0
 x.error                 // Returns "" (empty)
 
@@ -2619,7 +2619,7 @@ result.error {
 
 The `or!` operator provides a default value or executes a block when the left side is an error or null:
 
-```c67
+```vibe67
 // Handle errors
 x = 10 / 0              // Error result
 safe = x or! 99         // Returns 99 (error case)
@@ -2661,7 +2661,7 @@ result := sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
 
 ### Error Propagation Patterns
 
-```c67
+```vibe67
 // Check and early return
 process = input -> {
     step1 = validate(input)
@@ -2726,7 +2726,7 @@ allocate_buffer = size -> {
 
 Use the `error` function to create error Results:
 
-```c67
+```vibe67
 // Create error with code
 validate = x -> {
     x < 0 { ret error("arg") }  // Negative argument
@@ -2747,7 +2747,7 @@ divide = (a, b) => {
 
 The compiler tracks whether a value is a Result type:
 
-```c67
+```vibe67
 // Compiler knows this returns Result
 divide = (a, b) => {
     b == 0 { ret error("dv0") }
@@ -2793,7 +2793,7 @@ The `.error` accessor:
 1. Checks if value is NaN: `UCOMISD xmm0, xmm0` (sets parity flag if NaN)
 2. If not NaN: returns empty string ""
 3. If NaN: extracts low 32 bits of mantissa as error code
-4. Converts 4-byte code to C67 string (strips null bytes)
+4. Converts 4-byte code to Vibe67 string (strips null bytes)
 5. Returns error code string
 5. Otherwise: return empty string ""
 
@@ -2822,7 +2822,7 @@ The `or!` operator:
 
 **Examples:**
 
-```c67
+```vibe67
 // Good: check errors
 result = fetch_data()
 result.error {
@@ -2849,20 +2849,20 @@ validate = x -> x < 0 { ret error("bad") }  // Use "arg" instead
 
 ```bash
 # Compile to executable
-c67 program.c67 -o program
+vibe67 program.vibe67 -o program
 
 # Compile with C library
-c67 program.c67 -o program -lm
+vibe67 program.vibe67 -o program -lm
 
 # Specify target architecture
-c67 program.c67 -o program -arch arm64
-c67 program.c67 -o program -arch riscv64
+vibe67 program.vibe67 -o program -arch arm64
+vibe67 program.vibe67 -o program -arch riscv64
 
 # Hot reload mode (Unix)
-c67 --hot program.c67
+vibe67 --hot program.vibe67
 
 # Show version
-c67 --version
+vibe67 --version
 ```
 
 ### Supported Architectures
@@ -2889,13 +2889,13 @@ c67 --version
 
 ### Program Execution Model
 
-C67 supports three program structures:
+Vibe67 supports three program structures:
 
 #### 1. Main Function Entry Point
 
 When a `main` function is defined, it serves as the entry point:
 
-```c67
+```vibe67
 main = { println("Hello, World!") }    // main() called, returns true (1.0)
 main = 42                               // Returns 42 as exit code
 main = () -> { println("Starting"); 1 } // Returns 1
@@ -2909,7 +2909,7 @@ main = () -> { println("Starting"); 1 } // Returns 1
 - Numeric values are converted to int32
 
 **Examples:**
-```c67
+```vibe67
 // Auto-called (no explicit main() call in top-level code)
 main = { println("Hello!") }
 // Output: Hello!
@@ -2936,7 +2936,7 @@ wrapper = { main() }  // main() inside lambda doesn't count
 
 When `main` is a variable (not a function) and there's no top-level code:
 
-```c67
+```vibe67
 main = 42        // Exit code 42
 main = {}        // Exit code 0 (empty map)
 main = []        // Exit code 0 (empty list)
@@ -2948,7 +2948,7 @@ The value of `main` becomes the program's exit code directly.
 
 When there's no `main` defined, top-level statements execute sequentially:
 
-```c67
+```vibe67
 println("Starting")
 result := compute_something()
 println(f"Result: {result}")
@@ -2966,7 +2966,7 @@ println(f"Result: {result}")
 
 When both exist, top-level code executes first and is responsible for calling `main()`:
 
-```c67
+```vibe67
 // Setup in top-level
 config := load_config()
 
@@ -2986,7 +2986,7 @@ If top-level code doesn't call `main()`, the function is never executed, and the
 
 The `main` variable is just another variable; top-level code determines execution:
 
-```c67
+```vibe67
 main = 99  // Just a variable
 
 println("Running")
@@ -2997,13 +2997,13 @@ println("Running")
 
 ### Hello World
 
-```c67
+```vibe67
 println("Hello, World!")
 ```
 
 ### Factorial
 
-```c67
+```vibe67
 // Iterative
 factorial = n -> {
     result := 1
@@ -3025,7 +3025,7 @@ println(factorial(5, 1))  // 120
 
 ### FizzBuzz
 
-```c67
+```vibe67
 @ i in 1..100 {
     result = i % 15 {
         0 -> "FizzBuzz"
@@ -3043,7 +3043,7 @@ println(factorial(5, 1))  // 120
 
 ### List Processing
 
-```c67
+```vibe67
 // Map, filter, reduce
 numbers = [1, 2, 3, 4, 5]
 
@@ -3058,7 +3058,7 @@ println(f"Evens: {evens}")
 
 ### Pattern Matching
 
-```c67
+```vibe67
 // Value match
 classify_number = x -> x {
     0 -> "zero"
@@ -3087,7 +3087,7 @@ check_value = x -> x {
 
 ### Error Handling
 
-```c67
+```vibe67
 // Division with error handling
 safe_divide = (a, b) => {
     result = a / b
@@ -3110,7 +3110,7 @@ compute = (a, b) => {
 
 ### Parallel Processing
 
-```c67
+```vibe67
 data = [1, 2, 3, 4, 5, 6, 7, 8]
 
 // Process in parallel
@@ -3121,7 +3121,7 @@ println(f"Results: {results}")
 
 ### Web Server (ENet)
 
-```c67
+```vibe67
 // Simple echo server
 server =>> {
     @ {
@@ -3152,7 +3152,7 @@ server()
 
 ### C Interop
 
-```c67
+```vibe67
 // Define C struct
 cstruct Buffer {
     data as ptr,
@@ -3198,7 +3198,7 @@ free_buffer(buf)
 
 ### SDL3 Graphics Example
 
-```c67
+```vibe67
 import sdl3 as sdl
 
 // Initialize with railway-oriented error handling
@@ -3253,7 +3253,7 @@ main()
 
 ### Advanced: Custom Allocator
 
-```c67
+```vibe67
 // Arena allocator pattern
 process_requests = requests -> {
     arena {
@@ -3270,7 +3270,7 @@ process_requests = requests -> {
 
 ### Advanced: Unsafe Assembly
 
-```c67
+```vibe67
 // Direct syscall (Linux x86_64)
 print_fast = msg -> {
     len = msg.length
@@ -3305,7 +3305,7 @@ Traditional languages have complex type hierarchies:
 - Type conversions and coercions
 - Boxing/unboxing overhead
 
-**C67's approach:** Everything is `map[uint64]float64`
+**Vibe67's approach:** Everything is `map[uint64]float64`
 
 **Benefits:**
 1. **Conceptual simplicity:** Learn one type, understand the entire language
@@ -3323,21 +3323,21 @@ Most compilers use intermediate representations (IR):
 - WebAssembly (many languages)
 - Custom IR (Go, V8)
 
-**C67's approach:** AST → Machine code directly
+**Vibe67's approach:** AST → Machine code directly
 
 **Benefits:**
 1. **Fast compilation:** No IR translation overhead
 2. **Small compiler:** ~30k lines vs hundreds of thousands
 3. **No dependencies:** Self-contained, no LLVM/GCC required
 4. **Predictable output:** Same code every time
-5. **Full control:** Optimize for C67's semantics, not general-purpose IR
+5. **Full control:** Optimize for Vibe67's semantics, not general-purpose IR
 
 **Trade-offs:**
 - More code per architecture (x86_64, ARM64, RISCV64)
 - Manual optimization (no LLVM optimization passes)
 - More maintenance burden
 
-**Why it's worth it:** C67's simplicity makes per-architecture code manageable. The universal type system means optimizations work uniformly across all values.
+**Why it's worth it:** Vibe67's simplicity makes per-architecture code manageable. The universal type system means optimizations work uniformly across all values.
 
 ### Why Fork-Based Parallelism?
 
@@ -3346,7 +3346,7 @@ Many languages use threads or async/await:
 - Green threads (runtime complexity)
 - Async/await (function coloring problem)
 
-**C67's approach:** `fork()` + ENet channels
+**Vibe67's approach:** `fork()` + ENet channels
 
 **Benefits:**
 1. **True isolation:** Separate address spaces
@@ -3369,7 +3369,7 @@ Traditional approaches:
 - Actors (Erlang, Akka): Heavy runtime
 - MPI: Complex API
 
-**C67's approach:** ENet-style network channels
+**Vibe67's approach:** ENet-style network channels
 
 **Benefits:**
 1. **Familiar model:** Network programming concepts
@@ -3379,7 +3379,7 @@ Traditional approaches:
 5. **Scales naturally:** From single machine to distributed
 
 **Design:**
-```c67
+```vibe67
 &8080 <- msg           // Send to local port
 &"host:9000" <- msg    // Send to remote host
 data <= &8080        // Receive from port
@@ -3395,7 +3395,7 @@ GC languages (Java, Go, Python) have:
 - Performance cliffs (GC pressure)
 - Tuning complexity
 
-**C67's approach:** Arena allocators + move semantics
+**Vibe67's approach:** Arena allocators + move semantics
 
 **Benefits:**
 1. **Predictable performance:** No GC pauses
@@ -3417,7 +3417,7 @@ Many languages accumulate features:
 - Special case syntax
 - Keyword proliferation
 
-**C67's approach:** Minimal, orthogonal features
+**Vibe67's approach:** Minimal, orthogonal features
 
 **Examples:**
 - One loop construct: `@`
@@ -3442,9 +3442,9 @@ if (x | FLAG)  // Bitwise OR - easy to confuse with ||
 if (~x)        // Bitwise NOT - easy to confuse with logical !
 ```
 
-**C67's approach:** Explicit `b` suffix for bitwise, word operators for logical
+**Vibe67's approach:** Explicit `b` suffix for bitwise, word operators for logical
 
-```c67
+```vibe67
 x &b FLAG     // Clearly bitwise AND
 x and y       // Clearly logical AND
 x | transform // Clearly pipe
@@ -3474,12 +3474,12 @@ x ?b 5        // Bit test: is bit 5 set?
 7. **Systems-level control:** Direct assembly when needed
 8. **Familiar concepts:** Borrow from proven designs
 
-**C67 is not trying to be:**
+**Vibe67 is not trying to be:**
 - A replacement for application languages (Python, JavaScript)
 - A replacement for safe languages (Rust, Ada)
 - A general-purpose language for all domains
 
-**C67 is designed for:**
+**Vibe67 is designed for:**
 - Systems programming with radical simplicity
 - Performance-critical code with predictable behavior
 - Programmers who value minimalism over features
@@ -3489,7 +3489,7 @@ x ?b 5        // Bit test: is bit 5 set?
 
 ## Frequently Asked Questions
 
-### Is C67 practical for real projects?
+### Is Vibe67 practical for real projects?
 
 Yes, but in specific domains:
 - Systems utilities
@@ -3502,7 +3502,7 @@ Not ideal for:
 - GUI applications (no standard library)
 - Rapid prototyping (manual memory management)
 
-### How fast is C67?
+### How fast is Vibe67?
 
 Comparable to C for:
 - Arithmetic operations
@@ -3540,11 +3540,11 @@ But cost:
 - Complex integration
 - Loss of control
 
-For C67's goals (fast compilation, small compiler, direct control), hand-written backends win.
+For Vibe67's goals (fast compilation, small compiler, direct control), hand-written backends win.
 
 ### What about memory safety?
 
-C67 is **not memory-safe by default** like Rust.
+Vibe67 is **not memory-safe by default** like Rust.
 
 However:
 - Immutable-by-default reduces bugs
@@ -3554,9 +3554,9 @@ However:
 
 Trade-off: Less safe than Rust, simpler to use.
 
-### Can I use C67 in production?
+### Can I use Vibe67 in production?
 
-C67 1.6.0 is ready for:
+Vibe67 1.6.0 is ready for:
 - Personal projects
 - Internal tools
 - Experiments
@@ -3584,7 +3584,7 @@ Use your judgment.
 
 ## Overview
 
-C67 uses an arena-based memory allocator for all runtime string, list, and map operations. This provides fast, predictable memory allocation with automatic cleanup at scope boundaries.
+Vibe67 uses an arena-based memory allocator for all runtime string, list, and map operations. This provides fast, predictable memory allocation with automatic cleanup at scope boundaries.
 
 ## High-Level Design
 
@@ -3607,7 +3607,7 @@ C67 uses an arena-based memory allocator for all runtime string, list, and map o
 - `c.malloc()` - C malloc, user must call `c.free()`
 - `c.realloc()` - C realloc
 - `c.free()` - C free
-- `alloc()` - C67 builtin (uses malloc internally)
+- `alloc()` - Vibe67 builtin (uses malloc internally)
 
 ### Arena Lifecycle
 
@@ -3641,15 +3641,15 @@ Future: arena { ... } blocks:
 
 #### Meta-Arena Structure
 ```c
-// _c67_arena_meta: Global variable holding pointer to arena array
-uint64_t _c67_arena_meta;         // Pointer to arena_ptr[]
+// _vibe67_arena_meta: Global variable holding pointer to arena array
+uint64_t _vibe67_arena_meta;         // Pointer to arena_ptr[]
 
 // Meta-arena array (dynamically allocated)
 void* arena_ptrs[];                 // Array of pointers to arena structs
 
 // Meta-arena metadata
-uint64_t _c67_arena_meta_cap;     // Capacity of arena_ptrs array
-uint64_t _c67_arena_meta_len;     // Number of arenas currently allocated
+uint64_t _vibe67_arena_meta_cap;     // Capacity of arena_ptrs array
+uint64_t _vibe67_arena_meta_len;     // Number of arenas currently allocated
 ```
 
 #### Arena Structure
@@ -3674,8 +3674,8 @@ call malloc
 # rax = pointer to meta-arena array (P1)
 
 # 2. Store meta-arena pointer in global variable
-lea rbx, [_c67_arena_meta]
-mov [rbx], rax              # _c67_arena_meta = P1
+lea rbx, [_vibe67_arena_meta]
+mov [rbx], rax              # _vibe67_arena_meta = P1
 
 # 3. Allocate arena buffer (1MB)
 mov rdi, 1048576
@@ -3698,14 +3698,14 @@ mov rcx, 8
 mov [rax + 24], rcx         # alignment = 8
 
 # 6. Store arena struct pointer in meta-arena[0]
-lea rbx, [_c67_arena_meta]
+lea rbx, [_vibe67_arena_meta]
 mov rbx, [rbx]              # rbx = P1 (meta-arena array)
 mov [rbx], rax              # P1[0] = P3 (arena struct)
 ```
 
 **Memory Layout After Initialization:**
 ```
-_c67_arena_meta --> P1 --> [P3, NULL, NULL, ...]
+_vibe67_arena_meta --> P1 --> [P3, NULL, NULL, ...]
                              |
                              v
                         Arena Struct {
@@ -3718,7 +3718,7 @@ _c67_arena_meta --> P1 --> [P3, NULL, NULL, ...]
 
 ### Allocation Sequence
 
-When allocating N bytes, `c67_arena_alloc(arena_ptr, size)` executes:
+When allocating N bytes, `vibe67_arena_alloc(arena_ptr, size)` executes:
 
 ```assembly
 # Input: rdi = arena_ptr (P3), rsi = size (N)
@@ -3809,12 +3809,12 @@ Creating `[x, y]` where x=10, y=20:
 mov rdi, 40                 # size = 40
 
 # Allocate from arena
-lea r11, [_c67_arena_meta] # Step 1: Get meta-arena variable address
+lea r11, [_vibe67_arena_meta] # Step 1: Get meta-arena variable address
 mov r11, [r11]              # Step 2: Load meta-arena pointer (P1)
 mov r11, [r11]              # Step 3: Load arena[0] pointer (P3)
 mov rsi, rdi                # rsi = size
 mov rdi, r11                # rdi = arena_ptr
-call c67_arena_alloc       # Allocate
+call vibe67_arena_alloc       # Allocate
 # rax = list pointer
 
 # Store count
@@ -3843,30 +3843,30 @@ The `callArenaAlloc()` function in `arena.go` is a helper that:
 
 1. Takes size in `rdi`
 2. Loads the global arena pointer
-3. Calls `c67_arena_alloc` with proper arguments
+3. Calls `vibe67_arena_alloc` with proper arguments
 4. Returns allocated pointer in `rax`
 
 **Critical Pattern (must load twice):**
 ```go
-// Step 1: Load address of _c67_arena_meta variable
-fc.out.LeaSymbolToReg("r11", "_c67_arena_meta")  // r11 = &_c67_arena_meta
+// Step 1: Load address of _vibe67_arena_meta variable
+fc.out.LeaSymbolToReg("r11", "_vibe67_arena_meta")  // r11 = &_vibe67_arena_meta
 
 // Step 2: Load meta-arena pointer from variable
-fc.out.MovMemToReg("r11", "r11", 0)               // r11 = *_c67_arena_meta = P1
+fc.out.MovMemToReg("r11", "r11", 0)               // r11 = *_vibe67_arena_meta = P1
 
 // Step 3: Load arena struct pointer from meta-arena[0]
 fc.out.MovMemToReg("r11", "r11", 0)               // r11 = P1[0] = P3
 
-// Now r11 = arena struct pointer, ready to pass to c67_arena_alloc
+// Now r11 = arena struct pointer, ready to pass to vibe67_arena_alloc
 ```
 
 **Why TWO loads?**
-- First load: dereference `_c67_arena_meta` to get meta-arena array pointer
+- First load: dereference `_vibe67_arena_meta` to get meta-arena array pointer
 - Second load: dereference `meta_arena[0]` to get arena struct pointer
 
 ### Integration Points
 
-**String Concatenation (`_c67_string_concat`):**
+**String Concatenation (`_vibe67_string_concat`):**
 ```go
 // OLD: fc.eb.GenerateCallInstruction("malloc")
 // NEW:
@@ -3893,7 +3893,7 @@ At program end, `cleanupAllArenas()` frees all arenas:
 
 ```assembly
 # Load meta-arena pointer
-lea rbx, [_c67_arena_meta]
+lea rbx, [_vibe67_arena_meta]
 mov rbx, [rbx]              # rbx = P1
 
 # Loop through arenas
@@ -3922,7 +3922,7 @@ call free
 
 Planned syntax for scoped arenas:
 
-```c67
+```vibe67
 # Global arena (default)
 global_data := "stays alive"
 
@@ -3951,11 +3951,11 @@ arena {
 1. **Segfault in callArenaAlloc:**
    - Check that meta-arena is initialized before first use
    - Verify TWO loads are performed to get arena struct pointer
-   - Ensure `c67_arena_alloc` is being called, not generated inline
+   - Ensure `vibe67_arena_alloc` is being called, not generated inline
 
 2. **Null pointer from allocation:**
    - Arena may be full and realloc failed
-   - Check error handling in `c67_arena_alloc`
+   - Check error handling in `vibe67_arena_alloc`
 
 3. **Corrupted data:**
    - Check alignment is respected
@@ -3963,7 +3963,7 @@ arena {
    - Ensure no double-free scenarios
 
 **Verification:**
-```c67
+```vibe67
 # Test arena allocation
 s1 := "hello"
 s2 := " world"
@@ -4000,15 +4000,15 @@ The arena allocator provides:
 - ✅ Automatic cleanup at scope boundaries
 - ✅ Zero fragmentation
 - ✅ Predictable memory usage
-- ✅ Integration with existing C67 runtime
+- ✅ Integration with existing Vibe67 runtime
 - ✅ Compatibility with C malloc/free when needed
 
-All C67 runtime operations (string concat, list creation, etc.) now use arena allocation by default, while user code can still use `c.malloc()` for manual memory management when needed.
-# C67 Compiler Optimizations
+All Vibe67 runtime operations (string concat, list creation, etc.) now use arena allocation by default, while user code can still use `c.malloc()` for manual memory management when needed.
+# Vibe67 Compiler Optimizations
 
 ## Overview
 
-The C67 compiler includes several modern CPU instruction optimizations that provide significant performance improvements for numerical and bit manipulation code. These optimizations use runtime CPU feature detection to ensure compatibility across different processors.
+The Vibe67 compiler includes several modern CPU instruction optimizations that provide significant performance improvements for numerical and bit manipulation code. These optimizations use runtime CPU feature detection to ensure compatibility across different processors.
 
 ## Implemented Optimizations
 
@@ -4031,7 +4031,7 @@ FMA (Fused Multiply-Add) combines multiplication and addition into a single inst
 
 The compiler automatically detects and optimizes these patterns:
 
-```c67
+```vibe67
 // Pattern 1: (a * b) + c
 result := x * y + z  // Optimized to VFMADD132SD
 
@@ -4118,7 +4118,7 @@ The instruction encoders in `vfmadd.go` handle all three architectures with comp
 
 Counts the number of set bits in a 64-bit integer.
 
-```c67
+```vibe67
 count := popcount(255.0)  // Returns 8.0 (0b11111111 has 8 bits set)
 ```
 
@@ -4149,7 +4149,7 @@ xor rcx, rcx           ; count = 0
 
 Counts the number of leading zero bits (useful for finding highest set bit).
 
-```c67
+```vibe67
 zeros := clz(8.0)      // Returns 60.0 (0b1000 in 64-bit has 60 leading zeros)
 ```
 
@@ -4162,7 +4162,7 @@ zeros := clz(8.0)      // Returns 60.0 (0b1000 in 64-bit has 60 leading zeros)
 
 Counts the number of trailing zero bits (useful for finding lowest set bit).
 
-```c67
+```vibe67
 zeros := ctz(8.0)      // Returns 3.0 (0b1000 has 3 trailing zeros)
 ```
 
@@ -4183,7 +4183,7 @@ zeros := ctz(8.0)      // Returns 3.0 (0b1000 has 3 trailing zeros)
 
 All optimizations use runtime CPU feature detection to ensure compatibility:
 
-```c67
+```vibe67
 // This code automatically:
 // 1. Detects CPU features at startup (CPUID)
 // 2. Uses optimal instructions if available
@@ -4205,7 +4205,7 @@ result := x * y + z  // Uses FMA if available, mul+add otherwise
 
 ### FMA Optimization
 
-```c67
+```vibe67
 // Polynomial evaluation benchmark
 polynomial := fn(x) { a * x * x + b * x + c }
 
@@ -4216,7 +4216,7 @@ With FMA:     78 ms  (1.82x faster)
 
 ### Bit Operations
 
-```c67
+```vibe67
 // Bit counting benchmark
 sum := 0.0
 for i in 0..1000000 {
@@ -4244,9 +4244,9 @@ AVX-512 processes 8 double-precision values simultaneously (vs 2 for SSE2, 4 for
 
 ### Hashmap Optimization
 
-C67 uses AVX-512 `vgatherqpd` to search 8 hashmap entries at once:
+Vibe67 uses AVX-512 `vgatherqpd` to search 8 hashmap entries at once:
 
-```c67
+```vibe67
 // This automatically uses AVX-512 if available:
 my_map := {"key1": 10.0, "key2": 20.0, "key3": 30.0}
 value := my_map["key2"]  // Searches 8 keys per iteration with AVX-512
@@ -4291,7 +4291,7 @@ The compiler generates both AVX-512 and SSE2 paths:
 **Status:** Infrastructure exists (20+ SIMD instruction files), needs wiring
 
 Process 4 float64 values simultaneously:
-```c67
+```vibe67
 // Future optimization:
 for i in 0..length {
     c[i] = a[i] + b[i]  // Could use VADDPD ymm (4 doubles per instruction)
@@ -4305,7 +4305,7 @@ for i in 0..length {
 **Status:** Infrastructure ready, needs loop analysis and transformation
 
 Process 8 float64 values simultaneously:
-```c67
+```vibe67
 // Future optimization:
 for i in 0..length {
     c[i] = a[i] + b[i]  // Could use VADDPD zmm (8 doubles per instruction)
@@ -4366,7 +4366,7 @@ All optimizations include fallback code paths:
 
 ## Summary
 
-C67 now includes production-ready optimizations that provide:
+Vibe67 now includes production-ready optimizations that provide:
 - ✅ **1.5-1.8x faster** numerical code (FMA)
 - ✅ **8-50x faster** bit operations (POPCNT/LZCNT/TZCNT)
 - ✅ **4-8x faster** hashmap lookups (AVX-512 gather)
@@ -4376,4 +4376,4 @@ C67 now includes production-ready optimizations that provide:
 
 The compiler is positioned to add general loop vectorization (AVX2/AVX-512) in the future, with all infrastructure already implemented (~3000 LOC in v*.go files).
 
-**C67 can now compete with C/Rust for numerical computing and data structure performance!** 🚀
+**Vibe67 can now compete with C/Rust for numerical computing and data structure performance!** 🚀

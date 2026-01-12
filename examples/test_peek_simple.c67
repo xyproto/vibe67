@@ -1,7 +1,0 @@
-import libc as c
-
-// Simpler test: read from static data
-// Don't use malloc at all
-
-val = peek32(0, 0)  // This will segfault, but let's see where
-println(val)

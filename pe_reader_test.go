@@ -199,11 +199,11 @@ static inline int SDL_FOURCC(char a, char b, char c, char d) {
 }
 
 func TestCTypeMapping(t *testing.T) {
-	// Test C type to C67 type mapping
+	// Test C type to Vibe67 type mapping
 	testCases := []struct {
-		cType     string
-		c67Type   string
-		shouldMap bool
+		cType      string
+		vibe67Type string
+		shouldMap  bool
 	}{
 		{"int", "cint", true},
 		{"unsigned int", "cuint", true},
@@ -221,7 +221,7 @@ func TestCTypeMapping(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.cType, func(t *testing.T) {
 			// This would test the actual mapping function once implemented
-			t.Logf("C type '%s' should map to C67 type '%s'", tc.cType, tc.c67Type)
+			t.Logf("C type '%s' should map to Vibe67 type '%s'", tc.cType, tc.vibe67Type)
 		})
 	}
 }

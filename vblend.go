@@ -8,13 +8,13 @@ import (
 
 // VBLENDMPD - Blend (conditional select) packed double-precision floats using mask
 //
-// Essential for C67's conditional operations:
+// Essential for Vibe67's conditional operations:
 //   - Ternary select: mask ? true_values : false_values
 //   - Conditional updates: update only selected elements
 //   - Predicated operations: apply operation where mask is true
 //   - Error handling: select valid or default values
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   m: mask = values || (x -> x > 0.0)
 //   result = m ? (values || (x -> x * 2)) : values
 //

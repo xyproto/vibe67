@@ -7,7 +7,7 @@ import (
 )
 
 // VFMSUB - Vector fused multiply-subtract for packed double-precision (float64)
-// Essential for C67's numerical operations with maximum precision:
+// Essential for Vibe67's numerical operations with maximum precision:
 //   - Polynomial evaluation with alternating signs
 //   - Error correction: computed - expected
 //   - Financial calculations with debits/credits

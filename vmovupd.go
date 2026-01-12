@@ -7,7 +7,7 @@ import (
 )
 
 // VMOVUPD - Vector load/store for unaligned packed double-precision (float64)
-// Essential for C67's memory operations:
+// Essential for Vibe67's memory operations:
 //   - Loading arrays: load vector from map[float64]float64 data
 //   - Storing results: write computed vectors back to memory
 //   - Pipeline I/O: loading inputs and storing outputs in bulk

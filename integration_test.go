@@ -77,17 +77,17 @@ var expectedExitCodes = map[string]int{
 	"div_zero_test": 1, // Tests division-by-zero error handling
 }
 
-// TestC67Programs is an integration test that compiles and runs all .c67 testprograms
+// TestVibe67Programs is an integration test that compiles and runs all .vibe67 testprograms
 // and compares their output against .result files
 
-func testC67Program(t *testing.T, name, srcPath, buildDir string) {
+func testVibe67Program(t *testing.T, name, srcPath, buildDir string) {
 	executable := filepath.Join(buildDir, name)
 	expectedPattern, shouldFailCompile := compileExpectations[name]
 
 	// Compile the program using Go API directly
 	// Use current platform for testing
 	platform := GetDefaultPlatform()
-	compileErr := CompileC67(srcPath, executable, platform)
+	compileErr := CompileVibe67(srcPath, executable, platform)
 
 	// Check compilation result
 	if compileErr != nil {
@@ -145,7 +145,7 @@ func testC67Program(t *testing.T, name, srcPath, buildDir string) {
 	}
 
 	// Compare output with .result file if it exists
-	resultPath := strings.TrimSuffix(srcPath, ".c67") + ".result"
+	resultPath := strings.TrimSuffix(srcPath, ".vibe67") + ".result"
 	if _, err := os.Stat(resultPath); os.IsNotExist(err) {
 		t.Logf("No .result file found at %s - skipping output comparison", resultPath)
 		return

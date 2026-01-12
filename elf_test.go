@@ -75,7 +75,7 @@ func TestELFOSABI(t *testing.T) {
 // TestMinimalELFSize ensures we stay under size targets
 func TestMinimalELFSize(t *testing.T) {
 	tmpDir := t.TempDir()
-	tmpfile := filepath.Join(tmpDir, "c67_size_test")
+	tmpfile := filepath.Join(tmpDir, "vibe67_size_test")
 	defer os.Remove(tmpfile)
 
 	eb, err := New("x86_64-linux")
@@ -136,7 +136,7 @@ func TestDynamicELFExecutable(t *testing.T) {
 		t.Skip("Skipping ELF execution test on non-Linux platform")
 	}
 
-	tmpfile := filepath.Join(os.TempDir(), "c67_exec_test")
+	tmpfile := filepath.Join(os.TempDir(), "vibe67_exec_test")
 	defer os.Remove(tmpfile)
 
 	eb, err := New("x86_64-linux")
@@ -185,7 +185,7 @@ func TestDynamicELFExecutable(t *testing.T) {
 // TestELFSegmentAlignment verifies proper segment alignment
 func TestELFSegmentAlignment(t *testing.T) {
 	tmpDir := t.TempDir()
-	tmpfile := filepath.Join(tmpDir, "c67_align_test")
+	tmpfile := filepath.Join(tmpDir, "vibe67_align_test")
 	defer os.Remove(tmpfile)
 
 	eb, err := New("x86_64-linux")
@@ -237,7 +237,7 @@ func TestELFSegmentAlignment(t *testing.T) {
 // TestELFInterpSegment verifies interpreter segment exists and is valid
 func TestELFInterpSegment(t *testing.T) {
 	tmpDir := t.TempDir()
-	tmpfile := filepath.Join(tmpDir, "c67_interp_test")
+	tmpfile := filepath.Join(tmpDir, "vibe67_interp_test")
 	defer os.Remove(tmpfile)
 
 	eb, err := New("x86_64-linux")
@@ -306,7 +306,7 @@ func TestELFInterpSegment(t *testing.T) {
 // TestELFDynamicSegment verifies dynamic segment structure
 func TestELFDynamicSegment(t *testing.T) {
 	tmpDir := t.TempDir()
-	tmpfile := filepath.Join(tmpDir, "c67_dynamic_seg_test")
+	tmpfile := filepath.Join(tmpDir, "vibe67_dynamic_seg_test")
 	defer os.Remove(tmpfile)
 
 	eb, err := New("x86_64-linux")
@@ -366,7 +366,7 @@ func TestELFDynamicSegment(t *testing.T) {
 // TestELFType verifies ET_DYN type for PIE executables
 func TestELFType(t *testing.T) {
 	tmpDir := t.TempDir()
-	tmpfile := filepath.Join(tmpDir, "c67_type_test")
+	tmpfile := filepath.Join(tmpDir, "vibe67_type_test")
 	defer os.Remove(tmpfile)
 
 	eb, err := New("x86_64-linux")
@@ -420,7 +420,7 @@ func TestELFMachine(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.arch, func(t *testing.T) {
-			tmpfile := filepath.Join(os.TempDir(), "c67_machine_test_"+tt.arch)
+			tmpfile := filepath.Join(os.TempDir(), "vibe67_machine_test_"+tt.arch)
 			defer os.Remove(tmpfile)
 
 			eb, err := New(tt.arch)
@@ -471,7 +471,7 @@ func TestELFMachine(t *testing.T) {
 // TestELFPermissions verifies executable permissions
 func TestELFPermissions(t *testing.T) {
 	tmpDir := t.TempDir()
-	tmpfile := filepath.Join(tmpDir, "c67_perms_test")
+	tmpfile := filepath.Join(tmpDir, "vibe67_perms_test")
 	defer os.Remove(tmpfile)
 
 	eb, err := New("x86_64-linux")

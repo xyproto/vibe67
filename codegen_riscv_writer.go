@@ -12,7 +12,7 @@ import (
 // on RISC-V64 architecture.
 
 // Confidence that this function is working: 50%
-func (fc *C67Compiler) writeELFRiscv64(outputPath string) error {
+func (fc *Vibe67Compiler) writeELFRiscv64(outputPath string) error {
 	// For now, create a static ELF (no dynamic linking)
 	// This is simpler and works with Spike
 

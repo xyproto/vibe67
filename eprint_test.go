@@ -138,7 +138,7 @@ func TestEprintFormatted(t *testing.T) {
 	}
 }
 
-// compileTestCode compiles C67 code and returns the path to the executable
+// compileTestCode compiles Vibe67 code and returns the path to the executable
 func compileTestCode(t *testing.T, code string) string {
 	t.Helper()
 
@@ -146,7 +146,7 @@ func compileTestCode(t *testing.T, code string) string {
 	tmpDir := t.TempDir()
 
 	// Write source file
-	srcFile := filepath.Join(tmpDir, "test.c67")
+	srcFile := filepath.Join(tmpDir, "test.vibe67")
 	if err := os.WriteFile(srcFile, []byte(code), 0644); err != nil {
 		t.Fatalf("Failed to write source file: %v", err)
 	}
@@ -159,7 +159,7 @@ func compileTestCode(t *testing.T, code string) string {
 		OS:   osType,
 		Arch: archType,
 	}
-	if err := CompileC67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
+	if err := CompileVibe67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
 		t.Fatalf("Compilation failed: %v", err)
 	}
 

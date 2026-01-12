@@ -5,20 +5,20 @@
 Currently, `event.type` fails when `event` is a raw `c.malloc()` pointer because:
 
 1. Compiler doesn't track that `event` points to `SDL_Event`
-2. FieldAccessExpr falls back to C67 map lookup
-3. Raw memory bytes ≠ C67 map → segfault
+2. FieldAccessExpr falls back to Vibe67 map lookup
+3. Raw memory bytes ≠ Vibe67 map → segfault
 
 ## Current Workarounds
 
 ### 1. Manual Memory Reading (peek32/peek8)
-```c67
+```vibe67
 event = c.malloc(192)
 event_type = peek32(event, 0)  // Read uint32 at offset 0
 ```
 **Status**: Implemented but has bugs in codegen
 
 ### 2. CStruct Declaration
-```c67
+```vibe67
 cstruct SDL_Event {
     type as uint32
 }
@@ -31,8 +31,8 @@ event_type = event.type  // Works! Compiler knows layout
 
 Add type information using the existing `as` keyword for casting:
 
-```c67
-// C67 idiomatic way: Arena allocation with type cast
+```vibe67
+// Vibe67 idiomatic way: Arena allocation with type cast
 arena {
     event := alloc(192) as SDL_Event
     event_type = event.type  // Compiler knows event is SDL_Event*, can read at offset 0
@@ -52,7 +52,7 @@ event_type = event.type
 ### Implementation Plan
 
 1. **Parser**: Accept `as TypeName` after expressions
-   ```c67
+   ```vibe67
    name := expression as TypeName
    ```
 
@@ -85,14 +85,14 @@ event_type = event.type
 - **Zero-cost**: No runtime overhead, just metadata for compiler
 - **Type-safe**: Compiler validates field names against cstruct
 - **Natural syntax**: Reuses existing `as` keyword for type casting
-- **Consistent**: Works like other casts in C67
-- **Arena-friendly**: Works with C67's arena allocation model
+- **Consistent**: Works like other casts in Vibe67
+- **Arena-friendly**: Works with Vibe67's arena allocation model
 - **Backward compatible**: Untyped pointers still work
 - **Reuses existing infra**: cstruct, FieldAccessExpr, `as` keyword, arena blocks
 
 ### Example Usage
 
-```c67
+```vibe67
 import sdl3 as sdl
 
 cstruct SDL_Event {
@@ -100,7 +100,7 @@ cstruct SDL_Event {
     timestamp as uint64
 }
 
-// C67 idiomatic way: Arena allocation with type cast
+// Vibe67 idiomatic way: Arena allocation with type cast
 arena {
     event := alloc(192) as SDL_Event
     sdl.SDL_PollEvent(event)
@@ -115,7 +115,7 @@ arena {
 
 ### Complete SDL Example
 
-```c67
+```vibe67
 import sdl3 as sdl
 
 cstruct SDL_Event {
@@ -160,7 +160,7 @@ running := 1
 
 ### For Long-Lived Objects: Use Manual Allocation
 
-```c67
+```vibe67
 // When you need control over lifetime (e.g., persistent event buffer)
 event := c.malloc(192) as SDL_Event
 
@@ -176,7 +176,7 @@ c.free(event)
 
 ### Alternative: Infer Type from cstruct Constructor
 
-```c67
+```vibe67
 cstruct Point { x as int32, y as int32 }
 
 // Auto-generate constructor that returns typed pointer
@@ -188,8 +188,8 @@ p.x = 10     // Works! Compiler knows p is Point*
 
 Implement **Type Casting with `as` keyword** because:
 - Reuses existing `as` keyword and semantics
-- Most natural for C67 (consistent with existing conversions)
-- Works with arena blocks (idiomatic C67)
+- Most natural for Vibe67 (consistent with existing conversions)
+- Works with arena blocks (idiomatic Vibe67)
 - Also works with `c.malloc()` when needed
 - Clear and explicit at point of allocation
 - Can be used to recast existing pointers
@@ -197,9 +197,9 @@ Implement **Type Casting with `as` keyword** because:
 
 The syntax `event := alloc(192) as SDL_Event` is:
 - Concise
-- Idiomatic C67 (uses arena)
+- Idiomatic Vibe67 (uses arena)
 - Self-documenting
 - Zero runtime cost
 - Memory-safe (arena auto-cleanup)
 
-This would make C67's C FFI integration seamless while maintaining zero-cost abstractions, idiomatic syntax, and the arena allocation model that makes C67 memory-safe by default.
+This would make Vibe67's C FFI integration seamless while maintaining zero-cost abstractions, idiomatic syntax, and the arena allocation model that makes Vibe67 memory-safe by default.

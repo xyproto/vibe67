@@ -7,7 +7,7 @@ import (
 )
 
 // VCMPPD - Vector comparison for packed double-precision (float64) values
-// Essential for C67's filter operations and conditionals:
+// Essential for Vibe67's filter operations and conditionals:
 //   - List comprehensions: [x for x in values if x > threshold]
 //   - Filter operations: values |> filter(x -> x >= min)
 //   - Pattern matching guards: [x in rest]{x < pivot}

@@ -75,7 +75,7 @@ func NewARM64CodeGen(eb *ExecutableBuilder, cConstants map[string]*CHeaderConsta
 	}
 }
 
-// CompileProgram compiles a C67 program to ARM64
+// CompileProgram compiles a Vibe67 program to ARM64
 func (acg *ARM64CodeGen) CompileProgram(program *Program) error {
 	// Initialize arena tracking
 	acg.currentArena = 1 // Start at 1 to enable default global arena
@@ -409,7 +409,7 @@ func (acg *ARM64CodeGen) compileArenaStmt(stmt *ArenaStmt) error {
 func (acg *ARM64CodeGen) compileExpression(expr Expression) error {
 	switch e := expr.(type) {
 	case *NumberExpr:
-		// C67 uses float64 for all numbers
+		// Vibe67 uses float64 for all numbers
 		// For whole numbers, convert via integer; for decimals, load from .rodata
 		if e.Value == float64(int64(e.Value)) {
 			// Whole number - convert to int64, then to float64
@@ -571,8 +571,8 @@ func (acg *ARM64CodeGen) compileExpression(expr Expression) error {
 				}
 				acg.out.AddImm64("sp", "sp", 16)
 
-				// Call _c67_list_concat(x0, x1) -> x0
-				if err := acg.eb.GenerateCallInstruction("_c67_list_concat"); err != nil {
+				// Call _vibe67_list_concat(x0, x1) -> x0
+				if err := acg.eb.GenerateCallInstruction("_vibe67_list_concat"); err != nil {
 					return err
 				}
 
@@ -625,8 +625,8 @@ func (acg *ARM64CodeGen) compileExpression(expr Expression) error {
 				}
 				acg.out.AddImm64("sp", "sp", 16)
 
-				// Call _c67_string_concat(x0, x1) -> x0
-				if err := acg.eb.GenerateCallInstruction("_c67_string_concat"); err != nil {
+				// Call _vibe67_string_concat(x0, x1) -> x0
+				if err := acg.eb.GenerateCallInstruction("_vibe67_string_concat"); err != nil {
 					return err
 				}
 
@@ -980,8 +980,8 @@ func (acg *ARM64CodeGen) compileExpression(expr Expression) error {
 			}
 			acg.out.AddImm64("sp", "sp", 16)
 
-			// Call _c67_list_cons(element, list) -> new_list
-			if err := acg.eb.GenerateCallInstruction("_c67_list_cons"); err != nil {
+			// Call _vibe67_list_cons(element, list) -> new_list
+			if err := acg.eb.GenerateCallInstruction("_vibe67_list_cons"); err != nil {
 				return err
 			}
 
@@ -2060,7 +2060,7 @@ func (acg *ARM64CodeGen) compileCall(call *CallExpr) error {
 			return err
 		}
 		// Arg in d0
-		if err := acg.eb.GenerateCallInstruction("_c67_str"); err != nil {
+		if err := acg.eb.GenerateCallInstruction("_vibe67_str"); err != nil {
 			return err
 		}
 		// Result pointer in x0, convert to d0
@@ -2092,7 +2092,7 @@ func (acg *ARM64CodeGen) compileCall(call *CallExpr) error {
 	case "string_concat":
 		// Internal string concatenation function
 		// Arguments should already be in x0 and x1
-		return acg.eb.GenerateCallInstruction("_c67_string_concat")
+		return acg.eb.GenerateCallInstruction("_vibe67_string_concat")
 	case "write_i8", "write_i16", "write_i32", "write_i64",
 		"write_u8", "write_u16", "write_u32", "write_u64", "write_f64":
 		return acg.compileMemoryWrite(call)
@@ -2602,12 +2602,12 @@ func (acg *ARM64CodeGen) compilePrintln(call *CallExpr) error {
 	nonZeroPos := acg.eb.text.Len()
 	acg.patchJumpOffset(nonZeroJump, int32(nonZeroPos-nonZeroJump))
 
-	// For non-zero numbers, call _c67_itoa helper
+	// For non-zero numbers, call _vibe67_itoa helper
 	// x0 already has the integer value
 	// itoa uses global buffer, no need to allocate or pass buffer address
 
-	// Call _c67_itoa(x0=number) -> x1=buffer, x2=length
-	if err := acg.eb.GenerateCallInstruction("_c67_itoa"); err != nil {
+	// Call _vibe67_itoa(x0=number) -> x1=buffer, x2=length
+	if err := acg.eb.GenerateCallInstruction("_vibe67_itoa"); err != nil {
 		return err
 	}
 
@@ -2754,19 +2754,19 @@ func (acg *ARM64CodeGen) compileEprint(call *CallExpr) error {
 		// Convert to integer: fcvtzs x0, d0
 		acg.out.out.writer.WriteBytes([]byte{0x00, 0x00, 0x78, 0x9e})
 
-		// Set up parameters for _c67_itoa
+		// Set up parameters for _vibe67_itoa
 		// x0 already contains the number
 		// Allocate 32 bytes on stack for buffer
 		acg.out.out.writer.WriteBytes([]byte{0xff, 0x83, 0x00, 0xd1}) // sub sp, sp, #32
 		acg.out.out.writer.WriteBytes([]byte{0xef, 0x03, 0x00, 0x91}) // mov x15, sp
 
-		// Call _c67_itoa - returns x1=string start, x2=length
+		// Call _vibe67_itoa - returns x1=string start, x2=length
 		offset := uint64(acg.eb.text.Len())
 		acg.eb.pcRelocations = append(acg.eb.pcRelocations, PCRelocation{
 			offset:     offset,
-			symbolName: "_c67_itoa",
+			symbolName: "_vibe67_itoa",
 		})
-		acg.out.out.writer.WriteBytes([]byte{0x00, 0x00, 0x00, 0x94}) // BL _c67_itoa
+		acg.out.out.writer.WriteBytes([]byte{0x00, 0x00, 0x00, 0x94}) // BL _vibe67_itoa
 		acg.out.AddImm64("sp", "sp", 32)                              // Restore stack after itoa buffer allocation
 
 		// Write to stderr: write(2, x1, x2)
@@ -3779,7 +3779,7 @@ func (acg *ARM64CodeGen) compileCFunctionCall(funcName string, args []Expression
 	// Return value: x0 (integer/pointer) or d0 (float)
 
 	// For simplicity, we'll assume:
-	// - All C67 values are float64 (our internal representation)
+	// - All Vibe67 values are float64 (our internal representation)
 	// - Pointer types need conversion from float64 bits to integer register
 	// - Integer types need fcvtzs conversion from float64 to int
 	// - Float types stay in float registers
@@ -4210,12 +4210,12 @@ func (acg *ARM64CodeGen) getExprType(expr Expression) string {
 
 // generateRuntimeHelpers generates ARM64 runtime helper functions
 func (acg *ARM64CodeGen) generateRuntimeHelpers() error {
-	// Generate _c67_list_concat(left_ptr, right_ptr) -> new_ptr
+	// Generate _vibe67_list_concat(left_ptr, right_ptr) -> new_ptr
 	// Arguments: x0 = left_ptr, x1 = right_ptr
 	// Returns: x0 = pointer to new concatenated list
 	// List format: [length (8 bytes)][elem0 (8 bytes)][elem1 (8 bytes)]...
 
-	acg.eb.MarkLabel("_c67_list_concat")
+	acg.eb.MarkLabel("_vibe67_list_concat")
 
 	// Function prologue
 	// stp x29, x30, [sp, #-N]! (save fp and lr, pre-decrement sp by N)
@@ -4346,12 +4346,12 @@ func (acg *ARM64CodeGen) generateRuntimeHelpers() error {
 	acg.out.out.writer.WriteBytes([]byte{0xfd, 0x7b, 0xc4, 0xa8}) // ldp x29, x30, [sp], #64
 	acg.out.Return("x30")
 
-	// Generate _c67_string_concat(left_ptr, right_ptr) -> new_ptr
+	// Generate _vibe67_string_concat(left_ptr, right_ptr) -> new_ptr
 	// Arguments: x0 = left_ptr, x1 = right_ptr
 	// Returns: x0 = pointer to new concatenated string
 	// String format (map): [count (8 bytes)][key0 (8)][val0 (8)]...
 
-	acg.eb.MarkLabel("_c67_string_concat")
+	acg.eb.MarkLabel("_vibe67_string_concat")
 
 	// Function prologue - same as list concat
 	acg.out.out.writer.WriteBytes([]byte{0xfd, 0x7b, 0xbc, 0xa9}) // stp x29, x30, [sp, #-64]!
@@ -4494,11 +4494,11 @@ func (acg *ARM64CodeGen) generateRuntimeHelpers() error {
 	// Define a global buffer for itoa (128 bytes for safety, writable)
 	acg.eb.DefineWritable("_itoa_buffer", string(make([]byte, 128)))
 
-	// Generate _c67_itoa(int64) -> (buffer_ptr, length)
+	// Generate _vibe67_itoa(int64) -> (buffer_ptr, length)
 	// Converts integer in x0 to decimal string
 	// Returns: x1 = buffer pointer (global), x2 = length
 	// Uses global _itoa_buffer, builds string backwards
-	acg.eb.MarkLabel("_c67_itoa")
+	acg.eb.MarkLabel("_vibe67_itoa")
 
 	// Prologue: save link register (no stack allocation needed)
 	acg.out.out.writer.WriteBytes([]byte{0xfd, 0x7b, 0xbe, 0xa9}) // stp x29, x30, [sp, #-32]!
@@ -4683,9 +4683,9 @@ func (acg *ARM64CodeGen) generateRuntimeHelpers() error {
 	acg.out.out.writer.WriteBytes([]byte{0xfd, 0x7b, 0xc2, 0xa8}) // ldp x29, x30, [sp], #32
 	acg.out.Return("x30")
 
-	// Generate _c67_str(float64) -> pointer (to map string)
-	// Converts float64 in d0 to a C67 string (map of indices to characters)
-	acg.eb.MarkLabel("_c67_str")
+	// Generate _vibe67_str(float64) -> pointer (to map string)
+	// Converts float64 in d0 to a Vibe67 string (map of indices to characters)
+	acg.eb.MarkLabel("_vibe67_str")
 
 	// Prologue
 	acg.out.out.writer.WriteBytes([]byte{0xfd, 0x7b, 0xba, 0xa9}) // stp x29, x30, [sp, #-96]!
@@ -4697,7 +4697,7 @@ func (acg *ARM64CodeGen) generateRuntimeHelpers() error {
 	acg.out.out.writer.WriteBytes([]byte{0x00, 0x00, 0x78, 0x9e}) // fcvtzs x0, d0
 
 	// Call itoa: x1=buf, x2=len
-	if err := acg.eb.GenerateCallInstruction("_c67_itoa"); err != nil {
+	if err := acg.eb.GenerateCallInstruction("_vibe67_itoa"); err != nil {
 		return err
 	}
 
@@ -4729,7 +4729,7 @@ func (acg *ARM64CodeGen) generateRuntimeHelpers() error {
 	acg.out.out.writer.WriteBytes([]byte{0xf5, 0x03, 0x1f, 0xaa}) // mov x21, xzr (index)
 	acg.out.AddImm64("x11", "x10", 8)                             // x11 = dst pointer
 
-	acg.eb.MarkLabel("_c67_str_loop")
+	acg.eb.MarkLabel("_vibe67_str_loop")
 	strLoopStart := acg.eb.text.Len()
 
 	// cmp x21, x20; b.ge end
@@ -5644,26 +5644,26 @@ func (acg *ARM64CodeGen) compileMemoryWrite(call *CallExpr) error {
 // generateArenaRuntimeARM64 generates arena runtime functions for ARM64
 func (acg *ARM64CodeGen) generateArenaRuntimeARM64() error {
 	// Define arena global variables in .data section
-	acg.eb.Define("_c67_arena_meta", "\x00\x00\x00\x00\x00\x00\x00\x00")     // Pointer to meta-arena array
-	acg.eb.Define("_c67_arena_meta_cap", "\x00\x00\x00\x00\x00\x00\x00\x00") // Capacity of meta-arena
-	acg.eb.Define("_c67_arena_meta_len", "\x00\x00\x00\x00\x00\x00\x00\x00") // Length (number of arenas)
+	acg.eb.Define("_vibe67_arena_meta", "\x00\x00\x00\x00\x00\x00\x00\x00")     // Pointer to meta-arena array
+	acg.eb.Define("_vibe67_arena_meta_cap", "\x00\x00\x00\x00\x00\x00\x00\x00") // Capacity of meta-arena
+	acg.eb.Define("_vibe67_arena_meta_len", "\x00\x00\x00\x00\x00\x00\x00\x00") // Length (number of arenas)
 
 	// Generate arena runtime functions
 	// These will be placeholders that call through to libc functions
 	// For now, we'll generate simple stub implementations
 
-	// _c67_arena_ensure_capacity(depth) - Ensure meta-arena can hold depth arenas
+	// _vibe67_arena_ensure_capacity(depth) - Ensure meta-arena can hold depth arenas
 	// Simplified stub: just return (arena allocation is done directly by alloc())
-	acg.eb.MarkLabel("_c67_arena_ensure_capacity")
+	acg.eb.MarkLabel("_vibe67_arena_ensure_capacity")
 	if err := acg.out.Return("x30"); err != nil {
 		return err
 	}
 
-	// c67_arena_create(capacity) -> arena_ptr
+	// vibe67_arena_create(capacity) -> arena_ptr
 	// Creates a new arena with the specified capacity
 	// Argument: x0 = capacity
 	// Returns: x0 = arena pointer
-	acg.eb.MarkLabel("_c67_arena_create")
+	acg.eb.MarkLabel("_vibe67_arena_create")
 	// Save link register
 	// stp x29, x30, [sp, #-16]!
 	acg.out.out.writer.WriteBytes([]byte{0xfd, 0x7b, 0xbf, 0xa9})
@@ -5682,11 +5682,11 @@ func (acg *ARM64CodeGen) generateArenaRuntimeARM64() error {
 		return err
 	}
 
-	// c67_arena_alloc(arena_ptr, size) -> allocation_ptr
+	// vibe67_arena_alloc(arena_ptr, size) -> allocation_ptr
 	// Allocates memory from the arena
 	// Arguments: x0 = arena_ptr, x1 = size
 	// Returns: x0 = allocated memory pointer
-	acg.eb.MarkLabel("_c67_arena_alloc")
+	acg.eb.MarkLabel("_vibe67_arena_alloc")
 	// Save link register
 	// stp x29, x30, [sp, #-16]!
 	acg.out.out.writer.WriteBytes([]byte{0xfd, 0x7b, 0xbf, 0xa9})
@@ -5704,10 +5704,10 @@ func (acg *ARM64CodeGen) generateArenaRuntimeARM64() error {
 		return err
 	}
 
-	// c67_arena_reset(arena_ptr)
+	// vibe67_arena_reset(arena_ptr)
 	// Resets the arena offset to 0
 	// Argument: x0 = arena_ptr
-	acg.eb.MarkLabel("_c67_arena_reset")
+	acg.eb.MarkLabel("_vibe67_arena_reset")
 	// No-op for now
 	if err := acg.out.Return("x30"); err != nil {
 		return err

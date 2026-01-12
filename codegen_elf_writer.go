@@ -15,11 +15,11 @@ import (
 // executables for Linux/Unix systems on x86_64 architecture.
 
 // Confidence that this function is working: 85%
-func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
+func (fc *Vibe67Compiler) writeELF(program *Program, outputPath string) error {
 	// Check if dynamic linking is actually needed
 	// On Linux, printf/println use syscalls, not libc
 	libcFunctions := map[string]bool{
-		// Note: printf NOT in list - C67 implements it with syscalls on Linux
+		// Note: printf NOT in list - Vibe67 implements it with syscalls on Linux
 		"sprintf": true, "snprintf": true, "fprintf": true, "dprintf": true,
 		"puts": true, "putchar": true, "fputc": true, "fputs": true, "fflush": true,
 		"scanf": true, "sscanf": true, "fscanf": true,
@@ -240,7 +240,7 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 		if lambdaSet[funcName] {
 			continue
 		}
-		if strings.HasPrefix(funcName, "_c67") || strings.HasPrefix(funcName, "c67_") {
+		if strings.HasPrefix(funcName, "_vibe67") || strings.HasPrefix(funcName, "vibe67_") {
 			continue
 		}
 		if !pltSet[funcName] {

@@ -7,7 +7,7 @@ import (
 )
 
 // VMULPD - Vector multiplication for packed double-precision (float64) values
-// Essential for C67's map operations over collections:
+// Essential for Vibe67's map operations over collections:
 //   - Vectorized scaling: values |> map(x -> x * scale_factor)
 //   - Parallel multiplication: [a, b, c, d] * [e, f, g, h]
 //   - Matrix operations and dot products

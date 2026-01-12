@@ -7,7 +7,7 @@ import (
 )
 
 // NEG instruction for arithmetic negation (two's complement)
-// Essential for implementing C67's negation operations:
+// Essential for implementing Vibe67's negation operations:
 //   - Unary minus: -x, -value
 //   - Direction reversal: -velocity
 //   - Sign flipping: -balance

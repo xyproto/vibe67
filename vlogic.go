@@ -8,13 +8,13 @@ import (
 
 // VANDPD/VORPD/VXORPD - Vector bitwise logical operations on packed doubles
 //
-// Essential for C67's mask manipulation and bit-level operations:
+// Essential for Vibe67's mask manipulation and bit-level operations:
 //   - Mask combination: m1 and m2, m1 or m2, m1 xor m2
 //   - Bit manipulation: clearing sign bits (abs), flipping bits
 //   - Conditional operations: combining predicates
 //   - Set operations: union, intersection, symmetric difference
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   m3: mask = m1 and m2           // Intersection
 //   m4: mask = m1 or m2            // Union
 //   m5: mask = m1 xor m2           // Symmetric difference

@@ -388,7 +388,7 @@ func strengthReduceExpr(expr Expression) Expression {
 
 			// x * 2^n → x << n (only for positive integer powers of 2)
 			// DISABLED: Infrastructure in place, but context detection needs more work.
-			// This optimization only makes sense for integer-heavy code, which is rare in C67.
+			// This optimization only makes sense for integer-heavy code, which is rare in Vibe67.
 			// Users needing integer performance can use unsafe blocks with inline assembly.
 			// TODO: Fix context detection if integer optimizations become important.
 			/*
@@ -611,7 +611,7 @@ func strengthReduceExpr(expr Expression) Expression {
 		}
 
 		// Peephole optimizations for logical operators
-		// Note: and/or in C67 are boolean operators that return 0 or 1, not value-selecting
+		// Note: and/or in Vibe67 are boolean operators that return 0 or 1, not value-selecting
 		if e.Function == "and" && len(e.Args) == 2 {
 			leftNum, leftIsNum := e.Args[0].(*NumberExpr)
 			rightNum, rightIsNum := e.Args[1].(*NumberExpr)

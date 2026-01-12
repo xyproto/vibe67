@@ -20,7 +20,7 @@ type CFFIManager struct {
 	// Combined function signatures (from headers + DLL validation)
 	functions map[string]*CFunction
 
-	// Type mappings from C to C67
+	// Type mappings from C to Vibe67
 	typeMappings map[string]string
 }
 
@@ -44,7 +44,7 @@ func NewCFFIManager() *CFFIManager {
 	}
 }
 
-// getDefaultTypeMappings returns the default C-to-C67 type mappings
+// getDefaultTypeMappings returns the default C-to-Vibe67 type mappings
 func getDefaultTypeMappings() map[string]string {
 	return map[string]string{
 		// Integer types
@@ -189,14 +189,14 @@ func (cm *CFFIManager) GetConstant(name string) (int64, bool) {
 	return val, ok
 }
 
-// MapCTypeToC67 maps a C type to a C67 type
-func (cm *CFFIManager) MapCTypeToC67(cType string) string {
+// MapCTypeToVibe67 maps a C type to a Vibe67 type
+func (cm *CFFIManager) MapCTypeToVibe67(cType string) string {
 	// Normalize the type
 	cType = strings.TrimSpace(cType)
 
 	// Direct mapping
-	if c67Type, ok := cm.typeMappings[cType]; ok {
-		return c67Type
+	if vibe67Type, ok := cm.typeMappings[cType]; ok {
+		return vibe67Type
 	}
 
 	// Pointer types
@@ -243,19 +243,19 @@ func (cm *CFFIManager) MapCTypeToC67(cType string) string {
 	return "cptr"
 }
 
-// GenerateC67Binding generates a C67 function binding for a C function
-func (cm *CFFIManager) GenerateC67Binding(funcName string) (string, error) {
+// GenerateVibe67Binding generates a Vibe67 function binding for a C function
+func (cm *CFFIManager) GenerateVibe67Binding(funcName string) (string, error) {
 	fn, ok := cm.functions[funcName]
 	if !ok {
 		return "", fmt.Errorf("function %s not found", funcName)
 	}
 
-	// Generate C67 function signature
+	// Generate Vibe67 function signature
 	var paramTypes []string
 	var paramNames []string
 	for i, param := range fn.Params {
-		c67Type := cm.MapCTypeToC67(param.Type)
-		paramTypes = append(paramTypes, c67Type)
+		vibe67Type := cm.MapCTypeToVibe67(param.Type)
+		paramTypes = append(paramTypes, vibe67Type)
 		if param.Name != "" {
 			paramNames = append(paramNames, param.Name)
 		} else {
@@ -263,7 +263,7 @@ func (cm *CFFIManager) GenerateC67Binding(funcName string) (string, error) {
 		}
 	}
 
-	returnType := cm.MapCTypeToC67(fn.ReturnType)
+	returnType := cm.MapCTypeToVibe67(fn.ReturnType)
 
 	// Format: funcName = (param1: type1, param2: type2) -> returnType { cffi("library", "funcName") }
 	binding := fmt.Sprintf("%s = (%s) %s {\n    cffi(\"%s\", \"%s\")\n}",

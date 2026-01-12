@@ -18,7 +18,7 @@ println("after")
 	t.Logf("Output: %q", result)
 }
 
-// TestBuiltinIsError removed - is_error is not a builtin in C67
+// TestBuiltinIsError removed - is_error is not a builtin in Vibe67
 // Use or! operator instead for error handling
 
 // TestPropertyAccessOnNumber tests accessing any property on a number

@@ -59,13 +59,13 @@ func (p *PrintfCodeGen) PatchJump(jumpPos int, targetPos int, jumpInstrSize int)
 
 // EmitFloatToStringRuntime emits a runtime function that converts float64 to string
 // This can be called from printf to handle %v, %f, %g conversions
-// Signature: _c67_float_to_string(xmm0: float64, rdi: buffer_ptr) -> (rsi: str_start, rdx: length)
+// Signature: _vibe67_float_to_string(xmm0: float64, rdi: buffer_ptr) -> (rsi: str_start, rdx: length)
 func EmitFloatToStringRuntime(eb *ExecutableBuilder, out *Out) error {
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: Emitting _c67_float_to_string runtime function\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: Emitting _vibe67_float_to_string runtime function\n")
 	}
 
-	eb.MarkLabel("_c67_float_to_string")
+	eb.MarkLabel("_vibe67_float_to_string")
 
 	// TODO: Implement a simplified float-to-string that handles common cases
 	// For now, just convert to integer and print that (MVP)
@@ -169,7 +169,7 @@ func EmitFloatToStringRuntime(eb *ExecutableBuilder, out *Out) error {
 	out.Ret()
 
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: _c67_float_to_string emitted successfully\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: _vibe67_float_to_string emitted successfully\n")
 	}
 
 	return nil

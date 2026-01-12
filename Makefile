@@ -1,6 +1,6 @@
 .PHONY: install test clean
 
-PROGRAM := c67
+PROGRAM := vibe67
 SOURCES := $(wildcard *.go)
 
 GO ?= go
@@ -14,7 +14,7 @@ BINDIR ?= $(PREFIX)/bin
 $(PROGRAM): $(SOURCES) $(MODULE_FILES)
 	$(GO) build $(GOFLAGS)
 
-install: c67
+install: $(PROGRAM)
 	install -d "$(DESTDIR)$(BINDIR)"
 	install -m 755 $(PROGRAM) "$(DESTDIR)$(BINDIR)/$(PROGRAM)"
 

@@ -7,7 +7,7 @@ import (
 )
 
 // VSUBPD - Vector subtraction for packed double-precision (float64) values
-// Essential for C67's differential operations:
+// Essential for Vibe67's differential operations:
 //   - Vector differences: deltas |> map((a, b) -> a - b)
 //   - Offset removal: values |> map(x -> x - baseline)
 //   - Comparisons and differences in pipelines

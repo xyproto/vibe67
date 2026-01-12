@@ -9,7 +9,7 @@ import (
 
 // TestDynamicELFStructure tests the structure of dynamically-linked ELF
 func TestDynamicELFStructure(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "c67_dynamic_test")
+	tmpfile, err := os.CreateTemp("", "vibe67_dynamic_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
@@ -257,7 +257,7 @@ func TestStringTableDeduplication(t *testing.T) {
 
 // TestLDDOutput tests that ldd can analyze the generated executable
 func TestLDDOutput(t *testing.T) {
-	tmpfile, err := os.CreateTemp("", "c67_ldd_test")
+	tmpfile, err := os.CreateTemp("", "vibe67_ldd_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}

@@ -15,7 +15,7 @@ import (
 // on ARM64 (Apple Silicon) architecture.
 
 // resolveDylibPath resolves a library name to its dylib path on macOS
-func (fc *C67Compiler) resolveDylibPath(libName string) string {
+func (fc *Vibe67Compiler) resolveDylibPath(libName string) string {
 	// Common library path mappings for macOS
 	switch strings.ToLower(libName) {
 	case "sdl3":
@@ -62,7 +62,7 @@ func (fc *C67Compiler) resolveDylibPath(libName string) string {
 }
 
 // Confidence that this function is working: 60%
-func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
+func (fc *Vibe67Compiler) writeMachOARM64(outputPath string) error {
 	// Build neededFunctions list from call patches (actual function calls made)
 	// Extract unique function names from callPatches
 	neededSet := make(map[string]bool)
@@ -71,8 +71,8 @@ func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 		// Strip the "$stub" suffix to get the function name
 		funcName := strings.TrimSuffix(patch.targetName, "$stub")
 
-		// Skip internal C67 runtime functions (they're defined in the binary)
-		if strings.HasPrefix(funcName, "_c67_") || strings.HasPrefix(funcName, "c67_") || strings.HasPrefix(funcName, "__") {
+		// Skip internal Vibe67 runtime functions (they're defined in the binary)
+		if strings.HasPrefix(funcName, "_vibe67_") || strings.HasPrefix(funcName, "vibe67_") || strings.HasPrefix(funcName, "__") {
 			continue
 		}
 

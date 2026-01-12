@@ -7,7 +7,7 @@ import (
 )
 
 // PUSH/POP instructions for stack management
-// Critical for implementing C67's function calls and local variables:
+// Critical for implementing Vibe67's function calls and local variables:
 //   - Function prologue/epilogue
 //   - Preserving registers across calls
 //   - Local variable storage

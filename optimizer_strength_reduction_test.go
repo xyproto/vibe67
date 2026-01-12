@@ -7,7 +7,7 @@
 //   - x % 2^n → x & (2^n-1) (modulo by power-of-2 → AND mask)
 //
 // Status: Context detection needs more work. Low priority since:
-//  1. C67 is float64-native (integer ops are rare)
+//  1. Vibe67 is float64-native (integer ops are rare)
 //  2. Users can use unsafe blocks with inline assembly for performance
 //  3. These optimizations would only help a tiny subset of programs
 //

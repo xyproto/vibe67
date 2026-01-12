@@ -1,2 +1,0 @@
-// Demonstrates binary size with DCE
-main = () -> 0

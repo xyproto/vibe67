@@ -205,7 +205,7 @@ func isLikelyDirectory(source string) bool {
 	return strings.Contains(source, "/") || strings.Contains(source, "\\")
 }
 
-// resolveGitRepo clones or updates a git repository and returns paths to .c67 files
+// resolveGitRepo clones or updates a git repository and returns paths to .vibe67 files
 func resolveGitRepo(spec *ImportSpec) ([]string, error) {
 	// Normalize the URL
 	repoURL := spec.Source
@@ -234,11 +234,11 @@ func resolveGitRepo(spec *ImportSpec) ([]string, error) {
 		return nil, err
 	}
 
-	// Find all top-level .c67 files
-	return findC67Files(repoPath, false)
+	// Find all top-level .vibe67 files
+	return findVibe67Files(repoPath, false)
 }
 
-// resolveDirectory resolves a local directory or file import and returns paths to .c67 files
+// resolveDirectory resolves a local directory or file import and returns paths to .vibe67 files
 func resolveDirectory(spec *ImportSpec) ([]string, error) {
 	dirPath := spec.Source
 
@@ -266,21 +266,21 @@ func resolveDirectory(spec *ImportSpec) ([]string, error) {
 		return nil, fmt.Errorf("path not found: %s", dirPath)
 	}
 
-	// If it's a .c67 file, return it directly
+	// If it's a .vibe67 file, return it directly
 	if !info.IsDir() {
-		if strings.HasSuffix(dirPath, ".c67") {
+		if strings.HasSuffix(dirPath, ".vibe67") {
 			return []string{dirPath}, nil
 		}
-		return nil, fmt.Errorf("not a .c67 file or directory: %s", dirPath)
+		return nil, fmt.Errorf("not a .vibe67 file or directory: %s", dirPath)
 	}
 
-	// Find all top-level .c67 files (not recursive for directories)
-	return findC67Files(dirPath, true)
+	// Find all top-level .vibe67 files (not recursive for directories)
+	return findVibe67Files(dirPath, true)
 }
 
-// findC67Files finds all .c67 files in a directory
+// findVibe67Files finds all .vibe67 files in a directory
 // If topLevelOnly is true, only returns files in the root of the directory
-func findC67Files(dirPath string, topLevelOnly bool) ([]string, error) {
+func findVibe67Files(dirPath string, topLevelOnly bool) ([]string, error) {
 	var files []string
 
 	if topLevelOnly {
@@ -291,8 +291,8 @@ func findC67Files(dirPath string, topLevelOnly bool) ([]string, error) {
 		}
 
 		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".c67") {
-				// Exclude test files (test_*.c67) and generated files (_*.c67)
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".vibe67") {
+				// Exclude test files (test_*.vibe67) and generated files (_*.vibe67)
 				name := entry.Name()
 				if !strings.HasPrefix(name, "test_") && !strings.HasPrefix(name, "_") {
 					files = append(files, filepath.Join(dirPath, entry.Name()))
@@ -300,13 +300,13 @@ func findC67Files(dirPath string, topLevelOnly bool) ([]string, error) {
 			}
 		}
 	} else {
-		// Recursively find all .c67 files
+		// Recursively find all .vibe67 files
 		err := filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			if !info.IsDir() && strings.HasSuffix(path, ".c67") {
-				// Exclude test files (test_*.c67) and generated files (_*.c67)
+			if !info.IsDir() && strings.HasSuffix(path, ".vibe67") {
+				// Exclude test files (test_*.vibe67) and generated files (_*.vibe67)
 				baseName := filepath.Base(path)
 				if !strings.HasPrefix(baseName, "test_") && !strings.HasPrefix(baseName, "_") {
 					files = append(files, path)
@@ -320,7 +320,7 @@ func findC67Files(dirPath string, topLevelOnly bool) ([]string, error) {
 	}
 
 	if len(files) == 0 {
-		return nil, fmt.Errorf("no .c67 files found in: %s", dirPath)
+		return nil, fmt.Errorf("no .vibe67 files found in: %s", dirPath)
 	}
 
 	return files, nil

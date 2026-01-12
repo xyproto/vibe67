@@ -8,13 +8,13 @@ import (
 
 // VCVT* - Vector conversion between integer and float types
 //
-// Essential for C67's map[uint64]float64 foundation:
+// Essential for Vibe67's map[uint64]float64 foundation:
 //   - Converting integer keys to floats for computation
 //   - Converting float results back to integer indices
 //   - Type conversions in data pipelines
 //   - Integer-based indexing operations
 //
-// Example usage in C67:
+// Example usage in Vibe67:
 //   float_keys = int_keys || map(i64_to_f64)
 //   int_indices = float_vals || map(f64_to_i64)
 //

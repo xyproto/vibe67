@@ -76,7 +76,7 @@
 3. **Code size optimization** (-Os equivalent) - Long term
 
 **Realistic target**: 21,500 bytes with conditional CPUID
-**Gap to GCC**: ~6KB (mostly inherent C67 runtime overhead)
+**Gap to GCC**: ~6KB (mostly inherent Vibe67 runtime overhead)
 
 ## Conclusion
 

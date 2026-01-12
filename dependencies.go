@@ -14,10 +14,10 @@ import (
 // and automatically fetches the repository containing the implementation
 var FunctionRepository = map[string]string{
 	// Math functions
-	// Keep these as auto-dependencies (can be pure C67 implementations):
-	"abs": "github.com/xyproto/c67_math", // Simple: x < 0 { -> -x ~> x }
-	"min": "github.com/xyproto/c67_math",
-	"max": "github.com/xyproto/c67_math",
+	// Keep these as auto-dependencies (can be pure Vibe67 implementations):
+	"abs": "github.com/xyproto/vibe67_math", // Simple: x < 0 { -> -x ~> x }
+	"min": "github.com/xyproto/vibe67_math",
+	"max": "github.com/xyproto/vibe67_math",
 
 	// These have excellent x87 FPU instruction support - consider making builtin:
 	// sqrt: SQRTSD (SSE2)
@@ -26,35 +26,35 @@ var FunctionRepository = map[string]string{
 	// log, exp: FYL2X, F2XM1 (x87)
 	// pow: FYL2X + F2XM1 (x87)
 	// floor, ceil, round: FRNDINT (x87)
-	"sqrt":  "github.com/xyproto/c67_math",
-	"pow":   "github.com/xyproto/c67_math",
-	"sin":   "github.com/xyproto/c67_math",
-	"cos":   "github.com/xyproto/c67_math",
-	"tan":   "github.com/xyproto/c67_math",
-	"asin":  "github.com/xyproto/c67_math",
-	"acos":  "github.com/xyproto/c67_math",
-	"atan":  "github.com/xyproto/c67_math",
-	"atan2": "github.com/xyproto/c67_math",
-	"log":   "github.com/xyproto/c67_math",
-	"log10": "github.com/xyproto/c67_math",
-	"exp":   "github.com/xyproto/c67_math",
-	"floor": "github.com/xyproto/c67_math",
-	"ceil":  "github.com/xyproto/c67_math",
-	"round": "github.com/xyproto/c67_math",
+	"sqrt":  "github.com/xyproto/vibe67_math",
+	"pow":   "github.com/xyproto/vibe67_math",
+	"sin":   "github.com/xyproto/vibe67_math",
+	"cos":   "github.com/xyproto/vibe67_math",
+	"tan":   "github.com/xyproto/vibe67_math",
+	"asin":  "github.com/xyproto/vibe67_math",
+	"acos":  "github.com/xyproto/vibe67_math",
+	"atan":  "github.com/xyproto/vibe67_math",
+	"atan2": "github.com/xyproto/vibe67_math",
+	"log":   "github.com/xyproto/vibe67_math",
+	"log10": "github.com/xyproto/vibe67_math",
+	"exp":   "github.com/xyproto/vibe67_math",
+	"floor": "github.com/xyproto/vibe67_math",
+	"ceil":  "github.com/xyproto/vibe67_math",
+	"round": "github.com/xyproto/vibe67_math",
 
 	// Standard library
-	// "println": "github.com/xyproto/c67_core",  // Commented out - println is now a builtin
-	"print": "github.com/xyproto/c67_core", // Print without newline
+	// "println": "github.com/xyproto/vibe67_core",  // Commented out - println is now a builtin
+	"print": "github.com/xyproto/vibe67_core", // Print without newline
 
 	// Graphics (example)
-	"InitWindow":    "github.com/xyproto/c67_raylib",
-	"CloseWindow":   "github.com/xyproto/c67_raylib",
-	"DrawRectangle": "github.com/xyproto/c67_raylib",
+	"InitWindow":    "github.com/xyproto/vibe67_raylib",
+	"CloseWindow":   "github.com/xyproto/vibe67_raylib",
+	"DrawRectangle": "github.com/xyproto/vibe67_raylib",
 }
 
 // GetFunctionRepository returns the repository URL for a function
 // Checks environment variable FLAPC_FUNCTIONNAME first, then falls back to FunctionRepository map
-// Example: FLAPC_PRINTLN=github.com/xyproto/c67_alternative_core overrides the default
+// Example: FLAPC_PRINTLN=github.com/xyproto/vibe67_alternative_core overrides the default
 func GetFunctionRepository(funcName string) (string, bool) {
 	// Check for environment variable override
 	// Convert function name to uppercase for env var: println -> PRINTLN
@@ -71,27 +71,27 @@ func GetFunctionRepository(funcName string) (string, bool) {
 	return repoURL, ok
 }
 
-// GetCachePath returns the cache directory for c67 dependencies
+// GetCachePath returns the cache directory for vibe67 dependencies
 // Respects XDG_CACHE_HOME environment variable
-// Default: $XDG_CACHE_HOME/c67 or ~/.cache/c67/
+// Default: $XDG_CACHE_HOME/vibe67 or ~/.cache/vibe67/
 func GetCachePath() (string, error) {
 	// Check XDG_CACHE_HOME first
 	if xdgCache := os.Getenv("XDG_CACHE_HOME"); xdgCache != "" {
-		return filepath.Join(xdgCache, "c67"), nil
+		return filepath.Join(xdgCache, "vibe67"), nil
 	}
 
-	// Fall back to ~/.cache/c67
+	// Fall back to ~/.cache/vibe67
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
-	cachePath := filepath.Join(homeDir, ".cache", "c67")
+	cachePath := filepath.Join(homeDir, ".cache", "vibe67")
 	return cachePath, nil
 }
 
 // GetRepoCachePath returns the local path for a cloned repository
-// Example: "github.com/xyproto/c67_math" -> "~/.cache/c67/github.com/xyproto/c67_math"
+// Example: "github.com/xyproto/vibe67_math" -> "~/.cache/vibe67/github.com/xyproto/vibe67_math"
 func GetRepoCachePath(repoURL string) (string, error) {
 	cachePath, err := GetCachePath()
 	if err != nil {
@@ -491,8 +491,8 @@ func remoteBranchExists(repoPath, branchName string) bool {
 	return err == nil
 }
 
-// FindC67Files returns all .c67 files in a directory (recursively)
-func FindC67Files(dir string) ([]string, error) {
+// FindVibe67Files returns all .vibe67 files in a directory (recursively)
+func FindVibe67Files(dir string) ([]string, error) {
 	var files []string
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -505,8 +505,8 @@ func FindC67Files(dir string) ([]string, error) {
 			return filepath.SkipDir
 		}
 
-		// Add .c67 files
-		if !info.IsDir() && strings.HasSuffix(path, ".c67") {
+		// Add .vibe67 files
+		if !info.IsDir() && strings.HasSuffix(path, ".vibe67") {
 			files = append(files, path)
 		}
 

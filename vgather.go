@@ -9,7 +9,7 @@ import (
 // VGATHERDPD/VGATHERQPD - Vector gather loads of packed double-precision floats
 // using indices
 //
-// CRITICAL for C67's map[float64]float64 with non-contiguous access:
+// CRITICAL for Vibe67's map[float64]float64 with non-contiguous access:
 //   - Sparse map access: gather values at indices [i1, i2, i3, i4]
 //   - Indirect lookup: map_values[indices[0..7]]
 //   - Non-linear traversal: accessing map with computed offsets

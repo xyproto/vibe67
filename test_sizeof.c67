@@ -1,6 +1,0 @@
-cstruct SDL_Event {
-    type as uint32,
-    timestamp as uint64
-}
-
-println(sizeof(SDL_Event))

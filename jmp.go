@@ -7,7 +7,7 @@ import (
 )
 
 // Conditional jump instructions for all architectures
-// Critical for implementing C67 language control flow:
+// Critical for implementing Vibe67 language control flow:
 //   - Pattern matching: n <= 1 -> 1; ~> n * me(n - 1)
 //   - Error handling: x or! "error message"
 //   - Guard expressions: x or return y

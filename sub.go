@@ -7,7 +7,7 @@ import (
 )
 
 // SUB instruction implementation for all architectures
-// Essential for implementing C67's arithmetic and control flow:
+// Essential for implementing Vibe67's arithmetic and control flow:
 //   - Arithmetic expressions: n - 1
 //   - Decrement operations: me.health - amount
 //   - Pointer arithmetic: end - start
