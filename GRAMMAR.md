@@ -655,7 +655,7 @@ power_expr      = unary_expr { ( "**" | "^" ) unary_expr } ;
 unary_expr      = ( "-" | "not" | "!b" | "~b" | "#" | "µ" ) unary_expr
                 | postfix_expr ;
 
-postfix_expr    = primary_expr { postfix_op } ;
+postfix_expr    = primary_expr { postfix_op } [ "as" identifier ] ;
 
 postfix_op      = "[" expression "]"
                 | "." ( identifier | integer )

@@ -1,0 +1,22 @@
+// Test type casting with cstruct
+
+cstruct TestStruct {
+    x as uint32,
+    y as uint32
+}
+
+// Test arena allocation with type cast
+arena {
+    ptr := alloc(16) as TestStruct
+    
+    // This should compile and work now!
+    x_val = ptr.x
+    y_val = ptr.y
+    
+    println("x:")
+    println(x_val)
+    println("y:")
+    println(y_val)
+}
+
+println("Done!")

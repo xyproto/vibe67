@@ -376,6 +376,9 @@ func (p *Parser) ParseProgram() *Program {
 		panic(fmt.Errorf("compilation failed with %d error(s)", p.errors.ErrorCount()))
 	}
 
+	// Copy cstructs from parser to program
+	program.CStructs = p.cstructs
+
 	// Don't add automatic exit(0) statement - the compiler will emit exit code
 	// after processing deferred statements (see lines 2658-2669 in compileStatement)
 
@@ -3730,29 +3733,36 @@ func (p *Parser) parsePostfix() Expression {
 			// Parse the cast type
 			var castType string
 			if p.current.Type == TOKEN_IDENT {
-				// All C67 and C types are valid after 'as'
-				validTypes := map[string]bool{
-					// C integer types
-					"int8": true, "int16": true, "int32": true, "int64": true,
-					"uint8": true, "uint16": true, "uint32": true, "uint64": true,
-					"char": true, "short": true, "int": true, "long": true,
-					"uchar": true, "ushort": true, "uint": true, "ulong": true,
-					"size_t": true, "ssize_t": true, "ptrdiff_t": true,
-					// C floating point types
-					"float": true, "float32": true, "float64": true, "double": true,
-					// C string/pointer types
-					"cstr": true, "cstring": true, "ptr": true, "pointer": true,
-					// C67 types
-					"number": true, "num": true, "string": true, "str": true,
-					"list": true, "map": true, "address": true, "addr": true,
-					"bool": true, "boolean": true,
-					// Type aliases
-					"void": true,
-				}
-				if validTypes[p.current.Value] {
-					castType = p.current.Value
+				typeName := p.current.Value
+				// Check if it's a cstruct name
+				if _, exists := p.cstructs[typeName]; exists {
+					// It's a cstruct type - store the full type name
+					castType = typeName
 				} else {
-					p.error("expected valid type after 'as' (e.g., string, int, float, ptr)")
+					// Check if it's a built-in type
+					validTypes := map[string]bool{
+						// C integer types
+						"int8": true, "int16": true, "int32": true, "int64": true,
+						"uint8": true, "uint16": true, "uint32": true, "uint64": true,
+						"char": true, "short": true, "int": true, "long": true,
+						"uchar": true, "ushort": true, "uint": true, "ulong": true,
+						"size_t": true, "ssize_t": true, "ptrdiff_t": true,
+						// C floating point types
+						"float": true, "float32": true, "float64": true, "double": true,
+						// C string/pointer types
+						"cstr": true, "cstring": true, "ptr": true, "pointer": true,
+						// C67 types
+						"number": true, "num": true, "string": true, "str": true,
+						"list": true, "map": true, "address": true, "addr": true,
+						"bool": true, "boolean": true,
+						// Type aliases
+						"void": true,
+					}
+					if validTypes[p.current.Value] {
+						castType = p.current.Value
+					} else {
+						p.error("expected valid type or cstruct name after 'as' (e.g., string, int, SDL_Event)")
+					}
 				}
 			} else {
 				p.error("expected type after 'as'")

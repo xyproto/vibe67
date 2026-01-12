@@ -1,7 +1,10 @@
-import libc as c
-
-// Import the SDL3 library (auto detect header files and library files with pkg-config on Linux, use SDL3.dll and include/* on Windows)
 import sdl3 as sdl
+
+// Define SDL_Event structure for direct field access
+cstruct SDL_Event {
+    type as uint32,
+    timestamp as uint64
+}
 
 // Set the window dimentions
 width = 620
@@ -53,16 +56,41 @@ tex = sdl.SDL_CreateTextureFromSurface(renderer, bmp) or! {
 // Clean up the surface when the program ends
 defer sdl.SDL_DestroyTexture(tex)
 
-// Main loop - display for 5 seconds or until window closed
-// Allocate SDL_Event struct once (192 bytes in SDL3)
-event = c.malloc(192)
+// Main loop - display until window closed or ESC pressed
+running := 1
 
-// Run for approximately 5 seconds (300 frames * 16ms ~= 5s)
-@ frame in 0..<300 {
-    // Poll pending event to keep window responsive
-    // Note: We can't check event.type yet - need peek32() to work
-    // or proper struct field access with type tracking
-    sdl.SDL_PollEvent(event)
+@ running > 0 max inf {
+    arena {
+        // Allocate typed event buffer - enables direct field access!
+        event := alloc(192) as SDL_Event
+        
+        // Poll pending event
+        has_event := sdl.SDL_PollEvent(event)
+        
+        has_event {
+            0 => {}  // No events this frame
+            ~> {
+                // Direct field access now works thanks to type casting!
+                event.type {
+                    256 => { 
+                        // SDL_EVENT_QUIT (0x100) - window close button
+                        running = 0 
+                    }
+                    768 => {
+                        // SDL_EVENT_KEY_DOWN (0x300)
+                        // Read scancode from offset 16 (inside SDL_KeyboardEvent)
+                        scancode := peek32(event, 16)
+                        scancode {
+                            41 => { 
+                                // SDL_SCANCODE_ESCAPE = 41
+                                running = 0 
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Clear screen
     sdl.SDL_RenderClear(renderer)
@@ -77,7 +105,4 @@ event = c.malloc(192)
     sdl.SDL_Delay(16)  // ~60 FPS
 }
 
-// Free the event buffer
-c.free(event)
-
-// That's it
+// That's it - all resources cleaned up by defer statements

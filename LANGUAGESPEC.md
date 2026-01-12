@@ -1976,12 +1976,84 @@ event_type = event.type
 3. Compiler generates direct memory access
 4. No hash lookups, no overhead
 
+### Type Casting for Field Access
+
+When you allocate memory but the compiler doesn't know the structure type, use the `as` keyword to provide type information:
+
+```c67
+cstruct SDL_Event {
+    type as uint32,
+    timestamp as uint64
+}
+
+// Cast pointer to SDL_Event type
+arena {
+    event := alloc(192) as SDL_Event
+    sdl.SDL_PollEvent(event)
+    
+    // Now field access works!
+    event.type {
+        256 => { println("Quit event") }  // SDL_EVENT_QUIT
+        768 => { println("Key down") }     // SDL_EVENT_KEY_DOWN
+    }
+}
+```
+
+**How it works:**
+1. `alloc(192)` returns an untyped pointer
+2. `as SDL_Event` tells compiler to treat it as SDL_Event*
+3. Compiler uses cstruct layout for field access
+4. Zero runtime cost - pure compile-time feature
+
+**Type casting syntax:**
+```c67
+// Arena allocation (idiomatic C67)
+event := alloc(size) as TypeName
+
+// Manual allocation (when needed)
+event := c.malloc(size) as TypeName
+
+// Recast existing pointer
+typed_ptr := raw_ptr as TypeName
+```
+
+**Benefits:**
+- Enables natural field access syntax
+- Type-safe (compiler validates field names)
+- Zero runtime overhead
+- Works with arena blocks and c.malloc
+- Backward compatible (untyped pointers still work)
+
 ## Memory Management
 
-### Stack vs Heap
+### The C67 Way: Arena Blocks
 
-- **Stack**: Function local variables, temporaries
-- **Heap**: Dynamically allocated data (lists, maps, large objects)
+**CRITICAL:** Always prefer arena blocks over manual allocation!
+
+```c67
+// ✓ CORRECT: Arena allocation (automatic cleanup)
+arena {
+    buffer = alloc(1024)
+    process(buffer)
+}
+// All memory freed automatically
+
+// ✗ AVOID: Manual allocation (must track cleanup)
+ptr = c.malloc(1024)
+defer c.free(ptr)  // Easy to forget!
+```
+
+**Why arena blocks?**
+1. **Memory-safe by default** - No leaks, automatic cleanup
+2. **Performance** - Faster allocation, no fragmentation
+3. **Simplicity** - No manual free() calls
+4. **Locality** - Better cache performance
+5. **Idiomatic C67** - The language is designed around arenas
+
+**When to use c.malloc:**
+- Interop with C libraries that expect malloc'd pointers
+- Very long-lived objects (persist across many frames)
+- Objects with non-deterministic lifetime
 
 ### Arena Allocators and Minimal Builtins
 

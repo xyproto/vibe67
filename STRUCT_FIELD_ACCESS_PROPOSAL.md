@@ -32,13 +32,16 @@ event_type = event.type  // Works! Compiler knows layout
 Add type information using the existing `as` keyword for casting:
 
 ```c67
-// Preferred syntax: Use alloc() with type cast
-event := alloc(192) as SDL_Event
-event_type = event.type  // Compiler knows event is SDL_Event*, can read at offset 0
+// C67 idiomatic way: Arena allocation with type cast
+arena {
+    event := alloc(192) as SDL_Event
+    event_type = event.type  // Compiler knows event is SDL_Event*, can read at offset 0
+}
 
-// Also works with c.malloc() for compatibility
+// Also works with c.malloc() for when you need manual control
 event := c.malloc(192) as SDL_Event
 event_type = event.type
+c.free(event)
 
 // Cast can also be used on existing pointers
 raw_ptr = c.malloc(192)
@@ -83,8 +86,9 @@ event_type = event.type
 - **Type-safe**: Compiler validates field names against cstruct
 - **Natural syntax**: Reuses existing `as` keyword for type casting
 - **Consistent**: Works like other casts in C67
+- **Arena-friendly**: Works with C67's arena allocation model
 - **Backward compatible**: Untyped pointers still work
-- **Reuses existing infra**: cstruct, FieldAccessExpr, `as` keyword already implemented
+- **Reuses existing infra**: cstruct, FieldAccessExpr, `as` keyword, arena blocks
 
 ### Example Usage
 
@@ -96,15 +100,17 @@ cstruct SDL_Event {
     timestamp as uint64
 }
 
-// With type cast using 'as' - enables field access
-event := alloc(192) as SDL_Event
-sdl.SDL_PollEvent(event)
+// C67 idiomatic way: Arena allocation with type cast
+arena {
+    event := alloc(192) as SDL_Event
+    sdl.SDL_PollEvent(event)
 
-// Now this works!
-event_type = event.type  // Read at offset 0
-timestamp = event.timestamp  // Read at offset 4
-
-free(event)
+    // Now this works!
+    event_type = event.type  // Read at offset 0
+    timestamp = event.timestamp  // Read at offset 4
+    
+    // Arena auto-cleans up when block ends
+}
 ```
 
 ### Complete SDL Example
@@ -118,35 +124,54 @@ cstruct SDL_Event {
     // ... more fields
 }
 
-// Allocate typed event buffer
-event := alloc(192) as SDL_Event
-
+// SDL event loop with arena allocation
 running := 1
 @ running > 0 max inf {
-    has_event := sdl.SDL_PollEvent(event)
-    
-    has_event {
-        0 => {}  // No events
-        ~> {
-            // Direct field access!
-            event.type {
-                256 => { running = 0 }  // SDL_EVENT_QUIT
-                768 => {                 // SDL_EVENT_KEY_DOWN
-                    // Read nested struct fields
-                    scancode := peek32(event, 16)
-                    scancode {
-                        41 => { running = 0 }  // ESC
-                        20 => { running = 0 }  // Q
+    arena {
+        // Allocate typed event buffer in arena
+        event := alloc(192) as SDL_Event
+        
+        has_event := sdl.SDL_PollEvent(event)
+        
+        has_event {
+            0 => {}  // No events
+            ~> {
+                // Direct field access!
+                event.type {
+                    256 => { running = 0 }  // SDL_EVENT_QUIT
+                    768 => {                 // SDL_EVENT_KEY_DOWN
+                        // Read nested struct fields
+                        scancode := peek32(event, 16)
+                        scancode {
+                            41 => { running = 0 }  // ESC
+                            20 => { running = 0 }  // Q
+                        }
                     }
                 }
             }
         }
+        
+        // Arena automatically frees event at end of block
     }
     
     // ... render ...
 }
+```
 
-free(event)
+### For Long-Lived Objects: Use Manual Allocation
+
+```c67
+// When you need control over lifetime (e.g., persistent event buffer)
+event := c.malloc(192) as SDL_Event
+
+@ running > 0 max inf {
+    sdl.SDL_PollEvent(event)
+    event.type {
+        256 => { running = 0 }
+    }
+}
+
+c.free(event)
 ```
 
 ### Alternative: Infer Type from cstruct Constructor
@@ -164,15 +189,17 @@ p.x = 10     // Works! Compiler knows p is Point*
 Implement **Type Casting with `as` keyword** because:
 - Reuses existing `as` keyword and semantics
 - Most natural for C67 (consistent with existing conversions)
-- Works with both `alloc()` and `c.malloc()`
+- Works with arena blocks (idiomatic C67)
+- Also works with `c.malloc()` when needed
 - Clear and explicit at point of allocation
 - Can be used to recast existing pointers
 - Aligns with := assignment style
 
 The syntax `event := alloc(192) as SDL_Event` is:
 - Concise
-- Idiomatic C67
+- Idiomatic C67 (uses arena)
 - Self-documenting
 - Zero runtime cost
+- Memory-safe (arena auto-cleanup)
 
-This would make C67's C FFI integration seamless while maintaining zero-cost abstractions and idiomatic syntax.
+This would make C67's C FFI integration seamless while maintaining zero-cost abstractions, idiomatic syntax, and the arena allocation model that makes C67 memory-safe by default.

@@ -68,6 +68,7 @@ type C67Compiler struct {
 	parentVariables           map[string]bool               // Track parent-scope vars in parallel loops (use r11 instead of rbp)
 	varTypes                  map[string]string             // variable name -> "map" or "list" (legacy)
 	varTypeInfo               map[string]*C67Type           // variable name -> type annotation (new type system)
+	cstructs                  map[string]*CStructDecl       // cstruct name -> declaration
 	functionSignatures        map[string]*FunctionSignature // function name -> signature (params, variadic)
 	sourceCode                string                        // Store source for recompilation
 	usedFunctions             map[string]bool               // Track which functions are called
@@ -219,6 +220,7 @@ func NewC67Compiler(platform Platform, verbose bool) (*C67Compiler, error) {
 		lambdaVars:          make(map[string]bool),
 		varTypes:            make(map[string]string),
 		varTypeInfo:         make(map[string]*C67Type),
+		cstructs:            make(map[string]*CStructDecl),
 		functionSignatures:  make(map[string]*FunctionSignature),
 		usedFunctions:       make(map[string]bool),
 		calledLambdas:       make(map[string]bool),
@@ -713,6 +715,11 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// Transfer namespace information from program to compiler
 	if program.FunctionNamespaces != nil {
 		fc.functionNamespace = program.FunctionNamespaces
+	}
+
+	// Transfer cstructs from program to compiler
+	if program.CStructs != nil {
+		fc.cstructs = program.CStructs
 	}
 
 	if fc.debug {
@@ -3848,6 +3855,10 @@ func (fc *C67Compiler) getExprType(expr Expression) string {
 		case "ptr", "pointer":
 			return "pointer"
 		default:
+			// Check if it's a cstruct type
+			if _, exists := fc.cstructs[e.Type]; exists {
+				return e.Type // Return the cstruct type name
+			}
 			// All numeric types
 			return "number"
 		}
@@ -5783,8 +5794,99 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 		// Convert to integer pointer in rax
 		fc.out.MovqXmmToReg("rax", "xmm0")
 
-		// If we know the struct type and field offset, use direct memory access
-		// Otherwise, fall back to map-style hash lookup
+		// Try to determine the struct type from the object expression
+		var structType string
+		if e.StructName != "" {
+			// Already set by parser (from Type.field syntax)
+			structType = e.StructName
+		} else if ident, ok := e.Object.(*IdentExpr); ok {
+			// Check if variable has a cstruct type annotation
+			if typ, exists := fc.varTypes[ident.Name]; exists {
+				// Check if it's a cstruct type
+				if _, isCStruct := fc.cstructs[typ]; isCStruct {
+					structType = typ
+				}
+			}
+		}
+
+		// If we know the struct type and field, use direct memory access
+		if structType != "" {
+			if cstruct, exists := fc.cstructs[structType]; exists {
+				// Find the field in the cstruct
+				fieldFound := false
+				for _, field := range cstruct.Fields {
+					if field.Name == e.FieldName {
+						fieldFound = true
+						// Direct memory access at known offset
+						// Determine size based on field type
+						switch field.Type {
+						case "uint8", "int8", "u8", "i8":
+							// Read 8-bit value
+							fc.out.XorRegWithReg("rdx", "rdx")
+							// Use explicit encoding: movzx edx, byte [rax + offset]
+							// REX.W prefix + opcode 0x0f 0xb6 + ModRM
+							if field.Offset == 0 {
+								fc.out.Emit([]byte{0x0f, 0xb6, 0x10}) // movzx edx, byte [rax]
+							} else if field.Offset < 128 {
+								fc.out.Emit([]byte{0x0f, 0xb6, 0x50, byte(field.Offset)}) // movzx edx, byte [rax + offset]
+							} else {
+								fc.out.Emit([]byte{0x0f, 0xb6, 0x90})                         // movzx edx, byte [rax + offset]
+								fc.out.Emit([]byte{byte(field.Offset), 0, 0, 0})              // 32-bit offset
+							}
+							fc.out.Cvtsi2sd("xmm0", "rdx") // Convert to float64
+						case "uint16", "int16", "u16", "i16":
+							// Read 16-bit value
+							fc.out.XorRegWithReg("rdx", "rdx")
+							// movzx edx, word [rax + offset]
+							if field.Offset == 0 {
+								fc.out.Emit([]byte{0x0f, 0xb7, 0x00}) // movzx eax, word [rax]
+								fc.out.MovRegToReg("rdx", "rax")
+							} else {
+								fc.out.MovMemToReg("dx", "rax", field.Offset)
+							}
+							fc.out.Cvtsi2sd("xmm0", "rdx")
+						case "uint32", "int32", "u32", "i32":
+							// Read 32-bit value
+							fc.out.MovMemToReg("edx", "rax", field.Offset) // Load 32-bit value
+							fc.out.MovRegToReg("rax", "rdx")                // Zero-extend to 64-bit
+							fc.out.Cvtsi2sd("xmm0", "rax")                  // Convert to float64
+						case "uint64", "int64", "u64", "i64":
+							// Read 64-bit value
+							fc.out.MovMemToReg("rax", "rax", field.Offset) // Load 64-bit value
+							fc.out.Cvtsi2sd("xmm0", "rax")                  // Convert to float64
+						case "float32", "f32":
+							// Read 32-bit float
+							fc.out.Emit([]byte{0xf3, 0x0f, 0x10}) // movss xmm0, [rax + offset]
+							if field.Offset == 0 {
+								fc.out.Emit([]byte{0x00})
+							} else if field.Offset < 128 {
+								fc.out.Emit([]byte{0x40, byte(field.Offset)})
+							} else {
+								fc.out.Emit([]byte{0x80})
+								fc.out.Emit([]byte{byte(field.Offset), 0, 0, 0})
+							}
+							// Convert f32 to f64
+							fc.out.Emit([]byte{0xf3, 0x0f, 0x5a, 0xc0}) // cvtss2sd xmm0, xmm0
+						case "float64", "f64", "double":
+							// Read 64-bit float (native C67 type)
+							fc.out.MovMemToXmm("xmm0", "rax", field.Offset)
+						default:
+							// Unknown type - treat as 32-bit value
+							fc.out.MovMemToReg("edx", "rax", field.Offset)
+							fc.out.MovRegToReg("rax", "rdx")
+							fc.out.Cvtsi2sd("xmm0", "rax")
+						}
+						break
+					}
+				}
+				if !fieldFound {
+					compilerError("cstruct '%s' has no field '%s'", structType, e.FieldName)
+				}
+				return
+			}
+		}
+
+		// If offset was pre-computed (e.g., from Type.field in parser), use it
 		if e.Offset >= 0 && e.StructName != "" {
 			// Direct memory access at known offset
 			// Read the field value (assuming it's a 32-bit value like SDL event type)
@@ -6596,6 +6698,13 @@ func (fc *C67Compiler) compileCastExpr(expr *CastExpr) {
 		compilerError("'as list' conversion not yet implemented")
 
 	default:
+		// Check if it's a cstruct type - these are type annotations only
+		if _, exists := fc.cstructs[expr.Type]; exists {
+			// CStruct type cast: NO runtime conversion
+			// Value remains as pointer in xmm0
+			// Type annotation will be used by FieldAccessExpr for direct memory access
+			return
+		}
 		compilerError("unknown cast type '%s'", expr.Type)
 	}
 }
