@@ -61,29 +61,29 @@ running := 1
 
 // Allocate typed event buffer once - enables direct field access!
 event := c.malloc(192) as SDL_Event
+null_ptr := 0
 
 @ running > 0 max inf {
-    // Poll pending event
-    has_event := sdl.SDL_PollEvent(event)
-    
-    has_event {
-        0 => {}  // No events this frame
-        ~> {
-            // Direct field access now works thanks to type casting!
-            event.type {
-                256 => { 
-                    // SDL_EVENT_QUIT (0x100) - window close button
-                    running = 0 
-                }
-                768 => {
-                    // SDL_EVENT_KEY_DOWN (0x300)
-                    // Read scancode from offset 16 (inside SDL_KeyboardEvent)
-                    scancode := peek32(event, 16)
-                    scancode {
-                        41 => { 
-                            // SDL_SCANCODE_ESCAPE = 41
-                            running = 0 
-                        }
+    // Poll all pending events
+    @ sdl.SDL_PollEvent(event) > 0 max inf {
+        // Direct field access now works thanks to type casting!
+        event.type {
+            256 => { 
+                // SDL_EVENT_QUIT (0x100) - window close button
+                running = 0 
+            }
+            768 => {
+                // SDL_EVENT_KEY_DOWN (0x300)
+                // Read scancode from offset 16 (inside SDL_KeyboardEvent)
+                scancode := peek32(event, 16)
+                scancode {
+                    41 => { 
+                        // SDL_SCANCODE_ESCAPE = 41
+                        running = 0 
+                    }
+                    20 => {
+                        // SDL_SCANCODE_Q = 20
+                        running = 0
                     }
                 }
             }
@@ -94,7 +94,7 @@ event := c.malloc(192) as SDL_Event
     sdl.SDL_RenderClear(renderer)
 
     // Render texture (fills entire window)
-    sdl.SDL_RenderTexture(renderer, tex, 0, 0)
+    sdl.SDL_RenderTexture(renderer, tex, null_ptr, null_ptr)
 
     // Present the rendered frame
     sdl.SDL_RenderPresent(renderer)
