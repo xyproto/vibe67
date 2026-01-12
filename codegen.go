@@ -96,6 +96,7 @@ type C67Compiler struct {
 	lambdaOffsets             map[string]int                // Lambda name -> offset in .text
 	currentLambda             *LambdaFunc                   // Currently compiling lambda (for "me" self-reference)
 	lambdaBodyStart           int                           // Offset where lambda body starts (for tail recursion)
+	inLocalBlock              bool                          // Track if we're inside a local block (match clause, etc.)
 	hasExplicitExit           bool                          // Track if program contains explicit exit() call
 	debug                     bool                          // Enable debug output (set via DEBUG env var)
 	verbose                   bool                          // Enable verbose output
@@ -1094,7 +1095,7 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 			}
 
 			// Track module-level variables (defined outside any lambda) - allocate in .data
-			if fc.currentLambda == nil {
+			if fc.currentLambda == nil && !fc.inLocalBlock {
 				fc.moduleLevelVars[s.Name] = true
 				// Allocate in .data section
 				dataOffset := len(fc.dataSection)
@@ -1114,7 +1115,7 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 
 			if fc.debug {
 				if VerboseMode {
-					if fc.currentLambda == nil {
+					if fc.currentLambda == nil && !fc.inLocalBlock {
 						fmt.Fprintf(os.Stderr, "DEBUG collectSymbols: storing mutable global variable '%s' at data offset %d\n", s.Name, fc.globalVars[s.Name])
 					} else {
 						fmt.Fprintf(os.Stderr, "DEBUG collectSymbols: storing mutable variable '%s' at offset %d\n", s.Name, fc.variables[s.Name])
@@ -1154,7 +1155,7 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 				// Create new immutable variable
 
 				// Track module-level variables (defined outside any lambda) - allocate in .data
-				if fc.currentLambda == nil {
+				if fc.currentLambda == nil && !fc.inLocalBlock {
 					fc.moduleLevelVars[s.Name] = true
 					// Allocate in .data section
 					dataOffset := len(fc.dataSection)
@@ -1174,7 +1175,7 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 
 				if fc.debug {
 					if VerboseMode {
-						if fc.currentLambda == nil {
+						if fc.currentLambda == nil && !fc.inLocalBlock {
 							fmt.Fprintf(os.Stderr, "DEBUG collectSymbols: storing immutable global variable '%s' at data offset %d\n", s.Name, fc.globalVars[s.Name])
 						} else {
 							fmt.Fprintf(os.Stderr, "DEBUG collectSymbols: storing immutable variable '%s' at offset %d\n", s.Name, fc.variables[s.Name])
@@ -6147,6 +6148,11 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 		}
 
 	case *BlockExpr:
+		// Mark that we're in a local block scope (not module-level)
+		savedInLocalBlock := fc.inLocalBlock
+		fc.inLocalBlock = true
+		defer func() { fc.inLocalBlock = savedInLocalBlock }()
+		
 		// First, collect symbols from all statements in the block
 		for _, stmt := range e.Statements {
 			if err := fc.collectSymbols(stmt); err != nil {
