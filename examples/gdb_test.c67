@@ -1,0 +1,7 @@
+import sdl3 as sdl
+
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
+window = sdl.SDL_CreateWindow("Test", 640, 480, 0)
+// Add a printf so we have a breakpoint target
+printf("window = %f\n", window)
+sdl.SDL_Quit()

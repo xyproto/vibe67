@@ -20,7 +20,7 @@ sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
 defer sdl.SDL_Quit()
 
 // Create window, or exit with an error
-window = sdl.SDL_CreateWindow("Hello World!", width, height, sdl.SDL_WINDOW_RESIZABLE) or! {
+window = sdl.SDL_CreateWindow("Hello World!", width, height, 0) or! {
     exitf("Failed to create window: %s\n", sdl.SDL_GetError())
 }
 

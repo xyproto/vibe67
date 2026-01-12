@@ -5877,8 +5877,8 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 								fc.out.Emit([]byte{0x8b, 0x90}) // ModRM: 10 010 000 = [rax+disp32] -> edx
 								fc.out.Emit([]byte{byte(field.Offset), byte(field.Offset >> 8), byte(field.Offset >> 16), byte(field.Offset >> 24)})
 							}
-							fc.out.MovRegToReg("rax", "rdx")               // Zero-extend to 64-bit
-							fc.out.Cvtsi2sd("xmm0", "rax")                 // Convert to float64
+							fc.out.MovRegToReg("rax", "rdx") // Zero-extend to 64-bit
+							fc.out.Cvtsi2sd("xmm0", "rax")   // Convert to float64
 						case "uint64", "int64", "u64", "i64":
 							// Read 64-bit value
 							fc.out.MovMemToReg("rax", "rax", field.Offset) // Load 64-bit value
@@ -12822,8 +12822,8 @@ func (fc *C67Compiler) compileCFunctionCall(libName string, funcName string, arg
 					if isNullPointer {
 						// Already set rax to 0 above
 					} else {
-						// Pointer type - convert float64 to integer pointer
-						fc.out.Cvttsd2si("rax", "xmm0")
+						// Pointer type - extract raw 64-bit value (not a float conversion!)
+						fc.out.MovqXmmToReg("rax", "xmm0")
 					}
 
 				case "int", "i32", "int32":
@@ -13027,7 +13027,7 @@ func (fc *C67Compiler) compileCFunctionCall(libName string, funcName string, arg
 			// On Windows and Linux, pointers are 64-bit and returned in RAX correctly
 			// NOTE: When signature is unknown (returnType == ""), assume pointer/64-bit return
 			// This is safer than assuming 32-bit, and works for SDL functions
-			fc.out.Cvtsi2sd("xmm0", "rax")
+			fc.out.MovqRegToXmm("xmm0", "rax")
 		} else {
 			// Integer result in rax - convert to float64 for C67
 			// On Windows: bool returns are 1 byte (AL), int returns are 4 bytes (EAX)

@@ -1,0 +1,5 @@
+import sdl3 as sdl
+
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
+window = sdl.SDL_CreateWindow("Test", 640, 480, 0)
+sdl.SDL_Quit()

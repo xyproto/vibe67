@@ -1,0 +1,21 @@
+import sdl3 as sdl
+
+cstruct SDL_Event {
+    type as uint32,
+    timestamp as uint64
+}
+
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
+defer sdl.SDL_Quit()
+
+// Test: allocate memory and cast it
+event := c.malloc(192) as SDL_Event
+
+printf("event pointer = %f\n", event)
+
+// Try to access field
+event_type := event.type
+printf("event.type = %f\n", event_type)
+
+c.free(event)
+printf("Done!\n")

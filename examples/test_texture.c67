@@ -1,0 +1,42 @@
+import sdl3 as sdl
+
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
+    exitf("SDL_Init failed\n")
+}
+defer sdl.SDL_Quit()
+
+window = sdl.SDL_CreateWindow("Test", 640, 480, 0) or! {
+    exitf("Failed to create window\n")
+}
+defer sdl.SDL_DestroyWindow(window)
+
+renderer = sdl.SDL_CreateRenderer(window, 0) or! {
+    exitf("Failed to create renderer\n")
+}
+defer sdl.SDL_DestroyRenderer(renderer)
+
+printf("Loading BMP...\n")
+
+file = sdl.SDL_IOFromFile("img/grumpy-cat.bmp", "rb") or! {
+    exitf("Error reading file\n")
+}
+
+bmp = sdl.SDL_LoadBMP_IO(file, 1) or! {
+    exitf("Error creating surface\n")
+}
+defer sdl.SDL_DestroySurface(bmp)
+
+tex = sdl.SDL_CreateTextureFromSurface(renderer, bmp) or! {
+    exitf("Error creating texture\n")
+}
+defer sdl.SDL_DestroyTexture(tex)
+
+printf("Texture loaded!\n")
+
+// Render once
+sdl.SDL_RenderClear(renderer)
+sdl.SDL_RenderTexture(renderer, tex, 0, 0)
+sdl.SDL_RenderPresent(renderer)
+sdl.SDL_Delay(1000)
+
+printf("Done!\n")

@@ -1,0 +1,9 @@
+event := c.malloc(192)
+printf("event = %f\n", event)
+
+// Read value at offset 16
+value := peek32(event, 16)
+printf("value = %f\n", value)
+
+c.free(event)
+printf("Done!\n")

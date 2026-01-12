@@ -1,0 +1,26 @@
+import sdl3 as sdl
+
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
+    exitf("SDL_Init failed\n")
+}
+defer sdl.SDL_Quit()
+
+printf("Before SDL_CreateWindow\n")
+window = sdl.SDL_CreateWindow("Test", 640, 480, 0)
+printf("After SDL_CreateWindow, window = %f\n", window)
+
+// Try to use the pointer directly - let's pass it to SDL_GetError
+// which should work regardless of the window value
+error_msg := sdl.SDL_GetError()
+printf("SDL_GetError after window create: %s\n", error_msg)
+
+// Now try to use window in SDL_CreateRenderer
+printf("Before SDL_CreateRenderer with window = %f\n", window)
+renderer = sdl.SDL_CreateRenderer(window, 0)
+printf("After SDL_CreateRenderer, renderer = %f\n", renderer)
+
+renderer or! {
+    exitf("Failed to create renderer: %s\n", sdl.SDL_GetError())
+}
+
+printf("Success\n")

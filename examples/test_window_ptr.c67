@@ -1,0 +1,22 @@
+import sdl3 as sdl
+
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
+    exitf("SDL_Init failed\n")
+}
+defer sdl.SDL_Quit()
+
+window = sdl.SDL_CreateWindow("Test", 640, 480, 0)
+printf("window pointer = %f\n", window)
+
+window {
+    0 => {
+        printf("window is NULL\n")
+        exitf("Failed to create window: %s\n", sdl.SDL_GetError())
+    }
+    ~> {
+        printf("window is valid: %f\n", window)
+    }
+}
+
+defer sdl.SDL_DestroyWindow(window)
+printf("Success!\n")

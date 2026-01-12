@@ -1,0 +1,27 @@
+import sdl3 as sdl
+
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
+    exitf("SDL_Init failed\n")
+}
+defer sdl.SDL_Quit()
+
+window = sdl.SDL_CreateWindow("Test", 640, 480, 0)
+
+// Convert pointer to integer for printing
+window_int := window as int64
+printf("window pointer as int = %d\n", window_int)
+
+window_int {
+    0 => {
+        printf("window is NULL - getting error\n")
+        error_msg := sdl.SDL_GetError()
+        printf("SDL Error: %s\n", error_msg)
+        exitf("Failed\n")
+    }
+    ~> {
+        printf("window is valid pointer\n")
+        defer sdl.SDL_DestroyWindow(window)
+    }
+}
+
+printf("Success!\n")

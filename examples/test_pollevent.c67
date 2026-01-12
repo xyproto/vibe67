@@ -1,0 +1,13 @@
+import sdl3 as sdl
+
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
+
+event := c.malloc(192)
+printf("Before SDL_PollEvent, event = %f\n", event)
+
+result := sdl.SDL_PollEvent(event)
+printf("After SDL_PollEvent, result = %f\n", result)
+
+c.free(event)
+sdl.SDL_Quit()
+printf("Done!\n")

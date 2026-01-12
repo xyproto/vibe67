@@ -1,0 +1,1 @@
+exitf("Test error: %s\n", "hello")

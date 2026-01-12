@@ -1,0 +1,14 @@
+import sdl3 as sdl
+
+// Simple test: store pointer, load it, pass it
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
+window = sdl.SDL_CreateWindow("Test", 640, 480, 0)
+
+// Test: Call SDL_DestroyWindow immediately with the window pointer
+// If the pointer is corrupted, this should crash or SDL_GetError will show an error
+sdl.SDL_DestroyWindow(window)
+
+error := sdl.SDL_GetError()
+printf("After DestroyWindow, error = %s\n", error)
+
+sdl.SDL_Quit()

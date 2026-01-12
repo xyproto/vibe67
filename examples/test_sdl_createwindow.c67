@@ -1,0 +1,18 @@
+import sdl3 as sdl
+
+sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
+    exitf("SDL_Init failed: %s\n", sdl.SDL_GetError())
+}
+
+defer sdl.SDL_Quit()
+
+window := sdl.SDL_CreateWindow("Test Window", 640, 480, 0)
+window {
+    0 => {
+        exitf("Failed to create window: %s\n", sdl.SDL_GetError())
+    }
+    ~> {
+        println("Window created successfully!")
+        sdl.SDL_DestroyWindow(window)
+    }
+}

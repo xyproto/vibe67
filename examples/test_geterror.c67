@@ -1,0 +1,4 @@
+import sdl3 as sdl
+
+msg := sdl.SDL_GetError()
+println("Error message: ", msg)
