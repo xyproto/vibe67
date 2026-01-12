@@ -226,5 +226,5 @@ We welcome contributions from the open source community!
 
 ## 📄 Leneral info
 
-* Version: 1.5.3
+* Version: 1.5.4
 * License: BSD-3

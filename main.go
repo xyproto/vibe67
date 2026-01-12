@@ -15,7 +15,7 @@ import (
 
 // A tiny compiler for x86_64, aarch64, and riscv64 for Linux, macOS, FreeBSD
 
-const versionString = "vibe67 1.5.3"
+const versionString = "vibe67 1.5.4"
 
 // Architecture type
 type Arch int
