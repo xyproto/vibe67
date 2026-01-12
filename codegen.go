@@ -5831,8 +5831,8 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 							} else if field.Offset < 128 {
 								fc.out.Emit([]byte{0x0f, 0xb6, 0x50, byte(field.Offset)}) // movzx edx, byte [rax + offset]
 							} else {
-								fc.out.Emit([]byte{0x0f, 0xb6, 0x90})                         // movzx edx, byte [rax + offset]
-								fc.out.Emit([]byte{byte(field.Offset), 0, 0, 0})              // 32-bit offset
+								fc.out.Emit([]byte{0x0f, 0xb6, 0x90})            // movzx edx, byte [rax + offset]
+								fc.out.Emit([]byte{byte(field.Offset), 0, 0, 0}) // 32-bit offset
 							}
 							fc.out.Cvtsi2sd("xmm0", "rdx") // Convert to float64
 						case "uint16", "int16", "u16", "i16":
@@ -5849,12 +5849,12 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 						case "uint32", "int32", "u32", "i32":
 							// Read 32-bit value
 							fc.out.MovMemToReg("edx", "rax", field.Offset) // Load 32-bit value
-							fc.out.MovRegToReg("rax", "rdx")                // Zero-extend to 64-bit
-							fc.out.Cvtsi2sd("xmm0", "rax")                  // Convert to float64
+							fc.out.MovRegToReg("rax", "rdx")               // Zero-extend to 64-bit
+							fc.out.Cvtsi2sd("xmm0", "rax")                 // Convert to float64
 						case "uint64", "int64", "u64", "i64":
 							// Read 64-bit value
 							fc.out.MovMemToReg("rax", "rax", field.Offset) // Load 64-bit value
-							fc.out.Cvtsi2sd("xmm0", "rax")                  // Convert to float64
+							fc.out.Cvtsi2sd("xmm0", "rax")                 // Convert to float64
 						case "float32", "f32":
 							// Read 32-bit float
 							fc.out.Emit([]byte{0xf3, 0x0f, 0x10}) // movss xmm0, [rax + offset]
@@ -6152,7 +6152,7 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 		savedInLocalBlock := fc.inLocalBlock
 		fc.inLocalBlock = true
 		defer func() { fc.inLocalBlock = savedInLocalBlock }()
-		
+
 		// First, collect symbols from all statements in the block
 		for _, stmt := range e.Statements {
 			if err := fc.collectSymbols(stmt); err != nil {
@@ -13324,28 +13324,28 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		if len(call.Args) != 2 {
 			compilerError("peek32() requires exactly 2 arguments (ptr, offset), got %d", len(call.Args))
 		}
-		
+
 		// Compile pointer argument
 		fc.compileExpression(call.Args[0])
 		fc.out.MovqXmmToReg("rax", "xmm0") // Convert float64 to integer pointer
-		
+
 		// Save pointer
 		fc.out.SubImmFromReg("rsp", 8)
 		fc.out.MovRegToMem("rax", "rsp", 0)
-		
+
 		// Compile offset argument
 		fc.compileExpression(call.Args[1])
 		fc.out.Cvttsd2si("rbx", "xmm0") // Convert offset to integer
-		
+
 		// Restore pointer
 		fc.out.MovMemToReg("rax", "rsp", 0)
 		fc.out.AddImmToReg("rsp", 8)
-		
+
 		// Read uint32 at [rax + rbx]
 		fc.out.AddRegToReg("rax", "rbx")
 		// Use explicit encoding: mov eax, [rax] - this zero-extends to rax
 		fc.out.Emit([]byte{0x8B, 0x00}) // mov eax, [rax]
-		fc.out.Cvtsi2sd("xmm0", "rax")   // Convert to float64
+		fc.out.Cvtsi2sd("xmm0", "rax")  // Convert to float64
 		return
 
 	case "peek8":
@@ -13353,29 +13353,29 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		if len(call.Args) != 2 {
 			compilerError("peek8() requires exactly 2 arguments (ptr, offset), got %d", len(call.Args))
 		}
-		
+
 		// Compile pointer argument
 		fc.compileExpression(call.Args[0])
 		fc.out.MovqXmmToReg("rax", "xmm0")
-		
+
 		// Save pointer
 		fc.out.SubImmFromReg("rsp", 8)
 		fc.out.MovRegToMem("rax", "rsp", 0)
-		
+
 		// Compile offset argument
 		fc.compileExpression(call.Args[1])
 		fc.out.Cvttsd2si("rbx", "xmm0")
-		
+
 		// Restore pointer
 		fc.out.MovMemToReg("rax", "rsp", 0)
 		fc.out.AddImmToReg("rsp", 8)
-		
+
 		// Read uint32 at [rax + rbx] and mask to get byte
 		fc.out.AddRegToReg("rax", "rbx")
-		fc.out.MovMemToReg("edx", "rax", 0)       // Read 32-bit value
-		fc.out.MovImmToReg("rcx", "255")          // Mask value
-		fc.out.AndRegWithReg("rdx", "rcx")        // Mask to 8 bits
-		fc.out.Cvtsi2sd("xmm0", "rdx")            // Convert to float64
+		fc.out.MovMemToReg("edx", "rax", 0) // Read 32-bit value
+		fc.out.MovImmToReg("rcx", "255")    // Mask value
+		fc.out.AndRegWithReg("rdx", "rcx")  // Mask to 8 bits
+		fc.out.Cvtsi2sd("xmm0", "rdx")      // Convert to float64
 		return
 
 	case "head":

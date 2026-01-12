@@ -13,9 +13,9 @@ type Node interface {
 
 type Program struct {
 	Statements         []Statement
-	ExportMode         string            // "*" for export all without prefix, "" for require prefix
-	ExportedFuncs      []string          // Specific functions to export (only if ExportMode is not "*")
-	FunctionNamespaces map[string]string // function name -> namespace (for imports)
+	ExportMode         string                  // "*" for export all without prefix, "" for require prefix
+	ExportedFuncs      []string                // Specific functions to export (only if ExportMode is not "*")
+	FunctionNamespaces map[string]string       // function name -> namespace (for imports)
 	CStructs           map[string]*CStructDecl // cstruct name -> declaration
 }
 
