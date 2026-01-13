@@ -96,6 +96,7 @@ const (
 	TOKEN_GTGTGT_B   // >>>b (rotate right)
 	TOKEN_QUESTION_B // ?b (bit test)
 	TOKEN_AS         // as (type casting)
+	TOKEN_AS_BANG    // as! (raw bitcast)
 	// C type keywords
 	TOKEN_I8   // i8
 	TOKEN_I16  // i16
@@ -446,6 +447,11 @@ func (l *Lexer) NextToken() Token {
 		case "export":
 			return Token{Type: TOKEN_EXPORT, Value: value, Line: l.line, Column: tokenColumn}
 		case "as":
+			// Check for "as!" (raw bitcast)
+			if l.pos < len(l.input) && l.input[l.pos] == '!' {
+				l.pos++
+				return Token{Type: TOKEN_AS_BANG, Value: "as!", Line: l.line, Column: tokenColumn}
+			}
 			return Token{Type: TOKEN_AS, Value: value, Line: l.line, Column: tokenColumn}
 		case "unsafe":
 			return Token{Type: TOKEN_UNSAFE, Value: value, Line: l.line, Column: tokenColumn}

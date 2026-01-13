@@ -66,6 +66,21 @@ They do NOT change the runtime representation (always `map[uint64]float64`).
 
 Foreign types are used at FFI boundaries to guide marshalling.
 
+### Cast Operators
+
+Vibe67 provides two cast operators for different conversion semantics:
+
+- **`as`** - Numeric conversion (default, safe)
+  - Converts C pointer addresses to float64 values (cvtsi2sd)
+  - Example: `ptr as cptr` converts address `0x7fff1234` → float value `140733193388084.0`
+  - Use for: Normal C FFI pointers, arithmetic, comparisons
+
+- **`as!`** - Raw bitcast (unsafe, preserves bit pattern)
+  - Reinterprets raw bits without conversion (movq)
+  - Example: `value as! cptr` treats bits of `value` as if they were a pointer
+  - Use for: NaN boxing, tagged pointers, bit manipulation
+  - **Dangerous:** Can create invalid pointers if misused
+
 ## Table of Contents
 
 - [Grammar Notation](#grammar-notation)
@@ -655,7 +670,11 @@ power_expr      = unary_expr { ( "**" | "^" ) unary_expr } ;
 unary_expr      = ( "-" | "not" | "!b" | "~b" | "#" | "µ" ) unary_expr
                 | postfix_expr ;
 
-postfix_expr    = primary_expr { postfix_op } [ "as" identifier ] ;
+postfix_expr    = primary_expr { postfix_op } [ cast_op identifier ] ;
+
+cast_op         = "as"   // Numeric conversion (cvtsi2sd for pointers)
+                | "as!"  // Raw bitcast (movq, preserves bit pattern)
+                ;
 
 postfix_op      = "[" expression "]"
                 | "." ( identifier | integer )

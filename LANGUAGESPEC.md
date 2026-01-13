@@ -430,13 +430,39 @@ Without annotations, Vibe67 uses heuristics at FFI boundaries. With annotations,
 
 ### Type Conversions
 
-Use `as` for explicit type casts at FFI boundaries:
+Vibe67 provides two cast operators for different conversion semantics:
+
+#### `as` - Numeric Conversion (Safe, Default)
+
+Converts values numerically, preserving numeric meaning:
 
 ```vibe67
 x as int32      // Cast to C int32
-ptr as cstr     // Cast to C string pointer
+ptr as cptr     // Pointer address → float64 value (cvtsi2sd)
 val as float64  // Cast to C double
+
+// Example: C pointer conversion
+window = sdl.SDL_CreateWindow(...) as cptr
+// Address 0x7fff1234 becomes float value 140733193388084.0
 ```
+
+**Use for:** Normal C FFI, all pointer operations, arithmetic
+
+#### `as!` - Raw Bitcast (Unsafe)
+
+Reinterprets raw bit pattern without conversion:
+
+```vibe67
+tagged as! cptr      // Treat bits AS IF they were a pointer (movq)
+nan_boxed as! uint64 // Extract raw bits
+
+// Example: NaN boxing (advanced)
+ptr_bits = window as! uint64  // Get raw bit pattern
+tagged = (ptr_bits | 0xFFFF000000000000) as! cptr
+```
+
+**Use for:** NaN boxing, tagged pointers, bit manipulation
+**Warning:** Can create invalid pointers. Only use when you know what you're doing.
 
 **Supported cast types (legacy, for `unsafe` blocks):**
 ```

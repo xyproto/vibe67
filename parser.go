@@ -3725,10 +3725,11 @@ func (p *Parser) parsePostfix() Expression {
 			// Handle postfix length operator: xs#
 			p.nextToken() // skip to #
 			expr = &UnaryExpr{Operator: "#", Operand: expr}
-		} else if p.peek.Type == TOKEN_AS {
-			// Handle type cast: expr as type
+		} else if p.peek.Type == TOKEN_AS || p.peek.Type == TOKEN_AS_BANG {
+			// Handle type cast: expr as type or expr as! type (raw bitcast)
+			isRawBitcast := p.peek.Type == TOKEN_AS_BANG
 			p.nextToken() // skip current expr
-			p.nextToken() // skip 'as'
+			p.nextToken() // skip 'as' or 'as!'
 
 			// Parse the cast type
 			var castType string
@@ -3768,7 +3769,7 @@ func (p *Parser) parsePostfix() Expression {
 				p.error("expected type after 'as'")
 			}
 
-			expr = &CastExpr{Expr: expr, Type: castType}
+			expr = &CastExpr{Expr: expr, Type: castType, RawBitcast: isRawBitcast}
 		} else if p.peek.Type == TOKEN_DOT {
 			// Handle dot notation: obj.field, namespace.func(), namespace.CONSTANT, Type.size, Type.field.offset
 			p.nextToken() // skip current expr

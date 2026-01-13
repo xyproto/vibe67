@@ -891,8 +891,9 @@ func (l *LengthExpr) String() string {
 func (l *LengthExpr) expressionNode() {}
 
 type CastExpr struct {
-	Expr Expression
-	Type string // "i8", "i32", "u64", "f32", "f64", "cstr", "ptr", "number", "string", "list"
+	Expr       Expression
+	Type       string // "i8", "i32", "u64", "f32", "f64", "cstr", "ptr", "number", "string", "list"
+	RawBitcast bool   // true for as!, false for as (numeric conversion)
 }
 
 func (c *CastExpr) String() string {
