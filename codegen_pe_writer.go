@@ -26,7 +26,7 @@ func (fc *Vibe67Compiler) writePE(program *Program, outputPath string) error {
 	libraries := make(map[string][]string)
 
 	// Standard C runtime functions (msvcrt.dll)
-	msvcrtFuncs := []string{"printf", "fprintf", "stderr", "exit", "malloc", "free", "realloc", "strlen", "pow", "fflush", "sin", "cos", "sqrt", "fopen", "fclose", "fwrite", "fread", "memcpy", "memset"}
+	msvcrtFuncs := []string{"printf", "fprintf", "exit", "malloc", "free", "realloc", "strlen", "pow", "fflush", "sin", "cos", "sqrt", "fopen", "fclose", "fwrite", "fread", "memcpy", "memset"}
 
 	// Add all functions from usedFunctions, organized by library
 	lambdaSet := make(map[string]bool)

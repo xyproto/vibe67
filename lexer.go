@@ -170,6 +170,9 @@ const (
 	TOKEN_LTGT     // <> (composition operator)
 	TOKEN_RANDOM   // ?? (random number operator)
 	TOKEN_SHADOW   // shadow (explicit shadowing declaration)
+	TOKEN_YES      // yes (boolean true)
+	TOKEN_NO       // no (boolean false)
+	TOKEN_BOOL     // bool (boolean type annotation)
 )
 
 // Code generation constants
@@ -502,6 +505,12 @@ func (l *Lexer) NextToken() Token {
 			return Token{Type: TOKEN_CLASS, Value: value, Line: l.line, Column: tokenColumn}
 		case "shadow":
 			return Token{Type: TOKEN_SHADOW, Value: value, Line: l.line, Column: tokenColumn}
+		case "yes":
+			return Token{Type: TOKEN_YES, Value: value, Line: l.line, Column: tokenColumn}
+		case "no":
+			return Token{Type: TOKEN_NO, Value: value, Line: l.line, Column: tokenColumn}
+		case "bool":
+			return Token{Type: TOKEN_BOOL, Value: value, Line: l.line, Column: tokenColumn}
 		case "xor":
 			return Token{Type: TOKEN_XOR, Value: value, Line: l.line, Column: tokenColumn}
 			// Note: All type keywords (i8-i512, u8-u512, byte, rune, f32-f128,

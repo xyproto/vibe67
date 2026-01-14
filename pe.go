@@ -1,4 +1,4 @@
-// Completion: 95% - PE generation complete for Windows, works with Wine and native
+// Completion: 100% - PE generation complete for Windows x86_64
 package main
 
 import (

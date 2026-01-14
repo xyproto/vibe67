@@ -211,7 +211,7 @@ defer sdl.SDL_DestroyTexture(tex)
 | Platform | Arch | Status | Notes |
 |----------|------|--------|-------|
 | Linux | x86_64 | ✅ | Primary target, no libc required |
-| Windows | x86_64 | ✅ | Native PE generation |
+| Windows | x86_64 | ✅ | Native PE generation, full support |
 | Linux | ARM64 | ✅ | Raspberry Pi / Apple M1 (Linux) |
 | Linux | RISC-V | ✅ | SiFive / StarFive |
 | macOS | x86_64 | 🚧 | In progress |

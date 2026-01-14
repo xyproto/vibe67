@@ -1,138 +1,71 @@
-# Vibe67 Grammar Specification
+# C67 Grammar Specification
 
 **Version:** 1.5.0
 **Date:** 2025-12-03
-**Status:** Canonical Grammar Reference for Vibe67 3.0 Release
+**Status:** Canonical Grammar Reference for C67 3.0 Release
 
-This document defines the complete formal grammar of the Vibe67 programming language using Extended Backus-Naur Form (EBNF).
+This document defines the complete formal grammar of the C67 programming language using Extended Backus-Naur Form (EBNF).
 
-## ⚠️ CRITICAL: Zig-Inspired Type System
+## ⚠️ CRITICAL: The Universal Type
 
-Vibe67 uses **compile-time type inference** with **zero-cost abstractions** inspired by Zig.
+C67 has exactly ONE runtime type: `map[uint64]float64`, an ordered map.
 
-**Core Principles:**
+Not "represented as" or "backed by" — every value IS this map:
 
-1. **Compile-time types** - Types are inferred at compile time, not tracked at runtime
-2. **Native register allocation** - Values use native CPU registers (no boxing for monomorphic code)
-3. **Zero-cost abstractions** - Pay only for what you use
-4. **Universal support** - All useful types from systems programming to high-level languages
-5. **Demoscene-friendly** - Minimal size overhead, maximum performance
-
-**How It Works:**
-
-```vibe67
-// Compile-time type inference
-x = 42                    // Inferred: i64, stored in register
-name = "Hello"            // Inferred: UTF-8 string with length
-items = [1, 2, 3]         // Inferred: [3]i64, stack-allocated array
-ptr = c.malloc(100)!      // Inferred: cptr (64-bit pointer in register)
-
-// Native register allocation (no boxing)
-compute = (a: i32, b: i32) -> i32 {
-    a + b                 // i32 add in 32-bit register, no allocations
-}
-
-// Boxing only when needed (heterogeneous collections)
-mixed = [42, "hello", 3.14]  // Boxed values with type tags
+```c67
+42              // {0: 42.0}
+"Hello"         // {0: 72.0, 1: 101.0, 2: 108.0, 3: 108.0, 4: 111.0}
+[1, 2, 3]       // {0: 1.0, 1: 2.0, 2: 3.0}
+{x: 10}         // {hash("x"): 10.0}
+[]              // {}
+{}              // {}
 ```
 
-**Type Categories:**
+**Even C foreign types are stored as maps:**
 
-- **Integers**: `i8` `i16` `i32` `i64` `i128` `u8` `u16` `u32` `u64` `u128` (also: `byte` = `u8`, `rune` = `i32`)
-- **Floats**: `f32` `f64` `f128`
-- **Complex**: `complex64` `complex128` (real + imaginary components)
-- **Strings**: UTF-8 (default), UTF-16, UTF-32, C strings
-- **Collections**: Arrays (fixed-size), slices (dynamic), maps, sets, trees
-- **C FFI**: `cptr` `cstr` `cint` `clong` `cfloat` `cdouble` `cbool`
+```c67
+// C pointer (0x7fff1234) stored as float64 bits
+ptr: cptr = sdl.SDL_CreateWindow(...)  // {0: <pointer_as_float64>}
 
-**Performance Model:**
+// C string pointer
+err: cstring = sdl.SDL_GetError()      // {0: <char*_as_float64>}
 
-- Monomorphic code (single type): Native registers, zero overhead
-- Polymorphic code (multiple types): Specialized per type at call sites
-- Heterogeneous collections: Boxed with type tags (only when needed)
+// C int
+result: cint = sdl.SDL_Init(...)       // {0: 1.0} or {0: 0.0}
+```
 
-This approach provides the simplicity of dynamic languages with the performance of systems languages.
+There are NO special types, NO primitives, NO exceptions.
+Everything is a map from uint64 to float64.
+
+This is not an implementation detail — this IS C67.
 
 ## Type Annotations
 
-Type annotations are **compile-time metadata** that guide:
-1. **Type inference** - what type should be inferred for this value
-2. **Code generation** - which registers and instructions to use
-3. **FFI conversions** - how to marshal at C boundaries
-4. **Optimizations** - enabling specializations and SIMD
+Type annotations are **metadata** that specify:
+1. **Semantic intent** - what does this map represent?
+2. **FFI conversions** - how to marshal at C boundaries
+3. **Optimization hints** - compiler optimizations
 
-They enable zero-cost abstractions through compile-time specialization.
+They do NOT change the runtime representation (always `map[uint64]float64`).
 
-### Primitive Types
-
-**Integers (signed):** `i8` `i16` `i32` `i64` `i128` `i256` `i512`
-**Integers (unsigned):** `u8` `u16` `u32` `u64` `u128` `u256` `u512`
-**Aliases:** `byte` (u8), `rune` (i32 for Unicode)
-**Floats:** `f32` `f64` `f128`
-**Complex:** `complex64` `complex128`
-**Quaternions:** `quaternion`
-
-### String Types
-
-- `string` - UTF-8 string (default)
-- `utf8` - UTF-8 string (explicit)
-- `utf16` - UTF-16 string
-- `utf32` - UTF-32 string
-
-### Collection Types
-
-- `array` / `[N]T` - Fixed-size array
-- `slice` / `[]T` - Dynamic slice
-- `list` - Linked list
-- `map` / `map[K]V` - Hash map
-- `set` - Hash set
-- `tree` - Binary tree
+### Native C67 Types
+- `num` - number (default type)
+- `str` - string (map of char codes)
+- `list` - list (map with integer keys)
+- `map` - explicit map
+- `bool` - boolean (yes/no values)
 
 ### Foreign C Types
-
-- `cstr` - C `char*`
-- `cptr` - C pointer (void*)
-- `cint` - C `int` (32-bit)
-- `clong` - C `long` (64-bit)
-- `cfloat` - C `float` (32-bit)
-- `cdouble` - C `double` (64-bit)
-- `cbool` - C `bool` / `_Bool`
+- `cstring` - C `char*` (pointer stored as `{0: <ptr>}`)
+- `cptr` - C pointer (e.g., `SDL_Window*`)
+- `cint` - C `int`/`int32_t`
+- `clong` - C `int64_t`/`long`
+- `cfloat` - C `float`
+- `cdouble` - C `double`
+- `cbool` - C `bool`/`_Bool`
 - `cvoid` - C `void` (return type only)
 
 Foreign types are used at FFI boundaries to guide marshalling.
-
-### Cast Operators and Raw Bitcast
-
-Vibe67 provides type casting and raw bitcast operations:
-
-- **`as`** - Type cast (compile-time type conversion)
-  - Converts between compatible types
-  - Example: `x as i32` casts value to 32-bit integer
-  - Example: `ptr as cptr` casts to C pointer type
-  - Use for: Normal type conversions, C FFI marshalling
-
-- **`call()!`** - Raw bitcast for C FFI function returns
-  - The `!` suffix on function calls preserves all 64 bits of return values
-  - Uses raw bitcast instructions (movq) instead of numeric conversion
-  - Essential for C functions returning pointers that use high address bits
-  - Example: `window = sdl.SDL_CreateWindow(...)!` preserves full 64-bit pointer
-  - Example: `ptr = c.malloc(100)!` preserves pointer address beyond 2^53
-
-**C FFI Return Handling:**
-
-```vibe67
-// Without !: numeric conversion (works for pointers < 2^53)
-result = c.function_call(123)    // Uses cvtsi2sd (53-bit precision)
-
-// With !: raw bitcast (preserves all 64 bits)
-ptr = c.malloc(1024)!            // Uses movq (full 64-bit precision)
-window = sdl.SDL_CreateWindow(...)!  // Preserves high address bits
-```
-
-**When to use `!` suffix:**
-- C functions returning pointers (especially on systems using high memory addresses)
-- Any C function where the numeric value matters beyond 53-bit precision
-- Critical for SDL, graphics APIs, and any pointer-heavy C libraries
 
 ## Table of Contents
 
@@ -167,7 +100,7 @@ When the parser encounters `{`, it determines the block type by examining conten
 ### Rule 1: Map Literal
 **Condition:** First element contains `:` (before any `=>` or `~>`)
 
-```vibe67
+```c67
 config = { port: 8080, host: "localhost" }
 settings = { "key": value, "other": 42 }
 ```
@@ -180,7 +113,7 @@ There are TWO forms:
 #### Form A: Value Match (with expression before `{`)
 Evaluates expression, then matches its result against patterns:
 
-```vibe67
+```c67
 // Match on literal values
 x {
     0 => "zero"
@@ -198,7 +131,7 @@ x > 0 {
 #### Form B: Guard Match (no expression, uses `|` at line start)
 Each branch evaluates its own condition independently:
 
-```vibe67
+```c67
 // Guard branches with | at line start
 {
     | x == 0 => "zero"
@@ -214,7 +147,7 @@ Otherwise `|` is the pipe operator: `data | transform | filter`
 ### Rule 3: Statement Block
 **Condition:** No `=>` or `~>` in scope, not a map
 
-```vibe67
+```c67
 compute = x -> {
     temp = x * 2
     result = temp + 10
@@ -222,42 +155,10 @@ compute = x -> {
 }
 ```
 
-**Context-Sensitive Evaluation:**
-
-Statement blocks behave differently depending on context:
-
-#### Expression Context (Immediate Evaluation)
-When a block appears in expression position, it evaluates immediately:
-
-```vibe67
-println({ 10 })                    // Prints: 10
-println({ x = 5; x * 2 })          // Prints: 10
-result = ({ a = 10; a + 20 })      // result = 30
-```
-
-#### Assignment Context (Lambda Creation)
-When a block is assigned to a variable, it becomes a lambda (0-argument function):
-
-```vibe67
-f = { 10 }                         // f is a lambda
-println(f())                       // Prints: 10
-
-g = { x = 5; x * 2 }               // g is a lambda
-println(g())                       // Prints: 10
-
-// Lambda can be called later
-compute = { temp = 42; temp * 2 }
-result = compute()                 // result = 84
-```
-
-This allows elegant syntax for both immediate evaluation and deferred computation.
-
 **Disambiguation order:**
 1. Check for `:` → Map literal
 2. Check for `=>` or `~>` → Match block
 3. Otherwise → Statement block
-   - Expression context → Evaluate immediately
-   - Assignment context → Create lambda
 
 **Match block type:**
 - Has expression before `{` → Value match
@@ -269,7 +170,7 @@ The `shadow` keyword is used to explicitly declare that a variable shadows (hide
 
 ### Syntax
 
-```vibe67
+```c67
 shadow identifier [: type] = expression
 shadow identifier [: type] := expression
 ```
@@ -289,7 +190,7 @@ shadow identifier [: type] := expression
 
 ### Examples
 
-```vibe67
+```c67
 // Module level
 PORT = 8080
 config = { host: "localhost" }
@@ -339,7 +240,7 @@ test = {
 
 ## Import and Export System
 
-Vibe67's import system provides a unified way to import libraries, git repositories, and local directories. The export system controls which functions are available to importers and whether they require namespace prefixes.
+C67's import system provides a unified way to import libraries, git repositories, and local directories. The export system controls which functions are available to importers and whether they require namespace prefixes.
 
 ### Export Statements
 
@@ -348,21 +249,21 @@ The `export` statement controls which functions are available to importers:
 **Three export modes:**
 
 1. **`export *`** - Export all functions into global namespace (no prefix required)
-   ```vibe67
+   ```c67
    export *
 
    hello = { println("Hello from this module!") }
    goodbye = { println("Goodbye!") }
    ```
    When imported:
-   ```vibe67
+   ```c67
    import "github.com/user/greetings" as greet
    hello()      // Works - no prefix needed
    goodbye()    // Works - no prefix needed
    ```
 
 2. **`export func1 func2 ...`** - Export only listed functions (prefix required)
-   ```vibe67
+   ```c67
    export hello goodbye
 
    hello = { println("Hello!") }
@@ -370,7 +271,7 @@ The `export` statement controls which functions are available to importers:
    internal_helper = { println("Internal") }  // Not exported
    ```
    When imported:
-   ```vibe67
+   ```c67
    import "github.com/user/greetings" as greet
    greet.hello()         // Works - prefix required
    greet.goodbye()       // Works - prefix required
@@ -378,14 +279,14 @@ The `export` statement controls which functions are available to importers:
    ```
 
 3. **No export statement** - All functions available (prefix required)
-   ```vibe67
+   ```c67
    // No export statement
 
    hello = { println("Hello!") }
    goodbye = { println("Goodbye!") }
    ```
    When imported:
-   ```vibe67
+   ```c67
    import "github.com/user/greetings" as greet
    greet.hello()    // Works - prefix required
    greet.goodbye()  // Works - prefix required
@@ -397,8 +298,8 @@ The `export` statement controls which functions are available to importers:
 - No export is for general libraries where namespace pollution is a concern
 
 **Example: Beginner-friendly library**
-```vibe67
-// simplelib/main.vibe67
+```c67
+// simplelib/main.c67
 export *
 
 // Library initialization
@@ -439,17 +340,17 @@ init_window(800, 600, "My App")
 
 ### Import Syntax
 
-```vibe67
+```c67
 // Library import (uses pkg-config or finds .dll)
 import sdl3 as sdl
 import raylib as rl
 
 // Git repository import
-import github.com/xyproto/vibe67-math as math
-import github.com/xyproto/vibe67-math@v1.0.0 as math
-import github.com/xyproto/vibe67-math@latest as math
-import github.com/xyproto/vibe67-math@main as math
-import git@github.com:xyproto/vibe67-math.git as math
+import github.com/xyproto/c67-math as math
+import github.com/xyproto/c67-math@v1.0.0 as math
+import github.com/xyproto/c67-math@latest as math
+import github.com/xyproto/c67-math@main as math
+import git@github.com:xyproto/c67-math.git as math
 
 // Directory import
 import . as local                    // Current directory
@@ -464,8 +365,8 @@ import SDL3.dll as sdl
 ### Import Behavior
 
 - **Libraries**: Searches for library files and headers, parses C headers for FFI
-- **Git Repos**: Clones to `~/.cache/vibe67/` (respects `XDG_CACHE_HOME`), imports all top-level `.vibe67` files
-- **Directories**: Imports all top-level `.vibe67` files from the directory
+- **Git Repos**: Clones to `~/.cache/c67/` (respects `XDG_CACHE_HOME`), imports all top-level `.c67` files
+- **Directories**: Imports all top-level `.c67` files from the directory
 - **Version Specifiers**:
   - `@v1.0.0` - Specific tag
   - `@main` or `@master` - Specific branch
@@ -474,37 +375,37 @@ import SDL3.dll as sdl
 
 ### Namespace Rules
 
-When importing a Vibe67 module:
+When importing a C67 module:
 
 1. **If module has `export *`**: Functions available without prefix
-   ```vibe67
+   ```c67
    import "github.com/user/simplelib" as lib
    init_window()  // No prefix needed
    ```
 
 2. **If module has `export func1 func2`**: Only listed functions available, prefix required
-   ```vibe67
+   ```c67
    import "github.com/user/api" as api
    api.exported_func()  // Prefix required
    api.internal_func()  // Error - not exported
    ```
 
 3. **If module has no export**: All functions available, prefix required
-   ```vibe67
+   ```c67
    import "github.com/user/utils" as utils
    utils.helper()  // Prefix required
    ```
 
 ## Program Execution Model
 
-Vibe67 programs can be structured in three ways:
+C67 programs can be structured in three ways:
 
 ### 1. Main Function
 When a `main` function is defined, it becomes the program entry point:
 
-```vibe67
+```c67
 main = { println("Hello!") }     // A lambda that returns the value returned from println (true/1.0)
-main = 42                        // A Vibe67 number {0: 42.0}
+main = 42                        // A C67 number {0: 42.0}
 main = () -> { 100 }             // A lambda that returns 100
 main = { 100 }                   // A lambda that returns 100
 ```
@@ -518,7 +419,7 @@ main = { 100 }                   // A lambda that returns 100
 ### 2. Main Variable
 When a `main` variable (not a function) is defined without top-level code:
 
-```vibe67
+```c67
 main = 42        // Exit with code 42
 main = {}        // Exit with code 0 (empty map)
 main = []        // Exit with code 0 (empty list)
@@ -531,7 +432,7 @@ main = []        // Exit with code 0 (empty list)
 ### 3. Top-Level Code
 When there's no `main` function or variable, top-level code executes:
 
-```vibe67
+```c67
 println("Hello!")
 x := 42
 println(x)
@@ -551,7 +452,7 @@ println(x)
 - If top-level doesn't call `main()`, `main()` is never executed
 - Last expression in top-level code provides exit code
 
-```vibe67
+```c67
 // Top-level setup
 x := 100
 
@@ -566,7 +467,7 @@ main = { println(x); 42 }
 - `main` variable is accessible but not special
 - Last top-level expression provides exit code
 
-```vibe67
+```c67
 main = 99
 
 println("Setup")
@@ -623,14 +524,10 @@ class_field_decl = identifier "." identifier "=" expression ;
 
 method_decl     = identifier "=" lambda_expr ;
 
-c_type          = "i8" | "i16" | "i32" | "i64" | "i128"
-                | "u8" | "u16" | "u32" | "u64" | "u128"
-                | "byte" | "rune"
-                | "f32" | "f64" | "f128"
-                | "cptr" | "cstr" | "cint" | "clong" | "cfloat" | "cdouble" | "cbool"
-                | "int8" | "int16" | "int32" | "int64"  // Legacy
-                | "uint8" | "uint16" | "uint32" | "uint64"  // Legacy
-                | "float32" | "float64" ;  // Legacy
+c_type          = "int8" | "int16" | "int32" | "int64"
+                | "uint8" | "uint16" | "uint32" | "uint64"
+                | "float32" | "float64"
+                | "cptr" | "cstring" ;
 
 arena_statement = "arena" block ;
 
@@ -645,7 +542,7 @@ unsafe_statement = "unsafe" type_cast block [ block ] [ block ] ;
 type_cast       = "int8" | "int16" | "int32" | "int64"
                 | "uint8" | "uint16" | "uint32" | "uint64"
                 | "float32" | "float64"
-                | "number" | "string" | "list" | "addr"
+                | "number" | "string" | "list" | "address"
                 | "packed" | "aligned" ;
 
 assignment      = identifier [ ":" type_annotation ] ("=" | ":=" | "<-") expression
@@ -659,23 +556,11 @@ identifier_list = identifier { "," identifier } ;
 // All assignments at module level (outside functions/lambdas) MUST use UPPERCASE identifiers.
 // This prevents shadowing and makes globals visually distinct from locals.
 
-type_annotation = primitive_type | collection_type | foreign_type ;
+type_annotation = native_type | foreign_type ;
 
-primitive_type  = integer_type | float_type | complex_type | string_type ;
+native_type     = "num" | "str" | "list" | "map" | "bool" ;
 
-integer_type    = "i8" | "i16" | "i32" | "i64" | "i128" | "i256" | "i512"
-                | "u8" | "u16" | "u32" | "u64" | "u128" | "u256" | "u512"
-                | "byte" | "rune" ;
-
-float_type      = "f32" | "f64" | "f128" ;
-
-complex_type    = "complex64" | "complex128" | "quaternion" ;
-
-string_type     = "str" | "utf8" | "utf16" | "utf32" ;
-
-collection_type = "array" | "slice" | "list" | "map" | "set" | "tree" ;
-
-foreign_type    = "cstr" | "cptr" | "cint" | "clong"
+foreign_type    = "cstring" | "cptr" | "cint" | "clong"
                 | "cfloat" | "cdouble" | "cbool" | "cvoid" ;
 
 indexed_expr    = identifier "[" expression "]" ;
@@ -739,19 +624,17 @@ power_expr      = unary_expr { ( "**" | "^" ) unary_expr } ;
 unary_expr      = ( "-" | "not" | "!b" | "~b" | "#" | "µ" ) unary_expr
                 | postfix_expr ;
 
-postfix_expr    = primary_expr { postfix_op } [ cast_op identifier ] ;
-
-cast_op         = "as"   // Type cast (compile-time type conversion)
-                ;
+postfix_expr    = primary_expr { postfix_op } ;
 
 postfix_op      = "[" expression "]"
                 | "." ( identifier | integer )
-                | "(" [ argument_list ] ")" [ "!" ]  // ! suffix for raw bitcast return
+                | "(" [ argument_list ] ")"
                 | "#"
                 | match_block ;
 
 primary_expr    = identifier
                 | number
+                | boolean
                 | string
                 | fstring
                 | list_literal
@@ -765,6 +648,8 @@ primary_expr    = identifier
                 | "??"
                 | unsafe_expr
                 | arena_expr ;
+
+boolean         = "yes" | "no" ;
 
 instance_field  = "." identifier ;
 
@@ -821,7 +706,7 @@ lambda_body     = [ "->" type_annotation ] ( block | expression [ match_block ] 
 //   (x: num, y: num) -> num { x + y }             // Parameter and return types
 //   (name: str) -> str { upper(name) }            // String function
 //   (ptr: cptr) -> cint { sdl.SDL_DoSomething(ptr) }  // C types
-//   greet(name: string) -> string { f"Hello, {name}!" } // Function definition with types
+//   greet(name: str) -> str { f"Hello, {name}!" } // Function definition with types
 //
 // Inferred lambda syntax (works ONLY in assignment context):
 //   main = { println("hello") }                   // Inferred: main = -> { println("hello") }
@@ -905,16 +790,50 @@ digit      = "0" | "1" | ... | "9" ;
 - Can include Unicode letters
 
 **Valid examples:**
-```vibe67
+```c67
 x, count, user_name, myVar, value2, Temperature, λ
 ```
 
 **Invalid:**
-```vibe67
+```c67
 2count     // starts with digit
 _private   // starts with underscore
 my-var     // contains hyphen
 ```
+
+### Booleans
+
+Booleans are `map[uint64]float64` with a special marker value:
+
+```ebnf
+boolean = "yes" | "no" ;
+```
+
+**Examples:**
+```c67
+yes             // {0: 1.0, 1: 1.0} (marker: key 1 exists with value 1.0)
+no              // {0: 0.0, 1: 0.0} (marker: key 1 exists with value 0.0)
+```
+
+**Conversions:**
+- `yes as cstr` → `"true"` (C string)
+- `no as cstr` → `"false"` (C string)
+- `yes as cbool` → `true` (C bool)
+- `no as cbool` → `false` (C bool)
+- `yes as num` → `1.0`
+- `no as num` → `0.0`
+
+**Comparison with numbers:**
+Booleans are NOT the same as `1.0` or `0.0`. They have a distinct internal representation:
+```c67
+yes == 1.0      // no (different internal structure)
+no == 0.0       // no (different internal structure)
+yes == yes      // yes (same boolean value)
+no == no        // yes (same boolean value)
+```
+
+**Default return value:**
+Functions that don't explicitly return a value return `1.0` (number). To return a boolean success indicator, explicitly use `yes` or `no`.
 
 ### Numbers
 
@@ -925,7 +844,7 @@ number = [ "-" ] digit { digit } [ "." digit { digit } ] ;
 ```
 
 **Examples:**
-```vibe67
+```c67
 42              // {0: 42.0}
 3.14159         // {0: 3.14159}
 -17             // {0: -17.0}
@@ -949,7 +868,7 @@ string = '"' { character } '"' ;
 ```
 
 **Examples:**
-```vibe67
+```c67
 "Hello"         // {0: 72.0, 1: 101.0, 2: 108.0, 3: 108.0, 4: 111.0}
 "A"             // {0: 65.0}
 ""              // {} (empty map)
@@ -979,7 +898,7 @@ fstring = 'f"' { character | "{" expression "}" } '"' ;
 ```
 
 **Examples:**
-```vibe67
+```c67
 name = "World"
 greeting = f"Hello, {name}!"
 result = f"2 + 2 = {2 + 2}"
@@ -987,7 +906,7 @@ result = f"2 + 2 = {2 + 2}"
 
 ### Comments
 
-```vibe67
+```c67
 // Single-line comment (C++ style)
 ```
 
@@ -998,10 +917,10 @@ No multi-line comments.
 ### Reserved Keywords
 
 ```
-ret arena unsafe cstruct class as max this defer spawn import shadow
+ret arena unsafe cstruct class as max this defer spawn import shadow yes no
 ```
 
-**Note:** In Vibe67, lambda definitions use `->` (thin arrow) and match arms use `=>` (fat arrow), similar to Rust syntax, except that `~>` is used for the default case.
+**Note:** In C67, lambda definitions use `->` (thin arrow) and match arms use `=>` (fat arrow), similar to Rust syntax, except that `~>` is used for the default case.
 
 **No-argument lambdas** can be written as `-> expr` or inferred from context in assignments: `name = { ... }`
 
@@ -1009,101 +928,52 @@ The `shadow` keyword is required when declaring a variable that would shadow an 
 
 ### Type Keywords
 
-Type annotations use these keywords:
+Type annotations use these keywords (context-dependent):
 
-**Integer types (signed):**
+**Native C67 types:**
 ```
-i8 i16 i32 i64 i128 i256 i512
-```
-
-**Integer types (unsigned):**
-```
-u8 u16 u32 u64 u128 u256 u512
-byte      // Alias for u8
-```
-
-**Character types:**
-```
-rune      // Unicode code point (i32)
-```
-
-**Floating-point types:**
-```
-f32 f64 f128
-```
-
-**Complex number types:**
-```
-complex64 complex128
-```
-
-**Quaternion type:**
-```
-quaternion
-```
-
-**String types:**
-```
-string    // UTF-8 string (default)
-utf8      // UTF-8 string (explicit)
-utf16     // UTF-16 string
-utf32     // UTF-32 string
-```
-
-**Collection types:**
-```
-array     // Fixed-size array
-slice     // Dynamic slice
-list      // Linked list
-map       // Hash map
-set       // Hash set
-tree      // Binary tree
+num str list map bool
 ```
 
 **Foreign C types:**
 ```
-cstr cptr cint clong cfloat cdouble cbool cvoid
+cstring cptr cint clong cfloat cdouble cbool cvoid
 ```
 
 **Legacy type cast keywords (for `unsafe` blocks and `cstruct`):**
 ```
 int8 int16 int32 int64 uint8 uint16 uint32 uint64 float32 float64
-number string addr packed aligned
+cptr cstring number string address packed aligned
 ```
 
 **Usage:**
-```vibe67
-// Type annotations
-x: i32 = 42
-count: u64 = 100
-name: string = "Alice"
-data: [10]byte = ...     // 10-byte array
-ch: rune = 'A'
-ptr: cptr = sdl.SDL_CreateWindow(...)!
+```c67
+// Type annotations (preferred)
+x: num = 42
+name: str = "Alice"
+ptr: cptr = sdl.SDL_CreateWindow(...)
 
-// Complex types
-z: complex64 = ...
-items: []i32 = [1, 2, 3]
-mapping: map[str]i32 = ...
+// Type casts in unsafe blocks (legacy)
+value = unsafe int32 { ... }
 ```
 
 Type keywords are contextual - you can still use them as variable names in most contexts:
 
-```vibe67
-i32 = 100              // OK - variable named i32
-x: i32 = i32 * 2       // OK - type annotation vs variable
+```c67
+num = 100              // OK - variable named num
+x: num = num * 2       // OK - type annotation vs variable
 ```
 
 ## Memory Management and Builtins
 
-**CRITICAL DESIGN PRINCIPLE:** Vibe67 keeps builtin functions to an ABSOLUTE MINIMUM.
+**CRITICAL DESIGN PRINCIPLE:** C67 keeps builtin functions to an ABSOLUTE MINIMUM.
 
 **Memory allocation:**
 - NO `malloc`, `free`, `realloc`, or `calloc` as builtins
 - Use arena allocators: `allocate()` within `arena {}` blocks (recommended)
 - Or use C FFI: `c.malloc`, `c.free`, `c.realloc`, `c.calloc` (explicit)
 
-```vibe67
+```c67
 // Recommended: arena allocator
 result = arena {
     data = allocate(1024)
@@ -1130,7 +1000,6 @@ defer c.free(ptr)
 - Control flow: `@`, match blocks, `ret`
 - Core I/O: `print`, `println`, `printf` (and error/exit variants)
 - List operations: `head()`, `tail()`
-- Type introspection: `sizeof(Type)` for cstruct sizes
 - Keywords: `arena`, `unsafe`, `cstruct`, `class`, `defer`, etc.
 
 **Everything else via:**
@@ -1191,7 +1060,7 @@ All bitwise operators use `b` suffix:
 ```
 
 Example of bit test:
-```vibe67
+```c67
 x = 0b10110  // Binary 22
 bit2 = x ?b 2  // Returns 1 (bit 2 is set)
 bit3 = x ?b 3  // Returns 0 (bit 3 is not set)
@@ -1234,7 +1103,7 @@ bit3 = x ?b 3  // Returns 0 (bit 3 is not set)
 
 **Multiple Assignment (Tuple Unpacking):**
 
-```vibe67
+```c67
 // Functions can return multiple values as a list
 a, b = some_function()  // Unpack first two elements
 x, y, z := [1, 2, 3]    // Unpack list literal
@@ -1307,118 +1176,29 @@ From highest to lowest precedence:
 - Right-associative: `**`, all assignments
 - Non-associative: Comparison operators (can't chain)
 
-## Field Access
-
-The dot operator `.` provides field access for both Vibe67 maps and C structs:
-
-### Vibe67 Map Field Access
-
-For Vibe67 maps (the universal type), `.` provides syntactic sugar for hash-based lookup:
-
-```vibe67
-person = {name: "Alice", age: 30}
-person.name   // Syntactic sugar for person[hash("name")]
-person.age    // Syntactic sugar for person[hash("age")]
-```
-
-**Implementation:**
-- Field name is hashed at compile time
-- Lookup uses optimized SIMD map search
-- Returns 0.0 if field doesn't exist
-
-### C Struct Field Access
-
-For C structs (pointers from C FFI), `.` accesses memory at fixed offsets:
-
-```vibe67
-import sdl3 as sdl
-import libc as c
-
-// Allocate SDL_Event struct
-event = c.malloc(192)
-
-// Poll for events
-sdl.SDL_PollEvent(event)
-
-// Access struct field (requires struct layout knowledge)
-event_type = event.type  // Accesses memory at struct offset
-
-c.free(event)
-```
-
-**C Struct Field Access Modes:**
-
-1. **With known layout (via cstruct):**
-   ```vibe67
-   cstruct Point {
-       x as int32
-       y as int32
-   }
-   
-   // Allocate with sizeof()
-   p = c.malloc(sizeof(Point))
-   p.x = 10  // Direct memory write at offset 0
-   p.y = 20  // Direct memory write at offset 4
-   ```
-
-2. **With arena allocation (recommended):**
-   ```vibe67
-   cstruct SDL_Event {
-       type as uint32
-       timestamp as uint64
-   }
-   
-   arena {
-       event := alloc(sizeof(SDL_Event)) as SDL_Event
-       // Use event with type information for field access
-   }
-   ```
-
-3. **Manual offset access:**
-   ```vibe67
-   import libc as c
-   
-   // Read uint32 at specific offset
-   read_u32 = (ptr, offset) -> {
-       // TODO: Implement via inline assembly or intrinsic
-       0
-   }
-   
-   event = c.malloc(192)
-   event_type = read_u32(event, 0)  // Read type field at offset 0
-   ```
-
-**Best Practices:**
-- Use `cstruct` declarations for known C struct layouts
-- Use `sizeof(Type)` to get struct size in bytes
-- Prefer arena allocation with `alloc(sizeof(Type)) as Type`
-- Field access on C structs requires type information via `as` casting
-- For unknown layouts, use explicit offset calculations
-- Vibe67 maps always work with `.` notation
-
 ## Parsing Rules
 
 ### Minimal Parentheses Philosophy
 
-Vibe67 minimizes parenthesis usage. Use parentheses only when:
+C67 minimizes parenthesis usage. Use parentheses only when:
 
 1. **Precedence override needed:**
-   ```vibe67
+   ```c67
    (x + y) * z      // Override precedence
    ```
 
 2. **Complex condition grouping:**
-   ```vibe67
+   ```c67
    (x > 0 && y < 10) { ... }  // Group condition
    ```
 
 3. **Multiple lambda parameters:**
-   ```vibe67
+   ```c67
    (x, y) -> x + y  // Multiple params
    ```
 
 **Not needed:**
-```vibe67
+```c67
 // Good: no unnecessary parens
 x > 0 { => "positive" ~> "negative" }
 result = x + y * z
@@ -1433,7 +1213,7 @@ compute = (x) -> (x * 2)
 
 Statements are terminated by newlines:
 
-```vibe67
+```c67
 x = 10
 y = 20
 z = x + y
@@ -1441,7 +1221,7 @@ z = x + y
 
 Multiple statements on one line require explicit semicolons:
 
-```vibe67
+```c67
 x = 10; y = 20; z = x + y
 ```
 
@@ -1457,7 +1237,7 @@ x = 10; y = 20; z = x + y
 
 The `|` character is context-dependent:
 
-```vibe67
+```c67
 // Pipe operator (| not at line start)
 result = data | transform | filter
 
@@ -1473,7 +1253,7 @@ classify = x -> {
 
 #### Arrow Disambiguation
 
-```vibe67
+```c67
 =>   Match arm result
 ~>   Default match arm
 ->   Lambda or receive
@@ -1481,7 +1261,7 @@ classify = x -> {
 
 Context determines meaning:
 
-```vibe67
+```c67
 f = x -> x + 1             // Lambda with one arg
 msg <= &8080               // Receive from channel
 x { 0 => "zero" }          // Match arm
@@ -1491,7 +1271,7 @@ greet = { println("Hi") }  // No-arg lambda
 
 #### No-Argument Lambdas
 
-```vibe67
+```c67
 // Inferred lambda (in assignment context):
 greet = { println("Hello!") }            // Inferred: greet = -> { println("Hello!") }
 worker = { @ { process_forever() } }     // Inferred: worker = -> { @ { process_forever() } }
@@ -1519,7 +1299,7 @@ process(-> get_data())                      // Function argument, need explicit 
 
 The `@` symbol introduces loops (one of three forms):
 
-```vibe67
+```c67
 @ { ... }                  // Infinite loop
 @ i in collection { ... }  // For-each loop
 @ condition { ... }        // While loop
@@ -1527,7 +1307,7 @@ The `@` symbol introduces loops (one of three forms):
 
 **Loop Control with `ret @` and Numbered Labels:**
 
-Instead of `break`/`continue` keywords, Vibe67 uses `ret @` with automatically numbered loop labels.
+Instead of `break`/`continue` keywords, C67 uses `ret @` with automatically numbered loop labels.
 
 **Loop Numbering:** Loops are numbered from outermost to innermost:
 - `@1` = outermost loop
@@ -1535,7 +1315,7 @@ Instead of `break`/`continue` keywords, Vibe67 uses `ret @` with automatically n
 - `@3` = third level (nested inside @2)
 - `@` = current/innermost loop
 
-```vibe67
+```c67
 // Exit current loop
 @ i in 0..<100 {
     i > 50 { ret @ }      // Exit current loop (same as ret @1 here)
@@ -1567,7 +1347,7 @@ compute = n -> {
 
 Loops with unknown bounds or modified counters require `max`:
 
-```vibe67
+```c67
 // Counter modified - needs max
 @ i in 0..<10 max 20 {
     i++  // Modified counter
@@ -1589,7 +1369,7 @@ defer_statement = "defer" expression ;
 ```
 
 **Examples:**
-```vibe67
+```c67
 // Resource cleanup with defer
 init_resources = () -> {
     file := open("data.txt") or! {
@@ -1626,7 +1406,7 @@ defer sdl.SDL_DestroyWindow(window)  // Executes before SDL_Quit
 
 **Execution Order:**
 Deferred calls execute in reverse order of declaration (LIFO):
-```vibe67
+```c67
 defer println("1")  // Executes third
 defer println("2")  // Executes second
 defer println("3")  // Executes first
@@ -1647,7 +1427,7 @@ defer println("3")  // Executes first
 5. Return from error blocks instead of `exit()` - defer ensures cleanup
 
 **Common Pattern:**
-```vibe67
+```c67
 // Railway-oriented with defer
 resource := acquire() or! {
     println("Acquisition failed")
@@ -1663,14 +1443,14 @@ defer cleanup(resource)
 
 The `&` symbol creates ENet addresses (network endpoints):
 
-```vibe67
+```c67
 &8080                      // Port only: & followed by digits
 &localhost:8080            // Host:port: & followed by identifier/IP + :
 &192.168.1.1:3000          // IP:port
 ```
 
 **Examples:**
-```vibe67
+```c67
 // Loops (statement context)
 @ { println("Forever") }           // Infinite loop
 @ i in [1, 2, 3] { println(i) }    // For-each loop
@@ -1690,7 +1470,7 @@ listen(&8080)                       // Function call with address
 
 Disambiguated by contents (see Block Disambiguation Rules above):
 
-```vibe67
+```c67
 { x: 10 }                // Map: contains :
 x { 0 -> "zero" }        // Match: contains ->
 { temp = x * 2; temp }   // Statement block: no : or ->
@@ -1698,7 +1478,7 @@ x { 0 -> "zero" }        // Match: contains ->
 
 ## Error Handling and Result Types
 
-Vibe67 uses a **Result type** for operations that can fail. A Result is still `map[uint64]float64`, but with special semantic meaning tracked by the compiler.
+C67 uses a **Result type** for operations that can fail. A Result is still `map[uint64]float64`, but with special semantic meaning tracked by the compiler.
 
 ### Result Type Design
 
@@ -1711,11 +1491,11 @@ A Result is encoded as follows:
 
 **Type Bytes:**
 ```
-0x01 - Vibe67 Number (success)
-0x02 - Vibe67 String (success)
-0x03 - Vibe67 List (success)
-0x04 - Vibe67 Map (success)
-0x05 - Vibe67 Address (success)
+0x01 - C67 Number (success)
+0x02 - C67 String (success)
+0x03 - C67 List (success)
+0x04 - C67 Map (success)
+0x05 - C67 Address (success)
 0xE0 - Error (failure, followed by 4-char error code)
 0x10 - C int8
 0x11 - C int16
@@ -1732,7 +1512,7 @@ A Result is encoded as follows:
 ```
 
 **Success case:**
-- Type byte indicates the Vibe67 or C type
+- Type byte indicates the C67 or C type
 - Length field (uint64) indicates number of key-value pairs
 - Key-value pairs follow (each pair is uint64 key, float64 value)
 - Terminated with 0x00 byte
@@ -1767,7 +1547,7 @@ Every value has a `.error` accessor that:
 - Returns `""` (empty string) for success values
 - Returns the error code string (spaces stripped) for error values
 
-```vibe67
+```c67
 x = 10 / 2              // Success: returns 5.0
 x.error                 // Returns "" (empty)
 
@@ -1785,7 +1565,7 @@ result.error {
 
 The `or!` operator provides a default value or executes a block when the left side is an error or null:
 
-```vibe67
+```c67
 // Handle errors
 x = 10 / 0              // Error result
 safe = x or! 99         // Returns 99 (error case)
@@ -1827,7 +1607,7 @@ ptr := c_malloc(1024) or! 0  // Returns 0 if allocation failed
 
 ### Error Propagation Patterns
 
-```vibe67
+```c67
 // Check and early return
 process = input -> {
     step1 = validate(input)
@@ -1860,7 +1640,7 @@ result.error {
 
 Use the `error` function to create error Results:
 
-```vibe67
+```c67
 // Create error with code
 err = error("arg")  // Type byte 0xE0 + "arg "
 
@@ -1872,7 +1652,7 @@ fail = 0 / 0        // Returns error "dv0"
 
 The compiler tracks whether a value is a Result type:
 
-```vibe67
+```c67
 // Compiler knows this returns Result
 divide = (a, b) -> {
     b == 0 { ret error("dv0") }
@@ -1923,7 +1703,7 @@ The `or!` operator:
 
 ## Classes and Object-Oriented Programming
 
-Vibe67 supports classes as syntactic sugar over maps and closures, providing a familiar OOP interface while maintaining the language's fundamental simplicity.
+C67 supports classes as syntactic sugar over maps and closures, providing a familiar OOP interface while maintaining the language's fundamental simplicity.
 
 ### Core Principles
 
@@ -1932,12 +1712,12 @@ Vibe67 supports classes as syntactic sugar over maps and closures, providing a f
 - **Composition over inheritance:** Use `<>` to compose with behavior maps
 - **Dot notation:** `.field` inside methods for instance fields
 - **Minimal syntax:** Only one new keyword (`class`)
-- **Desugars to regular Vibe67:** Classes compile to maps and lambdas
+- **Desugars to regular C67:** Classes compile to maps and lambdas
 - **`this` keyword:** Reference to current instance
 
 ### Class Declaration
 
-```vibe67
+```c67
 class Point {
     // Constructor (implicit)
     init = (x, y) -> {
@@ -1967,9 +1747,9 @@ p1.move(5, 5)
 
 ### Desugaring
 
-Classes desugar to regular Vibe67 code:
+Classes desugar to regular C67 code:
 
-```vibe67
+```c67
 // class Point { ... } becomes:
 Point := (x, y) -> {
     instance := {}
@@ -1995,7 +1775,7 @@ Point := (x, y) -> {
 
 Use `.field` inside class methods to access instance state:
 
-```vibe67
+```c67
 class Counter {
     init = start -> {
         .count = start
@@ -2019,7 +1799,7 @@ println(c.get())  // 1
 
 Use `ClassName.field` for class-level state:
 
-```vibe67
+```c67
 class Entity {
     Entity.count = 0
     Entity.all = []
@@ -2041,7 +1821,7 @@ println(Entity.count)  // 2
 
 Extend classes with behavior maps using `<>`:
 
-```vibe67
+```c67
 Serializable = {
     to_json: {
         // Convert instance to JSON
@@ -2064,7 +1844,7 @@ json := p.to_json()
 
 **Multiple composition** - chain `<>` operators:
 
-```vibe67
+```c67
 class User {
     <> Serializable
     <> Validatable
@@ -2083,7 +1863,7 @@ Inside class methods:
 - `ClassName.field` → class field access
 - `other.field` → other instance field access
 
-```vibe67
+```c67
 class Point {
     Point.origin = nil  // Class field
 
@@ -2110,7 +1890,7 @@ Point.origin = Point(0, 0)  // Initialize class field
 
 Use underscore prefix for "private" methods (by convention):
 
-```vibe67
+```c67
 class Account {
     init = balance -> {
         .balance = balance
@@ -2134,7 +1914,7 @@ class Account {
 
 Combine classes with CStruct for performance:
 
-```vibe67
+```c67
 cstruct Vec2Data {
     x as float64,
     y as float64
@@ -2165,9 +1945,9 @@ class Vec2 {
 
 ### Operator Overloading via Methods
 
-While Vibe67 doesn't have operator overloading syntax, you can define methods with operator-like names:
+While C67 doesn't have operator overloading syntax, you can define methods with operator-like names:
 
-```vibe67
+```c67
 class Complex {
     init = (real, imag) -> {
         .real = real
@@ -2196,7 +1976,7 @@ class_decl      = "class" identifier { "<>" identifier } "{" { class_member } "}
 
 Semantically:
 
-```vibe67
+```c67
 class Point {
     <> Serializable
     <> Validatable
@@ -2220,7 +2000,7 @@ Point = (...) -> {
 
 Methods that return `. ` (this) enable chaining:
 
-```vibe67
+```c67
 class Builder {
     init = () -> {
         .parts = []
@@ -2239,9 +2019,9 @@ result = Builder().add("A").add("B").add("C").build()
 
 ### No Inheritance
 
-Vibe67 deliberately avoids inheritance hierarchies. Use composition:
+C67 deliberately avoids inheritance hierarchies. Use composition:
 
-```vibe67
+```c67
 // Instead of inheritance
 Drawable = {
     draw: { println("Drawing...") }
@@ -2307,7 +2087,7 @@ class {
 
 **Memory Management:**
 - **ALWAYS use arena allocation** instead of malloc/free when possible
-- The arena allocator (`vibe67_arena_alloc`) provides fast bump allocation with automatic growth
+- The arena allocator (`c67_arena_alloc`) provides fast bump allocation with automatic growth
 - Arena memory is freed in bulk, avoiding fragmentation
 - Only use malloc for external C library compatibility
 
@@ -2324,151 +2104,109 @@ class {
 
 ## Type Annotations
 
-Type annotations are **compile-time metadata** that guide type inference and optimization. The compiler uses these annotations to generate specialized, efficient code for each type.
+Type annotations are **optional metadata** that specify semantic intent and guide FFI marshalling. They do NOT change the runtime representation (always `map[uint64]float64`).
 
 ### Syntax
 
 **Variable declarations:**
-```vibe67
-x: i32 = 42                    // 32-bit signed integer
-count: u64 = 100               // 64-bit unsigned integer
-name: string = "Alice"            // UTF-8 string
-data: [10]byte = ...           // 10-byte array
-ch: rune = 'A'                 // Unicode code point (i32)
-value: f64 = 3.14159           // 64-bit float
+```c67
+x: num = 42                    // Number annotation
+name: str = "Alice"            // String annotation
+items: list = [1, 2, 3]        // List annotation
+config: map = {port: 8080}     // Map annotation
 
 // C types for FFI
-ptr: cptr = sdl.SDL_CreateWindow("Hi", 640, 480, 0)!
-err: cstr = sdl.SDL_GetError()
+ptr: cptr = sdl.SDL_CreateWindow("Hi", 640, 480, 0)
+err: cstring = sdl.SDL_GetError()
 result: cint = sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
+value: cdouble = 3.14159
 ```
 
 **Function signatures:**
-```vibe67
-// Integer arithmetic (native registers, zero overhead)
-add(x: i32, y: i32) -> i32 { x + y }
+```c67
+// Parameter and return types
+add(x: num, y: num) -> num { x + y }
 
 // String functions
-greet(name: string) -> string { f"Hello, {name}!" }
+greet(name: str) -> str { f"Hello, {name}!" }
 
 // C FFI functions
-create_window(title: string, w: i32, h: i32) -> cptr {
-    sdl.SDL_CreateWindow(title, w, h, 0)!
+create_window(title: str, w: cint, h: cint) -> cptr {
+    sdl.SDL_CreateWindow(title, w, h, 0)
 }
 
 // Mixed types
-format_number(x: f64) -> string {
-    f"Value: {x}"
+format_error(code: cint) -> str {
+    f"Error {code}: {sdl.SDL_GetError()}"
 }
-```
-
-**Complex types:**
-```vibe67
-// Fixed-size arrays
-buffer: [256]byte = ...
-
-// Dynamic slices
-items: []i32 = [1, 2, 3, 4, 5]
-
-// Maps
-mapping: map[str]i32 = {"a": 1, "b": 2}
-
-// Complex numbers
-z: complex64 = ...
 ```
 
 ### Type Semantics
 
-| Type       | Storage              | Register      | Example                 |
-|------------|----------------------|---------------|-------------------------|
-| `i8`-`i64` | Native integer       | GPR (8-64bit) | `x: i32 = 42`          |
-| `u8`-`u64` | Native unsigned      | GPR (8-64bit) | `count: u64 = 100`     |
-| `byte`     | Alias for `u8`       | 8-bit GPR     | `b: byte = 0xFF`       |
-| `rune`     | Unicode (i32)        | 32-bit GPR    | `ch: rune = 'A'`       |
-| `f32`-`f64`| Native float         | XMM/FPU       | `pi: f64 = 3.14`       |
-| `string`   | UTF-8 + length       | ptr + len     | `name: string = "Hi"`  |
-| `[N]T`     | Fixed array          | Stack         | `buf: [10]i32 = ...`   |
-| `[]T`      | Dynamic slice        | ptr + len+cap | `items: []i32 = ...`   |
-| `map[K]V`  | Hash map             | Heap          | `m: map[str]i32 = ...` |
-| `cptr`     | C pointer            | 64-bit GPR    | `p: cptr = c.fn()!`    |
-| `cstr`     | C `char*`            | 64-bit GPR    | `s: cstr = c.fn()`     |
-| `cint`     | C `int`              | 32-bit GPR    | `n: cint = c.fn()`     |
+| Type      | Runtime Repr          | Purpose       | Example               |
+|-----------|-----------------------|---------------|-----------------------|
+| `num`     | `{0: 42.0}`           | Number intent | `x: num = 42`         |
+| `str`     | `{0: 72.0, 1: 105.0}` | String intent | `name: str = "Hi"`    |
+| `list`    | `{0: 1.0, 1: 2.0}`    | List intent   | `xs: list = [1, 2]`   |
+| `map`     | `{hash("x"): 10.0}`   | Map intent    | `m: map = {x: 10}`    |
+| `cstring` | `{0: <ptr>}`          | C `char*`     | `s: cstring = c.fn()` |
+| `cptr`    | `{0: <ptr>}`          | C pointer     | `p: cptr = sdl.fn()`  |
+| `cint`    | `{0: 42.0}`           | C `int`       | `n: cint = sdl.fn()`  |
+| `clong`   | `{0: 42.0}`           | C `int64_t`   | `l: clong = c.time()` |
+| `cfloat`  | `{0: 3.14}`           | C `float`     | `f: cfloat = 3.14`    |
+| `cdouble` | `{0: 3.14}`           | C `double`    | `d: cdouble = c.fn()` |
+| `cbool`   | `{0: 1.0}`            | C `bool`      | `ok: cbool = c.fn()`  |
 
 ### FFI Marshalling
 
 Type annotations guide automatic conversions at C FFI boundaries:
 
-**Vibe67 → C conversions:**
-```vibe67
-// Vibe67 string → C string (automatic conversion)
-title: string = "Window"
-window = sdl.SDL_CreateWindow(title, 640, 480, 0)!  // str → char*
+**C67 → C conversions:**
+```c67
+// C67 string → C string (calls c67_string_to_cstr)
+title: str = "Window"
+window = sdl.SDL_CreateWindow(title, 640, 480, 0)  // title converted to char*
 
-// Vibe67 integers → C integers (native)
-width: i32 = 640
-height: i32 = 480
-sdl.SDL_CreateWindow("Title", width, height, 0)!
+// C67 number → C int (extracts {0: value})
+result: cint = sdl.SDL_Init(0x00000020)  // C67 num → C int
 ```
 
-**C → Vibe67 conversions:**
-```vibe67
-// C pointer → cptr (use ! for raw bitcast)
-window: cptr = sdl.SDL_CreateWindow(...)!  // Preserves all 64 bits
+**C → C67 conversions:**
+```c67
+// C char* → cstring (stored as pointer in {0: <ptr>})
+err: cstring = sdl.SDL_GetError()  // char* stored as-is
 
-// C char* → cstr
-err: cstr = sdl.SDL_GetError()
-
-// Convert cstr → string when needed
-err_str: string = str(err)
+// When needed, convert cstring → str manually
+err_str: str = str(err)  // Convert C string to C67 string
 ```
 
 ### Type Inference
 
-When annotations are omitted, the compiler infers types using Hindley-Milner style inference:
+When annotations are omitted, the compiler infers types:
 
-```vibe67
-x = 42              // Inferred: i64 (default integer type)
-count = 100u32      // Inferred: u32 (explicit suffix)
-name = "Alice"      // Inferred: str (UTF-8 string)
-items = [1, 2, 3]   // Inferred: [3]i64 (fixed-size array)
-ptr = c.malloc(100)!  // Inferred: cptr (from C signature + raw bitcast)
+```c67
+x = 42              // Inferred: num
+name = "Alice"      // Inferred: str
+items = [1, 2, 3]   // Inferred: list
+ptr = sdl.SDL_CreateWindow(...)  // Inferred: cptr (from FFI signature)
 ```
-
-**Inference rules:**
-- Integer literals default to `i64`
-- Float literals default to `f64`
-- String literals default to `str` (UTF-8)
-- Arrays infer element type from contents
-- Function return types inferred from body
-
-### Optimization Benefits
-
-The compiler uses type information to optimize code:
-
-1. **Native registers** - `i32` uses 32-bit register, no conversions
-2. **SIMD vectorization** - Arrays of primitives use SIMD instructions
-3. **No boxing** - Monomorphic code avoids heap allocations
-4. **Specialized code** - Functions generate type-specific code paths
-5. **Inlining** - Small typed functions inline aggressively
 
 ### When to Use Type Annotations
 
 **Use annotations when:**
-1. Performance matters (enables optimizations)
-2. Working with C FFI (required for proper marshalling)
-3. Documenting interfaces (clarifies contracts)
-4. Avoiding ambiguity (multiple valid inferences)
-5. Enforcing constraints (preventing type errors)
+1. Clarifying intent (documentation)
+2. Working with C FFI (marshalling guidance)
+3. Catching type errors early
+4. Enabling future optimizations
 
 **Omit annotations when:**
 1. Type is obvious from context
-2. Writing quick scripts or prototypes
-3. Inference produces the desired type
-4. Flexibility is more important than performance
+2. Writing quick scripts
+3. Type doesn't matter for correctness
 
 ---
 
-**Note:** This grammar is the canonical reference for Vibe67 3.0. The compiler implementation (lexer.go, parser.go) must match this specification exactly.
+**Note:** This grammar is the canonical reference for C67 3.0. The compiler implementation (lexer.go, parser.go) must match this specification exactly.
 
 **See also:**
 - [LANGUAGESPEC.md](LANGUAGESPEC.md) - Complete language semantics

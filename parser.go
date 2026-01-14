@@ -3982,6 +3982,12 @@ func (p *Parser) parsePrimary() Expression {
 	case TOKEN_RANDOM:
 		return &RandomExpr{}
 
+	case TOKEN_YES:
+		return &BooleanExpr{Value: true}
+
+	case TOKEN_NO:
+		return &BooleanExpr{Value: false}
+
 	case TOKEN_STRING:
 		return &StringExpr{Value: p.current.Value}
 

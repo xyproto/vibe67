@@ -77,6 +77,12 @@ func compileAndRun(t *testing.T, code string) string {
 	exePath := filepath.Join(tmpDir, "test")
 	osType, _ := ParseOS(runtime.GOOS)
 	archType, _ := ParseArch(runtime.GOARCH)
+	
+	// Add .exe extension on Windows
+	if runtime.GOOS == "windows" {
+		exePath += ".exe"
+	}
+	
 	platform := Platform{
 		OS:   osType,
 		Arch: archType,

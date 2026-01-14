@@ -390,6 +390,18 @@ type RandomExpr struct {
 func (r *RandomExpr) String() string  { return "??" }
 func (r *RandomExpr) expressionNode() {}
 
+type BooleanExpr struct {
+	Value bool // true for yes, false for no
+}
+
+func (b *BooleanExpr) String() string {
+	if b.Value {
+		return "yes"
+	}
+	return "no"
+}
+func (b *BooleanExpr) expressionNode() {}
+
 type StringExpr struct {
 	Value string
 }
