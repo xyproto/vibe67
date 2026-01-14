@@ -3718,18 +3718,29 @@ func (p *Parser) parsePostfix() Expression {
 			op := p.current.Value
 			expr = &PostfixExpr{Operator: op, Operand: expr}
 		} else if p.peek.Type == TOKEN_BANG {
-			// Handle move operator: x! (transfers ownership)
+			// Handle different meanings of ! based on context:
+			// - After function call: raw bitcast return value (call()!)
+			// - After other expr: move operator (x!)
 			p.nextToken() // skip to !
-			expr = &MoveExpr{Expr: expr}
+			if callExpr, ok := expr.(*CallExpr); ok {
+				// Set raw bitcast flag on the call expression
+				callExpr.RawBitcast = true
+			} else if directCall, ok := expr.(*DirectCallExpr); ok {
+				// For direct calls (lambdas), wrap in a move since we don't support raw bitcast for them
+				expr = &MoveExpr{Expr: directCall}
+			} else {
+				// For other expressions, use move operator
+				expr = &MoveExpr{Expr: expr}
+			}
 		} else if p.peek.Type == TOKEN_HASH {
 			// Handle postfix length operator: xs#
 			p.nextToken() // skip to #
 			expr = &UnaryExpr{Operator: "#", Operand: expr}
-		} else if p.peek.Type == TOKEN_AS || p.peek.Type == TOKEN_AS_BANG {
-			// Handle type cast: expr as type or expr as! type (raw bitcast)
-			isRawBitcast := p.peek.Type == TOKEN_AS_BANG
+		} else if p.peek.Type == TOKEN_AS {
+			// Handle type cast: expr as type
+			isRawBitcast := false
 			p.nextToken() // skip current expr
-			p.nextToken() // skip 'as' or 'as!'
+			p.nextToken() // skip 'as'
 
 			// Parse the cast type
 			var castType string

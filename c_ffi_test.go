@@ -94,7 +94,7 @@ printf("Point.x offset: %v\n", Point.x.offset)
 printf("Point.y offset: %v\n", Point.y.offset)
 
 // Allocate memory for a Point struct using C malloc
-ptr := c.malloc(Point.size)
+ptr := c.malloc(Point.size)!
 printf("Allocated %v bytes at address\n", Point.size)
 
 // Free the memory

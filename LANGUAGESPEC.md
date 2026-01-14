@@ -6,24 +6,43 @@
 
 This document describes the complete semantics, behavior, and design philosophy of the Vibe67 programming language. For the formal grammar, see [GRAMMAR.md](GRAMMAR.md).
 
-## ⚠️ CRITICAL: The Universal Type
+## ⚠️ CRITICAL: Zig-Inspired Type System
 
-Vibe67 has exactly ONE type: `map[uint64]float64`
+Vibe67 uses **compile-time type inference** with **zero-cost abstractions** inspired by Zig.
 
-Not "represented as" or "backed by" — every value IS this map:
+**Core Principles:**
+
+1. **Compile-time types** - Types are inferred at compile time, not tracked at runtime
+2. **Native register allocation** - Values use native CPU registers (no boxing for monomorphic code)
+3. **Zero-cost abstractions** - Pay only for what you use
+4. **Universal support** - All useful types from systems programming to high-level languages
+5. **Demoscene-friendly** - Minimal size overhead, maximum performance
+
+**Examples:**
 
 ```vibe67
-42              // {0: 42.0}
-"Hello"         // {0: 72.0, 1: 101.0, 2: 108.0, 3: 108.0, 4: 111.0}
-[1, 2, 3]       // {0: 1.0, 1: 2.0, 2: 3.0}
-{x: 10}         // {hash("x"): 10.0}
-[]              // {}
+// Compile-time type inference
+x = 42                    // Inferred: i64, stored in register
+name = "Hello"            // Inferred: UTF-8 string with length
+items = [1, 2, 3]         // Inferred: [3]i64, stack-allocated array
+ptr = c.malloc(100)!      // Inferred: cptr (64-bit pointer in register)
+
+// Native register allocation (no boxing)
+compute = (a: i32, b: i32) -> i32 {
+    a + b                 // i32 add in 32-bit register, no allocations
+}
+
+// Boxing only when needed (heterogeneous collections)
+mixed = [42, "hello", 3.14]  // Boxed values with type tags
 ```
 
-There are NO special types, NO primitives, NO exceptions.
-Everything is a map from uint64 to float64.
+**Performance Model:**
 
-This is not an implementation detail — this IS Vibe67.
+- Monomorphic code (single type): Native registers, zero overhead
+- Polymorphic code (multiple types): Specialized per type at call sites
+- Heterogeneous collections: Boxed with type tags (only when needed)
+
+This approach provides the simplicity of dynamic languages with the performance of systems languages.
 
 ## Table of Contents
 
@@ -49,13 +68,14 @@ This is not an implementation detail — this IS Vibe67.
 
 Vibe67 brings together several novel or rare features that distinguish it from other systems programming languages:
 
-### 1. Universal Map Type System
+### 1. Zig-Inspired Zero-Cost Type System
 
-The entire language is built on a single type: `map[uint64]float64`. Every value—numbers, strings, lists, functions—IS this map. This radical simplification enables:
-- No type system complexity
-- Uniform memory representation
-- Natural duck typing
-- Simple FFI (cast to native types only at boundaries)
+The entire language uses compile-time type inference with native register allocation. Every value uses the most efficient representation for its type. This approach enables:
+- Zero-cost abstractions (no boxing for monomorphic code)
+- Native register usage (i32 in 32-bit register, f64 in XMM register)
+- Compile-time specialization (functions specialized per type)
+- Simple FFI (direct native type marshalling)
+- Performance comparable to C/Rust/Zig
 
 ### 2. Direct Machine Code Generation
 
@@ -364,105 +384,167 @@ y := 100    // Mutable (explicit)
 
 ## Type System
 
-Vibe67 uses a **universal map type**: `map[uint64]float64`
+Vibe67 uses **compile-time type inference** with **native register allocation** inspired by Zig.
 
-Every value in Vibe67 IS `map[uint64]float64`:
+### Core Principles
 
-- **Numbers**: `{0: number_value}`
-- **Strings**: `{0: char0, 1: char1, 2: char2, ...}`
-- **Lists**: `{0: elem0, 1: elem1, 2: elem2, ...}`
-- **Objects**: `{key_hash: value, ...}`
-- **Functions**: `{0: code_pointer, 1: closure_data, ...}`
+1. **Compile-time types** - Types are inferred at compile time, not tracked at runtime
+2. **Native registers** - Values stored in appropriate CPU registers (GPR for integers, XMM for floats)
+3. **Zero-cost abstractions** - Monomorphic code has no runtime overhead
+4. **Specialization** - Functions generate type-specific code paths
+5. **Boxing when needed** - Only heterogeneous collections require type tags
 
-There are no special cases. No "single entry maps", no "byte indices", no "field hashes" — just uint64 keys and float64 values in every case.
+### Primitive Types
 
-### Type Annotations
-
-Type annotations are **optional metadata** that specify semantic intent and guide FFI conversions. They do NOT change the runtime representation (always `map[uint64]float64`).
-
-**Native Vibe67 types:**
+**Integers (signed):**
 ```vibe67
-num    // number (default type)
-str    // string (map of character codes)
-list   // list (map with sequential keys)
-map    // explicit map
+i8 i16 i32 i64 i128 i256 i512
 ```
 
-**Foreign C types:**
+**Integers (unsigned):**
+```vibe67
+u8 u16 u32 u64 u128 u256 u512
+byte      // Alias for u8
+```
+
+**Character types:**
+```vibe67
+rune      // Unicode code point (i32)
+```
+
+**Floating-point:**
+```vibe67
+f32 f64 f128
+```
+
+**Complex numbers:**
+```vibe67
+complex64 complex128    // real + imaginary parts
+quaternion              // 4D rotation representation
+```
+
+### String Types
+
+```vibe67
+str       // UTF-8 string (default)
+utf8      // UTF-8 string (explicit)
+utf16     // UTF-16 string
+utf32     // UTF-32 string
+```
+
+### Collection Types
+
+```vibe67
+[N]T      // Fixed-size array: [10]i32
+[]T       // Dynamic slice: []byte
+list      // Linked list
+map[K]V   // Hash map: map[str]i32
+set[T]    // Hash set: set[i32]
+tree[T]   // Binary tree: tree[i32]
+```
+
+### Foreign C Types
+
 ```vibe67
 cstring   // C char* (null-terminated string pointer)
-cptr      // C pointer (e.g., SDL_Window*, void*)
-cint      // C int/int32_t
-clong     // C int64_t/long
-cfloat    // C float
-cdouble   // C double
+cptr      // C pointer (void*, SDL_Window*, etc.)
+cint      // C int (32-bit)
+clong     // C long (64-bit)
+cfloat    // C float (32-bit)
+cdouble   // C double (64-bit)
 cbool     // C bool/_Bool
 cvoid     // C void (return type only)
 ```
 
-**Usage:**
+### Type Annotations
+
+**Variable declarations:**
 
 ```vibe67
-// Variable declarations
-x: num = 42
-name: str = "Alice"
-values: list = [1, 2, 3]
+x: i32 = 42                    // 32-bit signed integer
+count: u64 = 100               // 64-bit unsigned integer
+name: str = "Alice"            // UTF-8 string
+buffer: [256]byte = ...        // 256-byte array
+ch: rune = 'A'                 // Unicode code point
+value: f64 = 3.14159           // 64-bit float
 
-// Function parameters and return types
-add = (x: num, y: num) -> num { x + y }
-greet = (name: str) -> str { f"Hello, {name}!" }
-
-// FFI functions (type annotations required for correct marshalling)
-window: cptr = sdl.SDL_CreateWindow("Game", 800, 600, 0)
-error: cstring = sdl.SDL_GetError()
-result: cint = sdl.SDL_Init(0x00000020)
-
-// Without annotations, Vibe67 uses heuristics (may be imprecise)
-window := sdl.SDL_CreateWindow("Game", 800, 600, 0)  // Inferred as map
+// C types for FFI
+ptr: cptr = sdl.SDL_CreateWindow("Hi", 640, 480, 0)!
+err: cstring = sdl.SDL_GetError()
+result: cint = sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
 ```
 
-**When to use type annotations:**
-- **Optional** for pure Vibe67 code (types inferred from usage)
-- **Recommended** for FFI code (enables precise marshalling)
-- **Required** for complex FFI (pointer types, structs, proper error handling)
+**Function signatures:**
 
-Without annotations, Vibe67 uses heuristics at FFI boundaries. With annotations, Vibe67 marshalls precisely.
+```vibe67
+// Integer arithmetic (native registers, zero overhead)
+add = (x: i32, y: i32) -> i32 { x + y }
+
+// String functions
+greet = (name: str) -> str { f"Hello, {name}!" }
+
+// C FFI functions
+create_window = (title: str, w: i32, h: i32) -> cptr {
+    sdl.SDL_CreateWindow(title, w, h, 0)!
+}
+```
+
+### Type Inference
+
+When annotations are omitted, the compiler infers types using Hindley-Milner style inference:
+
+```vibe67
+x = 42              // Inferred: i64 (default integer type)
+count = 100u32      // Inferred: u32 (explicit suffix)
+name = "Alice"      // Inferred: str (UTF-8 string)
+items = [1, 2, 3]   // Inferred: [3]i64 (fixed-size array)
+ptr = c.malloc(100)!  // Inferred: cptr (from C signature + raw bitcast)
+```
+
+**Inference rules:**
+- Integer literals default to `i64`
+- Float literals default to `f64`
+- String literals default to `str` (UTF-8)
+- Arrays infer element type from contents
+- Function return types inferred from body
 
 ### Type Conversions
 
-Vibe67 provides two cast operators for different conversion semantics:
+Vibe67 provides type casting and raw bitcast for C FFI:
 
-#### `as` - Numeric Conversion (Safe, Default)
+#### `as` - Type Cast (Compile-time)
 
-Converts values numerically, preserving numeric meaning:
-
-```vibe67
-x as int32      // Cast to C int32
-ptr as cptr     // Pointer address → float64 value (cvtsi2sd)
-val as float64  // Cast to C double
-
-// Example: C pointer conversion
-window = sdl.SDL_CreateWindow(...) as cptr
-// Address 0x7fff1234 becomes float value 140733193388084.0
-```
-
-**Use for:** Normal C FFI, all pointer operations, arithmetic
-
-#### `as!` - Raw Bitcast (Unsafe)
-
-Reinterprets raw bit pattern without conversion:
+Type-level conversions between compatible types:
 
 ```vibe67
-tagged as! cptr      // Treat bits AS IF they were a pointer (movq)
-nan_boxed as! uint64 // Extract raw bits
+x as i32      // Cast to 32-bit integer
+ptr as cptr   // Cast to C pointer type
+val as f64    // Cast to 64-bit float
 
-// Example: NaN boxing (advanced)
-ptr_bits = window as! uint64  // Get raw bit pattern
-tagged = (ptr_bits | 0xFFFF000000000000) as! cptr
+// Example: Type conversions
+window = sdl.SDL_CreateWindow(...)! as cptr
+value = count as f64  // Integer to float conversion
 ```
 
-**Use for:** NaN boxing, tagged pointers, bit manipulation
-**Warning:** Can create invalid pointers. Only use when you know what you're doing.
+**Use for:** Normal type conversions, C FFI marshalling
+
+#### `call()!` - Raw Bitcast for C FFI Returns
+
+The `!` suffix on function calls preserves all 64 bits of return values:
+
+```vibe67
+// Without !: numeric conversion (works for pointers < 2^53)
+result = c.function_call(123)    // Uses cvtsi2sd (53-bit precision)
+
+// With !: raw bitcast (preserves all 64 bits)
+ptr = c.malloc(1024)!            // Uses movq (full 64-bit precision)
+window = sdl.SDL_CreateWindow(...)!  // Preserves high address bits
+```
+
+**When to use `!` suffix:**
+- C functions returning pointers (especially on systems using high memory addresses)
+- Any C function where the numeric value matters beyond 53-bit precision
+- Critical for SDL, graphics APIs, and pointer-heavy C libraries
 
 **Supported cast types (legacy, for `unsafe` blocks):**
 ```
@@ -472,9 +554,9 @@ float32 float64
 ptr cstr
 ```
 
-### Duck Typing
+### Structural Typing
 
-Since everything is a map, Vibe67 has structural typing:
+Vibe67 uses structural typing for collections and objects:
 
 ```vibe67
 point = { x: 10, y: 20 }
@@ -487,8 +569,8 @@ person.x  // Also works - different map, same key
 Type annotations are contextual keywords - you can use them as identifiers:
 
 ```vibe67
-num = 100              // OK - variable named num
-x: num = num * 2       // OK - type annotation vs variable
+i32 = 100              // OK - variable named i32
+x: i32 = i32 * 2       // OK - type annotation vs variable
 ```
 
 ## Variables and Assignment

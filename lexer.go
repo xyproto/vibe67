@@ -96,25 +96,49 @@ const (
 	TOKEN_GTGTGT_B   // >>>b (rotate right)
 	TOKEN_QUESTION_B // ?b (bit test)
 	TOKEN_AS         // as (type casting)
-	TOKEN_AS_BANG    // as! (raw bitcast)
-	// C type keywords
+	// Integer type keywords (signed)
 	TOKEN_I8   // i8
 	TOKEN_I16  // i16
 	TOKEN_I32  // i32
 	TOKEN_I64  // i64
+	TOKEN_I128 // i128
+	TOKEN_I256 // i256
+	TOKEN_I512 // i512
+	// Integer type keywords (unsigned)
 	TOKEN_U8   // u8
 	TOKEN_U16  // u16
 	TOKEN_U32  // u32
 	TOKEN_U64  // u64
+	TOKEN_U128 // u128
+	TOKEN_U256 // u256
+	TOKEN_U512 // u512
+	TOKEN_BYTE // byte (alias for u8)
+	TOKEN_RUNE // rune (Unicode code point, i32)
+	// Float type keywords
 	TOKEN_F32  // f32
 	TOKEN_F64  // f64
+	TOKEN_F128 // f128
+	// Complex type keywords
+	TOKEN_COMPLEX64  // complex64
+	TOKEN_COMPLEX128 // complex128
+	TOKEN_QUATERNION // quaternion
+	// String type keywords
+	TOKEN_STR   // str (UTF-8 string, default)
+	TOKEN_UTF8  // utf8 (UTF-8 string, explicit)
+	TOKEN_UTF16 // utf16 (UTF-16 string)
+	TOKEN_UTF32 // utf32 (UTF-32 string)
+	// Collection type keywords
+	TOKEN_ARRAY // array (fixed-size array)
+	TOKEN_SLICE // slice (dynamic slice)
+	TOKEN_LIST  // list (linked list)
+	TOKEN_MAP   // map (hash map)
+	TOKEN_SET   // set (hash set)
+	TOKEN_TREE  // tree (binary tree)
+	// Legacy C type keywords
 	TOKEN_CSTR // cstr
 	TOKEN_CPTR // cptr (C pointer)
-	// Vibe67 type keywords
-	TOKEN_NUM      // num (number type)
-	TOKEN_STR      // str (string type)
-	TOKEN_LIST     // list (type)
-	TOKEN_MAP      // map (type)
+	// Legacy Vibe67 type keywords
+	TOKEN_NUM      // num (legacy number type)
 	TOKEN_CSTRING  // cstring (C char*)
 	TOKEN_CINT     // cint (C int)
 	TOKEN_CLONG    // clong (C long/int64_t)
@@ -447,11 +471,6 @@ func (l *Lexer) NextToken() Token {
 		case "export":
 			return Token{Type: TOKEN_EXPORT, Value: value, Line: l.line, Column: tokenColumn}
 		case "as":
-			// Check for "as!" (raw bitcast)
-			if l.pos < len(l.input) && l.input[l.pos] == '!' {
-				l.pos++
-				return Token{Type: TOKEN_AS_BANG, Value: "as!", Line: l.line, Column: tokenColumn}
-			}
 			return Token{Type: TOKEN_AS, Value: value, Line: l.line, Column: tokenColumn}
 		case "unsafe":
 			return Token{Type: TOKEN_UNSAFE, Value: value, Line: l.line, Column: tokenColumn}
@@ -485,9 +504,10 @@ func (l *Lexer) NextToken() Token {
 			return Token{Type: TOKEN_SHADOW, Value: value, Line: l.line, Column: tokenColumn}
 		case "xor":
 			return Token{Type: TOKEN_XOR, Value: value, Line: l.line, Column: tokenColumn}
-			// Note: All type keywords (i8, i16, i32, i64, u8, u16, u32, u64, f32, f64,
-			// cstr, ptr, number, string, list) are contextual keywords.
-			// They are only treated as type keywords after "as" in cast expressions.
+			// Note: All type keywords (i8-i512, u8-u512, byte, rune, f32-f128,
+			// complex64, complex128, quaternion, str, utf8, utf16, utf32,
+			// array, slice, list, map, set, tree, cptr, cstring, etc.) are contextual keywords.
+			// They are only treated as type keywords in type annotation contexts (after : or ->).
 			// Otherwise they can be used as identifiers.
 		}
 

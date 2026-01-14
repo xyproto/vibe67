@@ -12540,17 +12540,17 @@ func (fc *Vibe67Compiler) compileRecursiveCall(call *CallExpr) {
 }
 
 // Confidence that this function is working: 85%
-func (fc *Vibe67Compiler) compileCFunctionCall(libName string, funcName string, args []Expression) {
+func (fc *Vibe67Compiler) compileCFunctionCall(libName string, funcName string, args []Expression, rawBitcast bool) {
 	// Generate C FFI call
 	// Strategy for v1.1.0:
 	// 1. Marshal arguments according to System V AMD64 ABI
 	// 2. Call function using PLT (dynamic linking)
-	// 3. Convert result to float64 in xmm0
+	// 3. Convert result to float64 in xmm0 (or preserve raw bits if rawBitcast==true)
 	//
 	// Note: Library is linked dynamically via DT_NEEDED in ELF
 
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "Generating C FFI call: %s.%s with %d args\n", libName, funcName, len(args))
+		fmt.Fprintf(os.Stderr, "Generating C FFI call: %s.%s with %d args (rawBitcast=%v)\n", libName, funcName, len(args), rawBitcast)
 	}
 
 	// Track library dependency for ELF generation
@@ -12822,8 +12822,9 @@ func (fc *Vibe67Compiler) compileCFunctionCall(libName string, funcName string, 
 					if isNullPointer {
 						// Already set rax to 0 above
 					} else {
-						// Pointer type - convert numeric float value to integer address
-						fc.out.Cvttsd2si("rax", "xmm0")
+						// Pointer type - preserve raw bits when extracting from xmm0
+						// Use movq to preserve all 64 bits (not Cvttsd2si which loses precision)
+						fc.out.MovqXmmToReg("rax", "xmm0")
 					}
 
 				case "int", "i32", "int32":
@@ -12977,14 +12978,19 @@ func (fc *Vibe67Compiler) compileCFunctionCall(libName string, funcName string, 
 			// Void return - set xmm0 to 0
 			fc.out.XorpdXmm("xmm0", "xmm0")
 		} else if isPointerType(returnType) || returnType == "" {
-			// Pointer type - keep raw integer value but convert to float64 for Vibe67
+			// Pointer type - choose conversion based on rawBitcast flag
 			// (Vibe67 internally represents everything as float64)
 			// On Windows and Linux, pointers are 64-bit and returned in RAX correctly
 			// NOTE: When signature is unknown (returnType == ""), assume pointer/64-bit return
-			// This is safer than assuming 32-bit, and works for SDL functions
-			// We use Cvtsi2sd to convert the address (integer) to a float value
-			// This preserves the numeric value of the pointer (up to 53 bits precision)
-			fc.out.Cvtsi2sd("xmm0", "rax")
+			if rawBitcast {
+				// Raw bitcast mode (call()!): Preserve all 64 bits using movq
+				// This is necessary for pointers that use upper bits beyond 53-bit mantissa
+				fc.out.MovqRegToXmm("xmm0", "rax")
+			} else {
+				// Numeric conversion mode (call()): Convert pointer address to float64
+				// Works for addresses < 2^53 (most user-space pointers on x86_64)
+				fc.out.Cvtsi2sd("xmm0", "rax")
+			}
 		} else {
 			// Integer result in rax - convert to float64 for Vibe67
 			// On Windows: bool returns are 1 byte (AL), int returns are 4 bytes (EAX)
@@ -13024,14 +13030,19 @@ func (fc *Vibe67Compiler) compileCFunctionCall(libName string, funcName string, 
 			// Void return - set xmm0 to 0
 			fc.out.XorpdXmm("xmm0", "xmm0")
 		} else if isPointerType(returnType) || returnType == "" {
-			// Pointer type - keep raw integer value but convert to float64 for Vibe67
+			// Pointer type - choose conversion based on rawBitcast flag
 			// (Vibe67 internally represents everything as float64)
 			// On Windows and Linux, pointers are 64-bit and returned in RAX correctly
 			// NOTE: When signature is unknown (returnType == ""), assume pointer/64-bit return
-			// This is safer than assuming 32-bit, and works for SDL functions
-			// We use Cvtsi2sd to convert the address (integer) to a float value
-			// This preserves the numeric value of the pointer (up to 53 bits precision)
-			fc.out.Cvtsi2sd("xmm0", "rax")
+			if rawBitcast {
+				// Raw bitcast mode (call()!): Preserve all 64 bits using movq
+				// This is necessary for pointers that use upper bits beyond 53-bit mantissa
+				fc.out.MovqRegToXmm("xmm0", "rax")
+			} else {
+				// Numeric conversion mode (call()): Convert pointer address to float64
+				// Works for addresses < 2^53 (most user-space pointers on x86_64)
+				fc.out.Cvtsi2sd("xmm0", "rax")
+			}
 		} else {
 			// Integer result in rax - convert to float64 for Vibe67
 			// On Windows: bool returns are 1 byte (AL), int returns are 4 bytes (EAX)
@@ -13077,7 +13088,7 @@ func (fc *Vibe67Compiler) compileCall(call *CallExpr) {
 		// C FFI calls go directly to the C function without namespace lookup
 		// The parser has already stripped the "c." prefix, so call.Function is just "malloc", "free", etc.
 		// Use "c" as the library name (libc)
-		fc.compileCFunctionCall("c", call.Function, call.Args)
+		fc.compileCFunctionCall("c", call.Function, call.Args, call.RawBitcast)
 		return
 	}
 
@@ -13090,7 +13101,7 @@ func (fc *Vibe67Compiler) compileCall(call *CallExpr) {
 
 			// Check if namespace is a registered C import
 			if libName, ok := fc.cImports[namespace]; ok {
-				fc.compileCFunctionCall(libName, funcName, call.Args)
+				fc.compileCFunctionCall(libName, funcName, call.Args, call.RawBitcast)
 				return
 			}
 

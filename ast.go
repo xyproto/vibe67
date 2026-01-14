@@ -588,6 +588,7 @@ type CallExpr struct {
 	MaxRecursionDepth   int64 // Maximum recursion depth (math.MaxInt64 for infinite)
 	NeedsRecursionCheck bool  // Whether to emit runtime recursion depth checking
 	IsCFFI              bool  // Whether this is a C FFI call (c.malloc, c.free, etc.)
+	RawBitcast          bool  // Whether to use raw bitcast for return value (call()! syntax)
 }
 
 func (c *CallExpr) String() string {

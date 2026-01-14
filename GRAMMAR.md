@@ -6,80 +6,133 @@
 
 This document defines the complete formal grammar of the Vibe67 programming language using Extended Backus-Naur Form (EBNF).
 
-## ⚠️ CRITICAL: The Universal Type
+## ⚠️ CRITICAL: Zig-Inspired Type System
 
-Vibe67 has exactly ONE runtime type: `map[uint64]float64`, an ordered map.
+Vibe67 uses **compile-time type inference** with **zero-cost abstractions** inspired by Zig.
 
-Not "represented as" or "backed by" — every value IS this map:
+**Core Principles:**
 
-```vibe67
-42              // {0: 42.0}
-"Hello"         // {0: 72.0, 1: 101.0, 2: 108.0, 3: 108.0, 4: 111.0}
-[1, 2, 3]       // {0: 1.0, 1: 2.0, 2: 3.0}
-{x: 10}         // {hash("x"): 10.0}
-[]              // {}
-{}              // {}
-```
+1. **Compile-time types** - Types are inferred at compile time, not tracked at runtime
+2. **Native register allocation** - Values use native CPU registers (no boxing for monomorphic code)
+3. **Zero-cost abstractions** - Pay only for what you use
+4. **Universal support** - All useful types from systems programming to high-level languages
+5. **Demoscene-friendly** - Minimal size overhead, maximum performance
 
-**Even C foreign types are stored as maps:**
+**How It Works:**
 
 ```vibe67
-// C pointer (0x7fff1234) stored as float64 bits
-ptr: cptr = sdl.SDL_CreateWindow(...)  // {0: <pointer_as_float64>}
+// Compile-time type inference
+x = 42                    // Inferred: i64, stored in register
+name = "Hello"            // Inferred: UTF-8 string with length
+items = [1, 2, 3]         // Inferred: [3]i64, stack-allocated array
+ptr = c.malloc(100)!      // Inferred: cptr (64-bit pointer in register)
 
-// C string pointer
-err: cstring = sdl.SDL_GetError()      // {0: <char*_as_float64>}
+// Native register allocation (no boxing)
+compute = (a: i32, b: i32) -> i32 {
+    a + b                 // i32 add in 32-bit register, no allocations
+}
 
-// C int
-result: cint = sdl.SDL_Init(...)       // {0: 1.0} or {0: 0.0}
+// Boxing only when needed (heterogeneous collections)
+mixed = [42, "hello", 3.14]  // Boxed values with type tags
 ```
 
-There are NO special types, NO primitives, NO exceptions.
-Everything is a map from uint64 to float64.
+**Type Categories:**
 
-This is not an implementation detail — this IS Vibe67.
+- **Integers**: `i8` `i16` `i32` `i64` `i128` `u8` `u16` `u32` `u64` `u128` (also: `byte` = `u8`, `rune` = `i32`)
+- **Floats**: `f32` `f64` `f128`
+- **Complex**: `complex64` `complex128` (real + imaginary components)
+- **Strings**: UTF-8 (default), UTF-16, UTF-32, C strings
+- **Collections**: Arrays (fixed-size), slices (dynamic), maps, sets, trees
+- **C FFI**: `cptr` `cstring` `cint` `clong` `cfloat` `cdouble` `cbool`
+
+**Performance Model:**
+
+- Monomorphic code (single type): Native registers, zero overhead
+- Polymorphic code (multiple types): Specialized per type at call sites
+- Heterogeneous collections: Boxed with type tags (only when needed)
+
+This approach provides the simplicity of dynamic languages with the performance of systems languages.
 
 ## Type Annotations
 
-Type annotations are **metadata** that specify:
-1. **Semantic intent** - what does this map represent?
-2. **FFI conversions** - how to marshal at C boundaries
-3. **Optimization hints** - compiler optimizations
+Type annotations are **compile-time metadata** that guide:
+1. **Type inference** - what type should be inferred for this value
+2. **Code generation** - which registers and instructions to use
+3. **FFI conversions** - how to marshal at C boundaries
+4. **Optimizations** - enabling specializations and SIMD
 
-They do NOT change the runtime representation (always `map[uint64]float64`).
+They enable zero-cost abstractions through compile-time specialization.
 
-### Native Vibe67 Types
-- `num` - number (default type)
-- `str` - string (map of char codes)
-- `list` - list (map with integer keys)
-- `map` - explicit map
+### Primitive Types
+
+**Integers (signed):** `i8` `i16` `i32` `i64` `i128` `i256` `i512`
+**Integers (unsigned):** `u8` `u16` `u32` `u64` `u128` `u256` `u512`
+**Aliases:** `byte` (u8), `rune` (i32 for Unicode)
+**Floats:** `f32` `f64` `f128`
+**Complex:** `complex64` `complex128`
+**Quaternions:** `quaternion`
+
+### String Types
+
+- `str` - UTF-8 string (default)
+- `utf8` - UTF-8 string (explicit)
+- `utf16` - UTF-16 string
+- `utf32` - UTF-32 string
+
+### Collection Types
+
+- `array` / `[N]T` - Fixed-size array
+- `slice` / `[]T` - Dynamic slice
+- `list` - Linked list
+- `map` / `map[K]V` - Hash map
+- `set` - Hash set
+- `tree` - Binary tree
 
 ### Foreign C Types
-- `cstring` - C `char*` (pointer stored as `{0: <ptr>}`)
-- `cptr` - C pointer (e.g., `SDL_Window*`)
-- `cint` - C `int`/`int32_t`
-- `clong` - C `int64_t`/`long`
-- `cfloat` - C `float`
-- `cdouble` - C `double`
-- `cbool` - C `bool`/`_Bool`
+
+- `cstring` - C `char*`
+- `cptr` - C pointer (void*)
+- `cint` - C `int` (32-bit)
+- `clong` - C `long` (64-bit)
+- `cfloat` - C `float` (32-bit)
+- `cdouble` - C `double` (64-bit)
+- `cbool` - C `bool` / `_Bool`
 - `cvoid` - C `void` (return type only)
 
 Foreign types are used at FFI boundaries to guide marshalling.
 
-### Cast Operators
+### Cast Operators and Raw Bitcast
 
-Vibe67 provides two cast operators for different conversion semantics:
+Vibe67 provides type casting and raw bitcast operations:
 
-- **`as`** - Numeric conversion (default, safe)
-  - Converts C pointer addresses to float64 values (cvtsi2sd)
-  - Example: `ptr as cptr` converts address `0x7fff1234` → float value `140733193388084.0`
-  - Use for: Normal C FFI pointers, arithmetic, comparisons
+- **`as`** - Type cast (compile-time type conversion)
+  - Converts between compatible types
+  - Example: `x as i32` casts value to 32-bit integer
+  - Example: `ptr as cptr` casts to C pointer type
+  - Use for: Normal type conversions, C FFI marshalling
 
-- **`as!`** - Raw bitcast (unsafe, preserves bit pattern)
-  - Reinterprets raw bits without conversion (movq)
-  - Example: `value as! cptr` treats bits of `value` as if they were a pointer
-  - Use for: NaN boxing, tagged pointers, bit manipulation
-  - **Dangerous:** Can create invalid pointers if misused
+- **`call()!`** - Raw bitcast for C FFI function returns
+  - The `!` suffix on function calls preserves all 64 bits of return values
+  - Uses raw bitcast instructions (movq) instead of numeric conversion
+  - Essential for C functions returning pointers that use high address bits
+  - Example: `window = sdl.SDL_CreateWindow(...)!` preserves full 64-bit pointer
+  - Example: `ptr = c.malloc(100)!` preserves pointer address beyond 2^53
+
+**C FFI Return Handling:**
+
+```vibe67
+// Without !: numeric conversion (works for pointers < 2^53)
+result = c.function_call(123)    // Uses cvtsi2sd (53-bit precision)
+
+// With !: raw bitcast (preserves all 64 bits)
+ptr = c.malloc(1024)!            // Uses movq (full 64-bit precision)
+window = sdl.SDL_CreateWindow(...)!  // Preserves high address bits
+```
+
+**When to use `!` suffix:**
+- C functions returning pointers (especially on systems using high memory addresses)
+- Any C function where the numeric value matters beyond 53-bit precision
+- Critical for SDL, graphics APIs, and any pointer-heavy C libraries
 
 ## Table of Contents
 
@@ -570,10 +623,14 @@ class_field_decl = identifier "." identifier "=" expression ;
 
 method_decl     = identifier "=" lambda_expr ;
 
-c_type          = "int8" | "int16" | "int32" | "int64"
-                | "uint8" | "uint16" | "uint32" | "uint64"
-                | "float32" | "float64"
-                | "cptr" | "cstring" ;
+c_type          = "i8" | "i16" | "i32" | "i64" | "i128"
+                | "u8" | "u16" | "u32" | "u64" | "u128"
+                | "byte" | "rune"
+                | "f32" | "f64" | "f128"
+                | "cptr" | "cstring" | "cint" | "clong" | "cfloat" | "cdouble" | "cbool"
+                | "int8" | "int16" | "int32" | "int64"  // Legacy
+                | "uint8" | "uint16" | "uint32" | "uint64"  // Legacy
+                | "float32" | "float64" ;  // Legacy
 
 arena_statement = "arena" block ;
 
@@ -602,9 +659,21 @@ identifier_list = identifier { "," identifier } ;
 // All assignments at module level (outside functions/lambdas) MUST use UPPERCASE identifiers.
 // This prevents shadowing and makes globals visually distinct from locals.
 
-type_annotation = native_type | foreign_type ;
+type_annotation = primitive_type | collection_type | foreign_type ;
 
-native_type     = "num" | "str" | "list" | "map" ;
+primitive_type  = integer_type | float_type | complex_type | string_type ;
+
+integer_type    = "i8" | "i16" | "i32" | "i64" | "i128" | "i256" | "i512"
+                | "u8" | "u16" | "u32" | "u64" | "u128" | "u256" | "u512"
+                | "byte" | "rune" ;
+
+float_type      = "f32" | "f64" | "f128" ;
+
+complex_type    = "complex64" | "complex128" | "quaternion" ;
+
+string_type     = "str" | "utf8" | "utf16" | "utf32" ;
+
+collection_type = "array" | "slice" | "list" | "map" | "set" | "tree" ;
 
 foreign_type    = "cstring" | "cptr" | "cint" | "clong"
                 | "cfloat" | "cdouble" | "cbool" | "cvoid" ;
@@ -672,13 +741,12 @@ unary_expr      = ( "-" | "not" | "!b" | "~b" | "#" | "µ" ) unary_expr
 
 postfix_expr    = primary_expr { postfix_op } [ cast_op identifier ] ;
 
-cast_op         = "as"   // Numeric conversion (cvtsi2sd for pointers)
-                | "as!"  // Raw bitcast (movq, preserves bit pattern)
+cast_op         = "as"   // Type cast (compile-time type conversion)
                 ;
 
 postfix_op      = "[" expression "]"
                 | "." ( identifier | integer )
-                | "(" [ argument_list ] ")"
+                | "(" [ argument_list ] ")" [ "!" ]  // ! suffix for raw bitcast return
                 | "#"
                 | match_block ;
 
@@ -941,11 +1009,55 @@ The `shadow` keyword is required when declaring a variable that would shadow an 
 
 ### Type Keywords
 
-Type annotations use these keywords (context-dependent):
+Type annotations use these keywords:
 
-**Native Vibe67 types:**
+**Integer types (signed):**
 ```
-num str list map
+i8 i16 i32 i64 i128 i256 i512
+```
+
+**Integer types (unsigned):**
+```
+u8 u16 u32 u64 u128 u256 u512
+byte      // Alias for u8
+```
+
+**Character types:**
+```
+rune      // Unicode code point (i32)
+```
+
+**Floating-point types:**
+```
+f32 f64 f128
+```
+
+**Complex number types:**
+```
+complex64 complex128
+```
+
+**Quaternion type:**
+```
+quaternion
+```
+
+**String types:**
+```
+str       // UTF-8 string (default)
+utf8      // UTF-8 string (explicit)
+utf16     // UTF-16 string
+utf32     // UTF-32 string
+```
+
+**Collection types:**
+```
+array     // Fixed-size array
+slice     // Dynamic slice
+list      // Linked list
+map       // Hash map
+set       // Hash set
+tree      // Binary tree
 ```
 
 **Foreign C types:**
@@ -956,25 +1068,30 @@ cstring cptr cint clong cfloat cdouble cbool cvoid
 **Legacy type cast keywords (for `unsafe` blocks and `cstruct`):**
 ```
 int8 int16 int32 int64 uint8 uint16 uint32 uint64 float32 float64
-cptr cstring number string address packed aligned
+number string address packed aligned
 ```
 
 **Usage:**
 ```vibe67
-// Type annotations (preferred)
-x: num = 42
+// Type annotations
+x: i32 = 42
+count: u64 = 100
 name: str = "Alice"
-ptr: cptr = sdl.SDL_CreateWindow(...)
+data: [10]byte = ...     // 10-byte array
+ch: rune = 'A'
+ptr: cptr = sdl.SDL_CreateWindow(...)!
 
-// Type casts in unsafe blocks (legacy)
-value = unsafe int32 { ... }
+// Complex types
+z: complex64 = ...
+items: []i32 = [1, 2, 3]
+mapping: map[str]i32 = ...
 ```
 
 Type keywords are contextual - you can still use them as variable names in most contexts:
 
 ```vibe67
-num = 100              // OK - variable named num
-x: num = num * 2       // OK - type annotation vs variable
+i32 = 100              // OK - variable named i32
+x: i32 = i32 * 2       // OK - type annotation vs variable
 ```
 
 ## Memory Management and Builtins
@@ -2207,58 +2324,75 @@ class {
 
 ## Type Annotations
 
-Type annotations are **optional metadata** that specify semantic intent and guide FFI marshalling. They do NOT change the runtime representation (always `map[uint64]float64`).
+Type annotations are **compile-time metadata** that guide type inference and optimization. The compiler uses these annotations to generate specialized, efficient code for each type.
 
 ### Syntax
 
 **Variable declarations:**
 ```vibe67
-x: num = 42                    // Number annotation
-name: str = "Alice"            // String annotation
-items: list = [1, 2, 3]        // List annotation
-config: map = {port: 8080}     // Map annotation
+x: i32 = 42                    // 32-bit signed integer
+count: u64 = 100               // 64-bit unsigned integer
+name: str = "Alice"            // UTF-8 string
+data: [10]byte = ...           // 10-byte array
+ch: rune = 'A'                 // Unicode code point (i32)
+value: f64 = 3.14159           // 64-bit float
 
 // C types for FFI
-ptr: cptr = sdl.SDL_CreateWindow("Hi", 640, 480, 0)
+ptr: cptr = sdl.SDL_CreateWindow("Hi", 640, 480, 0)!
 err: cstring = sdl.SDL_GetError()
 result: cint = sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
-value: cdouble = 3.14159
 ```
 
 **Function signatures:**
 ```vibe67
-// Parameter and return types
-add(x: num, y: num) -> num { x + y }
+// Integer arithmetic (native registers, zero overhead)
+add(x: i32, y: i32) -> i32 { x + y }
 
 // String functions
 greet(name: str) -> str { f"Hello, {name}!" }
 
 // C FFI functions
-create_window(title: str, w: cint, h: cint) -> cptr {
-    sdl.SDL_CreateWindow(title, w, h, 0)
+create_window(title: str, w: i32, h: i32) -> cptr {
+    sdl.SDL_CreateWindow(title, w, h, 0)!
 }
 
 // Mixed types
-format_error(code: cint) -> str {
-    f"Error {code}: {sdl.SDL_GetError()}"
+format_number(x: f64) -> str {
+    f"Value: {x}"
 }
+```
+
+**Complex types:**
+```vibe67
+// Fixed-size arrays
+buffer: [256]byte = ...
+
+// Dynamic slices
+items: []i32 = [1, 2, 3, 4, 5]
+
+// Maps
+mapping: map[str]i32 = {"a": 1, "b": 2}
+
+// Complex numbers
+z: complex64 = ...
 ```
 
 ### Type Semantics
 
-| Type      | Runtime Repr          | Purpose       | Example               |
-|-----------|-----------------------|---------------|-----------------------|
-| `num`     | `{0: 42.0}`           | Number intent | `x: num = 42`         |
-| `str`     | `{0: 72.0, 1: 105.0}` | String intent | `name: str = "Hi"`    |
-| `list`    | `{0: 1.0, 1: 2.0}`    | List intent   | `xs: list = [1, 2]`   |
-| `map`     | `{hash("x"): 10.0}`   | Map intent    | `m: map = {x: 10}`    |
-| `cstring` | `{0: <ptr>}`          | C `char*`     | `s: cstring = c.fn()` |
-| `cptr`    | `{0: <ptr>}`          | C pointer     | `p: cptr = sdl.fn()`  |
-| `cint`    | `{0: 42.0}`           | C `int`       | `n: cint = sdl.fn()`  |
-| `clong`   | `{0: 42.0}`           | C `int64_t`   | `l: clong = c.time()` |
-| `cfloat`  | `{0: 3.14}`           | C `float`     | `f: cfloat = 3.14`    |
-| `cdouble` | `{0: 3.14}`           | C `double`    | `d: cdouble = c.fn()` |
-| `cbool`   | `{0: 1.0}`            | C `bool`      | `ok: cbool = c.fn()`  |
+| Type       | Storage              | Register      | Example                 |
+|------------|----------------------|---------------|-------------------------|
+| `i8`-`i64` | Native integer       | GPR (8-64bit) | `x: i32 = 42`          |
+| `u8`-`u64` | Native unsigned      | GPR (8-64bit) | `count: u64 = 100`     |
+| `byte`     | Alias for `u8`       | 8-bit GPR     | `b: byte = 0xFF`       |
+| `rune`     | Unicode (i32)        | 32-bit GPR    | `ch: rune = 'A'`       |
+| `f32`-`f64`| Native float         | XMM/FPU       | `pi: f64 = 3.14`       |
+| `str`      | UTF-8 + length       | ptr + len     | `name: str = "Hi"`     |
+| `[N]T`     | Fixed array          | Stack         | `buf: [10]i32 = ...`   |
+| `[]T`      | Dynamic slice        | ptr + len+cap | `items: []i32 = ...`   |
+| `map[K]V`  | Hash map             | Heap          | `m: map[str]i32 = ...` |
+| `cptr`     | C pointer            | 64-bit GPR    | `p: cptr = c.fn()!`    |
+| `cstring`  | C `char*`            | 64-bit GPR    | `s: cstring = c.fn()`  |
+| `cint`     | C `int`              | 32-bit GPR    | `n: cint = c.fn()`     |
 
 ### FFI Marshalling
 
@@ -2266,46 +2400,71 @@ Type annotations guide automatic conversions at C FFI boundaries:
 
 **Vibe67 → C conversions:**
 ```vibe67
-// Vibe67 string → C string (calls vibe67_string_to_cstr)
+// Vibe67 string → C string (automatic conversion)
 title: str = "Window"
-window = sdl.SDL_CreateWindow(title, 640, 480, 0)  // title converted to char*
+window = sdl.SDL_CreateWindow(title, 640, 480, 0)!  // str → char*
 
-// Vibe67 number → C int (extracts {0: value})
-result: cint = sdl.SDL_Init(0x00000020)  // Vibe67 num → C int
+// Vibe67 integers → C integers (native)
+width: i32 = 640
+height: i32 = 480
+sdl.SDL_CreateWindow("Title", width, height, 0)!
 ```
 
 **C → Vibe67 conversions:**
 ```vibe67
-// C char* → cstring (stored as pointer in {0: <ptr>})
-err: cstring = sdl.SDL_GetError()  // char* stored as-is
+// C pointer → cptr (use ! for raw bitcast)
+window: cptr = sdl.SDL_CreateWindow(...)!  // Preserves all 64 bits
 
-// When needed, convert cstring → str manually
-err_str: str = str(err)  // Convert C string to Vibe67 string
+// C char* → cstring
+err: cstring = sdl.SDL_GetError()
+
+// Convert cstring → str when needed
+err_str: str = str(err)
 ```
 
 ### Type Inference
 
-When annotations are omitted, the compiler infers types:
+When annotations are omitted, the compiler infers types using Hindley-Milner style inference:
 
 ```vibe67
-x = 42              // Inferred: num
-name = "Alice"      // Inferred: str
-items = [1, 2, 3]   // Inferred: list
-ptr = sdl.SDL_CreateWindow(...)  // Inferred: cptr (from FFI signature)
+x = 42              // Inferred: i64 (default integer type)
+count = 100u32      // Inferred: u32 (explicit suffix)
+name = "Alice"      // Inferred: str (UTF-8 string)
+items = [1, 2, 3]   // Inferred: [3]i64 (fixed-size array)
+ptr = c.malloc(100)!  // Inferred: cptr (from C signature + raw bitcast)
 ```
+
+**Inference rules:**
+- Integer literals default to `i64`
+- Float literals default to `f64`
+- String literals default to `str` (UTF-8)
+- Arrays infer element type from contents
+- Function return types inferred from body
+
+### Optimization Benefits
+
+The compiler uses type information to optimize code:
+
+1. **Native registers** - `i32` uses 32-bit register, no conversions
+2. **SIMD vectorization** - Arrays of primitives use SIMD instructions
+3. **No boxing** - Monomorphic code avoids heap allocations
+4. **Specialized code** - Functions generate type-specific code paths
+5. **Inlining** - Small typed functions inline aggressively
 
 ### When to Use Type Annotations
 
 **Use annotations when:**
-1. Clarifying intent (documentation)
-2. Working with C FFI (marshalling guidance)
-3. Catching type errors early
-4. Enabling future optimizations
+1. Performance matters (enables optimizations)
+2. Working with C FFI (required for proper marshalling)
+3. Documenting interfaces (clarifies contracts)
+4. Avoiding ambiguity (multiple valid inferences)
+5. Enforcing constraints (preventing type errors)
 
 **Omit annotations when:**
 1. Type is obvious from context
-2. Writing quick scripts
-3. Type doesn't matter for correctness
+2. Writing quick scripts or prototypes
+3. Inference produces the desired type
+4. Flexibility is more important than performance
 
 ---
 
