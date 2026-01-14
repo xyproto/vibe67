@@ -698,3 +698,12 @@ func (o *Out) movupdXmmToMemX86(xmm, base string, offset int) {
 }
 
 // MovqRegToXmm - Move 64-bit integer from general-purpose register to XMM register
+
+
+
+
+
+
+
+
+

@@ -903,3 +903,12 @@ func (eb *ExecutableBuilder) patchRISCVPLTCalls(textBytes []byte, ds *DynamicSec
 		}
 	}
 }
+
+
+
+
+
+
+
+
+

@@ -15,7 +15,7 @@ package main
 //	r14 = new_capacity
 //	r15 = new meta-arena pointer
 //	r13 = updated to old len for initialization loop
-func (fc *Vibe67Compiler) generateMetaArenaGrowth() {
+func (fc *C67Compiler) generateMetaArenaGrowth() {
 	// Calculate new capacity: max(capacity * 2, required_depth)
 	fc.out.MovRegToReg("r14", "r13")
 	fc.out.AddRegToReg("r14", "r13") // r14 = capacity * 2
@@ -63,7 +63,7 @@ func (fc *Vibe67Compiler) generateMetaArenaGrowth() {
 // Output:
 //
 //	r13 = updated len after initialization
-func (fc *Vibe67Compiler) generateArenaInitLoop() {
+func (fc *C67Compiler) generateArenaInitLoop() {
 	// Initialize new slots (from len to required_depth)
 	// r13 = len, r12 = required_depth, r15 = meta-arena pointer
 	initLoopLabel := fc.eb.text.Len()
@@ -110,7 +110,7 @@ func (fc *Vibe67Compiler) generateArenaInitLoop() {
 //
 //	r13 = number of arenas created (min(8, required))
 //	r15 = meta-arena pointer
-func (fc *Vibe67Compiler) generateFirstMetaArenaAlloc() {
+func (fc *C67Compiler) generateFirstMetaArenaAlloc() {
 	// Allocate meta-arena with 8 slots initially
 	fc.out.MovImmToReg("rdi", "64") // 8 slots * 8 bytes = 64
 	fc.trackFunctionCall("malloc")
@@ -188,7 +188,7 @@ func (fc *Vibe67Compiler) generateFirstMetaArenaAlloc() {
 //	r8, r9, rdx, rax
 //
 // Calls realloc and updates arena structure
-func (fc *Vibe67Compiler) generateIndividualArenaGrowth(arenaGrowJump int) int {
+func (fc *C67Compiler) generateIndividualArenaGrowth(arenaGrowJump int) int {
 	arenaGrowLabel := fc.eb.text.Len()
 	fc.patchJumpImmediate(arenaGrowJump+2, int32(arenaGrowLabel-(arenaGrowJump+6)))
 	fc.eb.MarkLabel("_arena_alloc_grow")
@@ -223,3 +223,12 @@ func (fc *Vibe67Compiler) generateIndividualArenaGrowth(arenaGrowJump int) int {
 
 	return arenaErrorJump
 }
+
+
+
+
+
+
+
+
+

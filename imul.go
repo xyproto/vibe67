@@ -280,3 +280,12 @@ func (o *Out) imulRISCVImmToReg(dst string, imm int64) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

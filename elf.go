@@ -94,3 +94,12 @@ func (eb *ExecutableBuilder) WriteELFHeader() error {
 
 	return nil
 }
+
+
+
+
+
+
+
+
+

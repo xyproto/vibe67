@@ -5715,3 +5715,12 @@ func (acg *ARM64CodeGen) generateArenaRuntimeARM64() error {
 
 	return nil
 }
+
+
+
+
+
+
+
+
+

@@ -14,7 +14,7 @@ import (
 // for Windows systems on x86_64 architecture.
 
 // Confidence that this function is working: 80%
-func (fc *Vibe67Compiler) writePE(program *Program, outputPath string) error {
+func (fc *C67Compiler) writePE(program *Program, outputPath string) error {
 	if VerboseMode {
 		fmt.Fprintf(os.Stderr, "-> Generating Windows PE executable\n")
 	}
@@ -110,3 +110,12 @@ func mapLibraryToDLL(libName string) string {
 	// Default: add .dll extension
 	return libName + ".dll"
 }
+
+
+
+
+
+
+
+
+

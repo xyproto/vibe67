@@ -966,3 +966,12 @@ func writePEImportDescriptor(buf []byte, offset int, ilt, iat, name uint32, time
 	binary.LittleEndian.PutUint32(buf[offset+12:], name)         // RVA to DLL name
 	binary.LittleEndian.PutUint32(buf[offset+16:], iat)          // RVA to IAT
 }
+
+
+
+
+
+
+
+
+

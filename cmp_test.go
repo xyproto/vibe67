@@ -222,3 +222,12 @@ func TestCmpRISCVRegToReg(t *testing.T) {
 		t.Errorf("Expected rd=5 (t0), got %d", rd)
 	}
 }
+
+
+
+
+
+
+
+
+

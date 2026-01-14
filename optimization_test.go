@@ -204,3 +204,12 @@ fn main() -> float64 {
 	t := &testing.T{}
 	_ = compileAndRun(t, code)
 }
+
+
+
+
+
+
+
+
+

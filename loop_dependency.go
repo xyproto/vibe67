@@ -285,3 +285,12 @@ func (lda *LoopDependencyAnalyzer) GetDependencyReport(loop *LoopStmt) string {
 
 	return report
 }
+
+
+
+
+
+
+
+
+

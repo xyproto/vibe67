@@ -163,3 +163,12 @@ printf("step2(5) = %f\n", b)
 		t.Errorf("Composition with variables failed, got: %s", output)
 	}
 }
+
+
+
+
+
+
+
+
+

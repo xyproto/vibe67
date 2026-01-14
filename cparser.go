@@ -853,3 +853,12 @@ func ParseCHeaderFile(filepath string) (*CHeaderConstants, error) {
 	parser := NewCParser()
 	return parser.ParseFile(filepath)
 }
+
+
+
+
+
+
+
+
+

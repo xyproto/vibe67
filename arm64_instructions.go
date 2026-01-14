@@ -1085,3 +1085,12 @@ func (a *ARM64Out) FcmpScalar64(op1, op2 string) error {
 // - Advanced addressing modes (pre/post-index)
 // - Atomic operations (LDXR, STXR, CAS, etc.)
 // - More conversion instructions (FCVT between precisions)
+
+
+
+
+
+
+
+
+

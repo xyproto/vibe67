@@ -26,3 +26,12 @@ func (eb *ExecutableBuilder) SysExitX86_64(code ...string) {
 	}
 	eb.Emit("syscall")
 }
+
+
+
+
+
+
+
+
+

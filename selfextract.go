@@ -183,3 +183,12 @@ func generateTinyRLEDecompressor_x64() []byte {
 
 	return code.Bytes()
 }
+
+
+
+
+
+
+
+
+

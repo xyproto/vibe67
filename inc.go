@@ -106,3 +106,12 @@ func (o *Out) incRISCVReg(reg string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

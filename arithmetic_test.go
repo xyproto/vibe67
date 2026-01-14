@@ -222,3 +222,12 @@ func TestJumpRISCVEqual(t *testing.T) {
 		t.Errorf("Wrong funct3 for BEQ: %d", funct3)
 	}
 }
+
+
+
+
+
+
+
+
+

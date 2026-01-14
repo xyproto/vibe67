@@ -430,3 +430,12 @@ func (o *Out) vbroadcastRISCVMemToVector(dst, base string, offset int32) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

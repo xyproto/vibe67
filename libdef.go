@@ -358,3 +358,12 @@ func GenerateRaylibExample(eb *ExecutableBuilder) error {
 
 	return nil
 }
+
+
+
+
+
+
+
+
+

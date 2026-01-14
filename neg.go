@@ -200,3 +200,12 @@ func (o *Out) negRISCVRegToReg(dst, src string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

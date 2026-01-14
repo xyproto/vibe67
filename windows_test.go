@@ -38,7 +38,7 @@ c.printf("C FFI works: %d\n", 42)
 		OS:   OSWindows,
 	}
 
-	err = CompileVibe67(tmpPath, outputPath, platform)
+	err = CompileC67(tmpPath, outputPath, platform)
 	if err != nil {
 		t.Errorf("Windows compilation failed: %v", err)
 		return
@@ -74,3 +74,12 @@ c.printf("C FFI works: %d\n", 42)
 		t.Errorf("Invalid PE header: expected 'MZ', got %c%c", data[0], data[1])
 	}
 }
+
+
+
+
+
+
+
+
+

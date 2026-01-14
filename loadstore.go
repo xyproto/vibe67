@@ -377,3 +377,12 @@ func (o *Out) storeRISCVRegToMem(src, base string, offset int32) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

@@ -2137,3 +2137,12 @@ func shouldApplyIntegerOptimization(left, right Expression) bool {
 
 	return false
 }
+
+
+
+
+
+
+
+
+

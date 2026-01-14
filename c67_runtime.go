@@ -169,3 +169,12 @@ func (fr *Vibe67Runtime) CreateString() {
 func (fr *Vibe67Runtime) EmitArenaRuntime() {
 	fr.eb.EmitArenaRuntimeCode()
 }
+
+
+
+
+
+
+
+
+

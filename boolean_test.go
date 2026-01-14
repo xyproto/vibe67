@@ -135,3 +135,12 @@ func TestBooleanString(t *testing.T) {
 		t.Errorf("Expected 'no', got '%s'", no.String())
 	}
 }
+
+
+
+
+
+
+
+
+

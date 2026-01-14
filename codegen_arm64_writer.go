@@ -13,7 +13,7 @@ import (
 // This file handles the generation of ELF executables for Linux
 // on ARM64 architecture.
 
-func (fc *Vibe67Compiler) writeELFARM64(outputPath string) error {
+func (fc *C67Compiler) writeELFARM64(outputPath string) error {
 	// Enable dynamic linking for ARM64 ELF
 	fc.eb.useDynamicLinking = true
 
@@ -233,3 +233,12 @@ func (fc *Vibe67Compiler) writeELFARM64(outputPath string) error {
 
 	return nil
 }
+
+
+
+
+
+
+
+
+

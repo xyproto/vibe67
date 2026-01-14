@@ -122,7 +122,7 @@ println("Done!")
 		OS:   OSWindows,
 	}
 
-	err = CompileVibe67(tmpPath, outputPath, platform)
+	err = CompileC67(tmpPath, outputPath, platform)
 	if err != nil {
 		t.Errorf("Windows SDL3 compilation failed: %v", err)
 		return
@@ -273,7 +273,7 @@ func TestSDL3ExampleCompiles(t *testing.T) {
 				OS:   osType,
 				Arch: archType,
 			}
-			if err := CompileVibe67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
+			if err := CompileC67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
 
@@ -304,7 +304,7 @@ func TestSDL3ExampleCompiles(t *testing.T) {
 			OS:   osType,
 			Arch: archType,
 		}
-		if err := CompileVibe67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
+		if err := CompileC67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
 			t.Fatalf("Compilation failed: %v", err)
 		}
 
@@ -320,3 +320,12 @@ func TestSDL3ExampleCompiles(t *testing.T) {
 		t.Logf("Successfully compiled sdl3example.vibe67 for Windows: %d bytes", len(data))
 	})
 }
+
+
+
+
+
+
+
+
+

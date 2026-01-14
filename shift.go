@@ -441,3 +441,12 @@ func (o *Out) shrRISCVRegByReg(dst, src string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

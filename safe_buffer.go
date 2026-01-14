@@ -117,3 +117,12 @@ func (s *ScopedBuffer) ResetScope() {
 	s.buf.Reset()
 	s.done = false
 }
+
+
+
+
+
+
+
+
+

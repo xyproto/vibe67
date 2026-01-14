@@ -11,7 +11,7 @@ import (
 // GeneratePrintfSyscallRuntime generates syscall-based printf runtime helpers
 // Note: The main printf implementation uses compile-time parsing with inline code emission.
 // This function generates helper labels that might be used by some code paths.
-func (fc *Vibe67Compiler) GeneratePrintfSyscallRuntime() {
+func (fc *C67Compiler) GeneratePrintfSyscallRuntime() {
 	if fc.eb.target.OS() != OSLinux {
 		// On non-Linux systems, we still need libc printf
 		return
@@ -47,7 +47,7 @@ func (fc *Vibe67Compiler) GeneratePrintfSyscallRuntime() {
 // ============================================================================
 
 // generatePrintfMain generates the main printf dispatcher (UNUSED - see note above)
-func (fc *Vibe67Compiler) generatePrintfMain() {
+func (fc *C67Compiler) generatePrintfMain() {
 	fc.eb.MarkLabel("_vibe67_printf_syscall")
 
 	// Prologue
@@ -464,14 +464,14 @@ func (fc *Vibe67Compiler) generatePrintfMain() {
 }
 
 // Helper to patch short jumps (8-bit offset)
-func (fc *Vibe67Compiler) patchShortJump(offsetPos int, targetPos int) {
+func (fc *C67Compiler) patchShortJump(offsetPos int, targetPos int) {
 	bytes := fc.eb.text.Bytes()
 	offset := int8(targetPos - (offsetPos + 1))
 	bytes[offsetPos] = byte(offset)
 }
 
 // Helper to patch long jumps (32-bit offset)
-func (fc *Vibe67Compiler) patchJumpOffset(offsetPos int, targetPos int) {
+func (fc *C67Compiler) patchJumpOffset(offsetPos int, targetPos int) {
 	bytes := fc.eb.text.Bytes()
 	offset := int32(targetPos - (offsetPos + 4))
 	bytes[offsetPos] = byte(offset)
@@ -481,7 +481,7 @@ func (fc *Vibe67Compiler) patchJumpOffset(offsetPos int, targetPos int) {
 }
 
 // Helper to patch call offsets
-func (fc *Vibe67Compiler) patchCallOffset(offsetPos int, targetPos int) {
+func (fc *C67Compiler) patchCallOffset(offsetPos int, targetPos int) {
 	bytes := fc.eb.text.Bytes()
 	offset := int32(targetPos - (offsetPos + 4))
 	bytes[offsetPos] = byte(offset)
@@ -493,7 +493,7 @@ func (fc *Vibe67Compiler) patchCallOffset(offsetPos int, targetPos int) {
 // compilePrintfSyscall compiles a printf call using inline syscalls
 // This is a simplified approach that parses the format string at compile time
 // and emits inline syscalls for each segment
-func (fc *Vibe67Compiler) compilePrintfSyscall(call *CallExpr, formatStr *StringExpr) {
+func (fc *C67Compiler) compilePrintfSyscall(call *CallExpr, formatStr *StringExpr) {
 	processedFormat := processEscapeSequences(formatStr.Value)
 
 	// Parse format string and emit inline code for each segment
@@ -629,7 +629,7 @@ func (fc *Vibe67Compiler) compilePrintfSyscall(call *CallExpr, formatStr *String
 }
 
 // emitSyscallPrintLiteral emits code to print a literal string using syscalls
-func (fc *Vibe67Compiler) emitSyscallPrintLiteral(str string) {
+func (fc *C67Compiler) emitSyscallPrintLiteral(str string) {
 	labelName := fmt.Sprintf("printf_lit_%d", fc.stringCounter)
 	fc.stringCounter++
 	fc.eb.Define(labelName, str)
@@ -642,7 +642,7 @@ func (fc *Vibe67Compiler) emitSyscallPrintLiteral(str string) {
 }
 
 // emitSyscallPrintChar emits code to print a single character
-func (fc *Vibe67Compiler) emitSyscallPrintChar(ch rune) {
+func (fc *C67Compiler) emitSyscallPrintChar(ch rune) {
 	fc.out.SubImmFromReg("rsp", 8)
 	fc.out.MovImmToReg("rax", fmt.Sprintf("%d", ch))
 	fc.out.MovRegToMem("rax", "rsp", 0)
@@ -655,7 +655,7 @@ func (fc *Vibe67Compiler) emitSyscallPrintChar(ch rune) {
 }
 
 // emitSyscallPrintInteger emits code to print an integer in rax
-func (fc *Vibe67Compiler) emitSyscallPrintInteger() {
+func (fc *C67Compiler) emitSyscallPrintInteger() {
 	fc.out.PushReg("rbx")
 	fc.out.PushReg("rcx")
 	fc.out.PushReg("rdx")
@@ -716,7 +716,7 @@ func (fc *Vibe67Compiler) emitSyscallPrintInteger() {
 }
 
 // emitSyscallPrintVibe67String emits code to print a Vibe67 string (in xmm0)
-func (fc *Vibe67Compiler) emitSyscallPrintVibe67String() {
+func (fc *C67Compiler) emitSyscallPrintVibe67String() {
 	// Call the existing print syscall helper
 	fc.trackFunctionCall("_vibe67_print_syscall")
 	fc.out.MovqXmmToReg("rdi", "xmm0")
@@ -724,7 +724,7 @@ func (fc *Vibe67Compiler) emitSyscallPrintVibe67String() {
 }
 
 // emitSyscallPrintBoolean emits code to print true/false based on xmm0
-func (fc *Vibe67Compiler) emitSyscallPrintBoolean() {
+func (fc *C67Compiler) emitSyscallPrintBoolean() {
 	// Convert to integer
 	fc.out.Cvttsd2si("rax", "xmm0")
 	fc.out.Emit([]byte{0x48, 0x85, 0xc0}) // test rax, rax
@@ -749,7 +749,7 @@ func (fc *Vibe67Compiler) emitSyscallPrintBoolean() {
 }
 
 // emitSyscallPrintBooleanYesNo emits code to print yes/no based on xmm0
-func (fc *Vibe67Compiler) emitSyscallPrintBooleanYesNo() {
+func (fc *C67Compiler) emitSyscallPrintBooleanYesNo() {
 	// Convert to integer
 	fc.out.Cvttsd2si("rax", "xmm0")
 	fc.out.Emit([]byte{0x48, 0x85, 0xc0}) // test rax, rax
@@ -773,7 +773,7 @@ func (fc *Vibe67Compiler) emitSyscallPrintBooleanYesNo() {
 }
 
 // generatePrintString generates helper to print C-style strings
-func (fc *Vibe67Compiler) generatePrintString() {
+func (fc *C67Compiler) generatePrintString() {
 	fc.eb.MarkLabel("_printf_print_string")
 
 	fc.out.PushReg("rbx")
@@ -804,7 +804,7 @@ func (fc *Vibe67Compiler) generatePrintString() {
 }
 
 // generatePrintInteger generates helper to print signed integers
-func (fc *Vibe67Compiler) generatePrintInteger() {
+func (fc *C67Compiler) generatePrintInteger() {
 	fc.eb.MarkLabel("_printf_print_integer")
 
 	fc.out.PushReg("rbx")
@@ -869,7 +869,7 @@ func (fc *Vibe67Compiler) generatePrintInteger() {
 }
 
 // generatePrintUnsigned generates helper to print unsigned integers
-func (fc *Vibe67Compiler) generatePrintUnsigned() {
+func (fc *C67Compiler) generatePrintUnsigned() {
 	fc.eb.MarkLabel("_printf_print_unsigned")
 
 	// Same as print_integer but without negative handling
@@ -913,7 +913,7 @@ func (fc *Vibe67Compiler) generatePrintUnsigned() {
 }
 
 // generatePrintFloat generates helper to print floats (simplified version)
-func (fc *Vibe67Compiler) generatePrintFloat() {
+func (fc *C67Compiler) generatePrintFloat() {
 	fc.eb.MarkLabel("_printf_print_float")
 
 	// For now, convert float to integer and print
@@ -983,7 +983,7 @@ func (fc *Vibe67Compiler) generatePrintFloat() {
 // emitSyscallPrintFloatPrecise prints a float with 6 decimal places
 // Input: xmm0 = float64 value
 // FULLY INLINE - zero function calls, direct syscalls only!
-func (fc *Vibe67Compiler) emitSyscallPrintFloatPrecise(precision int) {
+func (fc *C67Compiler) emitSyscallPrintFloatPrecise(precision int) {
 	// Allocate 160 bytes: 128 for work area + 32 for emitSyscallPrintInteger's stack use
 	// This ensures our saved value stays at a consistent offset
 	fc.out.SubImmFromReg("rsp", 160)
@@ -1109,7 +1109,7 @@ func (fc *Vibe67Compiler) emitSyscallPrintFloatPrecise(precision int) {
 }
 
 // emitSyscallPrintHex emits code to print an integer in rax as hex (0x...)
-func (fc *Vibe67Compiler) emitSyscallPrintHex() {
+func (fc *C67Compiler) emitSyscallPrintHex() {
 	fc.out.PushReg("rbx")
 	fc.out.PushReg("rcx")
 	fc.out.PushReg("rdx")
@@ -1200,3 +1200,12 @@ func (fc *Vibe67Compiler) emitSyscallPrintHex() {
 	fc.out.PopReg("rcx")
 	fc.out.PopReg("rbx")
 }
+
+
+
+
+
+
+
+
+

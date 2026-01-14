@@ -1245,3 +1245,12 @@ func (x *X86_64CodeGen) MovzxByteToQword(dstReg, srcReg string) {
 	modrm := uint8(0xC0) | (uint8(dstNum&7) << 3) | uint8(srcNum&7)
 	x.write(modrm)
 }
+
+
+
+
+
+
+
+
+

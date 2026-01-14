@@ -123,3 +123,12 @@ func (fc *FuncCompiler) compileWithSafety() error {
 //
 // 	ds.dynsym.Commit()  // Mark as ready for reading
 // }
+
+
+
+
+
+
+
+
+

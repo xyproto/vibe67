@@ -50,7 +50,7 @@ func (is *IncrementalState) InitialCompile(inputPath, outputPath string) error {
 	}
 
 	// Perform full compilation
-	if err := CompileVibe67(inputPath, outputPath, is.platform); err != nil {
+	if err := CompileC67(inputPath, outputPath, is.platform); err != nil {
 		return err
 	}
 
@@ -149,7 +149,7 @@ func (is *IncrementalState) IncrementalRecompile(changedPath string) ([]string, 
 	// Do a full recompilation with the updated source
 	// (This is fast and ensures all dependencies are resolved correctly)
 	tempOutput := is.lastBinaryPath + ".tmp"
-	if err := CompileVibe67(changedPath, tempOutput, is.platform); err != nil {
+	if err := CompileC67(changedPath, tempOutput, is.platform); err != nil {
 		return nil, fmt.Errorf("recompilation failed: %v", err)
 	}
 
@@ -196,3 +196,12 @@ func (is *IncrementalState) GetWatchFiles() []string {
 	}
 	return files
 }
+
+
+
+
+
+
+
+
+

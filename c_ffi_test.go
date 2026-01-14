@@ -156,3 +156,12 @@ println(Vec3.z.offset)
 		t.Errorf("Expected Vec3.z offset, got: %s", output)
 	}
 }
+
+
+
+
+
+
+
+
+

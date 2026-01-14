@@ -286,3 +286,12 @@ func (o *Out) vgatherRISCVFromMem(dst, base, indices string, scale int32, mask s
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

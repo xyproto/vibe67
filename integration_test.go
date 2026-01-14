@@ -87,7 +87,7 @@ func testVibe67Program(t *testing.T, name, srcPath, buildDir string) {
 	// Compile the program using Go API directly
 	// Use current platform for testing
 	platform := GetDefaultPlatform()
-	compileErr := CompileVibe67(srcPath, executable, platform)
+	compileErr := CompileC67(srcPath, executable, platform)
 
 	// Check compilation result
 	if compileErr != nil {
@@ -225,3 +225,12 @@ func splitLines(data []byte) []string {
 	}
 	return lines
 }
+
+
+
+
+
+
+
+
+

@@ -394,3 +394,12 @@ func FatalError(message string, loc SourceLocation) CompilerError {
 		},
 	}
 }
+
+
+
+
+
+
+
+
+

@@ -177,7 +177,7 @@ func exampleIntegration() {
 	fmt.Println()
 
 	fmt.Println(`
-In Vibe67Compiler.compileLambda():
+In C67Compiler.compileLambda():
 
 // 1. Create allocator
 fc.regAlloc = NewRegisterAllocator(fc.platform.Arch())
@@ -198,7 +198,7 @@ fc.compileExpression(lambda.Body)
 fc.regAlloc.GenerateEpilogue(fc.out)
 fc.out.Ret()
 
-In Vibe67Compiler.compileVariable():
+In C67Compiler.compileVariable():
 
 if reg, ok := fc.regAlloc.GetRegister(varName); ok {
     // Variable is in register - use it directly!
@@ -222,3 +222,12 @@ func runRegisterAllocatorDemo() {
 	demonstrateSpilling()
 	exampleIntegration()
 }
+
+
+
+
+
+
+
+
+

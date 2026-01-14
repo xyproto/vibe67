@@ -277,7 +277,7 @@ func (p *Parser) synchronize() {
 // speculativeError is used to signal parse failure during speculative parsing
 type speculativeError struct{}
 
-// compilerError prints an error message and panics (to be recovered by CompileVibe67)
+// compilerError prints an error message and panics (to be recovered by CompileC67)
 // Use this instead of fmt.Fprintf + os.Exit in code generation
 func compilerError(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
@@ -5148,3 +5148,12 @@ func (p *Parser) parseTypeAnnotation() *Vibe67Type {
 		return nil
 	}
 }
+
+
+
+
+
+
+
+
+

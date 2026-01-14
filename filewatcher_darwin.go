@@ -123,3 +123,12 @@ func (fw *FileWatcher) Close() error {
 
 	return unix.Close(fw.kq)
 }
+
+
+
+
+
+
+
+
+

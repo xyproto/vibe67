@@ -39,3 +39,12 @@ func hasLocalVariables(expr Expression) bool {
 	scan(expr)
 	return found
 }
+
+
+
+
+
+
+
+
+

@@ -1019,3 +1019,12 @@ func (r *RiscvOut) LeaSymbolToReg(dst, symbol string) {
 		}
 	}
 }
+
+
+
+
+
+
+
+
+

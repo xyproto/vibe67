@@ -921,3 +921,12 @@ func (o *Out) movU32RegToMemX86(src, base string, offset int) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

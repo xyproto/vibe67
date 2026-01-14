@@ -209,3 +209,12 @@ func TestMovVsLea(t *testing.T) {
 		t.Error("PIE should use LEA instruction (0x8D)")
 	}
 }
+
+
+
+
+
+
+
+
+

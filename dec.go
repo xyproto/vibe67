@@ -107,3 +107,12 @@ func (o *Out) decRISCVReg(reg string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

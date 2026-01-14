@@ -15,7 +15,7 @@ import (
 // executables for Linux/Unix systems on x86_64 architecture.
 
 // Confidence that this function is working: 85%
-func (fc *Vibe67Compiler) writeELF(program *Program, outputPath string) error {
+func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	// Check if dynamic linking is actually needed
 	// On Linux, printf/println use syscalls, not libc
 	libcFunctions := map[string]bool{
@@ -56,7 +56,7 @@ func (fc *Vibe67Compiler) writeELF(program *Program, outputPath string) error {
 	needsLibm := false
 
 	// Check C FFI calls - these need dynamic linking
-	for funcName, libName := range fc.cFFIFunctions {
+	for funcName, libName := range fc.cFunctionLibs {
 		if libName == "c" {
 			// Check if it's a math function
 			if libmFunctions[funcName] {
@@ -68,7 +68,7 @@ func (fc *Vibe67Compiler) writeELF(program *Program, outputPath string) error {
 	}
 
 	// Check if any C FFI functions are used
-	hasCFFI := len(fc.cFFIFunctions) > 0
+	hasCFFI := len(fc.cFunctionLibs) > 0
 
 	// On Linux, printf/println use syscalls (no libc needed)
 	// On other platforms, they still need libc
@@ -78,15 +78,11 @@ func (fc *Vibe67Compiler) writeELF(program *Program, outputPath string) error {
 	needsPrintf := fc.usedFunctions["printf"] || fc.usedFunctions["println"] || fc.usedFunctions["print"] ||
 		fc.usedFunctions["eprint"] || fc.usedFunctions["eprintln"] || fc.usedFunctions["eprintf"]
 
-	// Check if safety checks are used (they emit printf in error handlers)
-	// Only count if not in unsafe block (safety checks disabled)
-	needsSafetyPrintf := (fc.usesNullCheck || fc.usesBoundsCheck) && !fc.inUnsafeBlock
-
 	// Enable static ELF when no dynamic libraries needed
 	// On Linux, printf is syscall-based so doesn't need dynamic linking
 	// Arenas require dynamic linking (use mmap syscall)
 	needsStatic := !needsLibc && !needsLibm && !hasCFFI && !fc.usesArenas &&
-		!(printfNeedsLibc && (needsPrintf || needsSafetyPrintf))
+		!(printfNeedsLibc && needsPrintf)
 
 	// If no dynamic libraries needed, use simple static ELF
 	if needsStatic {
@@ -758,3 +754,12 @@ func (fc *Vibe67Compiler) writeELF(program *Program, outputPath string) error {
 
 // Confidence that this function is working: 50%
 // writePE generates a Windows PE (Portable Executable) file for x86_64
+
+
+
+
+
+
+
+
+

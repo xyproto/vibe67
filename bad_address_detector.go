@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func (fc *Vibe67Compiler) detectBadAddresses(data []byte) {
+func (fc *C67Compiler) detectBadAddresses(data []byte) {
 	badPatterns := []struct {
 		pattern []byte
 		name    string
@@ -47,3 +47,12 @@ func (fc *Vibe67Compiler) detectBadAddresses(data []byte) {
 		}
 	}
 }
+
+
+
+
+
+
+
+
+

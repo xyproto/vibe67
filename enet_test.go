@@ -42,7 +42,7 @@ println(42)
 			}
 
 			// Try to compile
-			err := CompileVibe67(srcPath, outPath, platform)
+			err := CompileC67(srcPath, outPath, platform)
 
 			// We expect compilation to succeed (generates assembly/binary)
 			// It may fail at link time if ENet is not installed, which is acceptable
@@ -155,7 +155,7 @@ println("ENet test")
 		t.Fatalf("Failed to write source: %v", err)
 	}
 
-	err := CompileVibe67(srcPath, serverBin, platform)
+	err := CompileC67(srcPath, serverBin, platform)
 
 	if err != nil {
 		t.Fatalf("Failed to compile ENet server with library available: %v", err)
@@ -171,3 +171,12 @@ println("ENet test")
 	// Note: We don't run the binary in tests as it would start a server
 	// and require network setup. The compilation test is sufficient.
 }
+
+
+
+
+
+
+
+
+

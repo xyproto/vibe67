@@ -409,3 +409,12 @@ func (o *Out) Comment(text string) {
 		fmt.Fprintf(os.Stderr, "# %s\n", text)
 	}
 }
+
+
+
+
+
+
+
+
+

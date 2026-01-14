@@ -181,3 +181,12 @@ func (info *LoopVectorizationInfo) Print() {
 		fmt.Printf("Operations: %v\n", info.Operations)
 	}
 }
+
+
+
+
+
+
+
+
+

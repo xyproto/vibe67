@@ -52,3 +52,12 @@ func TestCompressionRatio(t *testing.T) {
 		t.Logf("Warning: compression ratio not very good (%.2f)", ratio)
 	}
 }
+
+
+
+
+
+
+
+
+

@@ -557,3 +557,12 @@ func (ra *RegisterAllocator) Reset() {
 		copy(ra.freeRegs, ra.calleeSaved)
 	}
 }
+
+
+
+
+
+
+
+
+

@@ -348,3 +348,12 @@ func TestEmitNoAssembly(t *testing.T) {
 		t.Errorf("Emit(\"   \") error = %v, want %v", err, errNoAssembly)
 	}
 }
+
+
+
+
+
+
+
+
+

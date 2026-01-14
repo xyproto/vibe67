@@ -102,3 +102,12 @@ func (fw *FileWatcher) Close() error {
 	close(fw.stopChan)
 	return nil
 }
+
+
+
+
+
+
+
+
+

@@ -182,7 +182,7 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 	// Compile - if multiple files, concatenate and compile
 	var err error
 	if len(inputFiles) == 1 {
-		err = CompileVibe67WithOptions(inputFiles[0], outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+		err = CompileC67WithOptions(inputFiles[0], outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	} else {
 		// Multi-file: concatenate sources
 		var combinedSource strings.Builder
@@ -215,7 +215,7 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 		tmpFile.Close()
 
 		// Compile the combined file
-		err = CompileVibe67WithOptions(tmpPath, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+		err = CompileC67WithOptions(tmpPath, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	}
 
 	if err != nil {
@@ -261,7 +261,7 @@ func cmdRun(ctx *CommandContext, args []string) error {
 	}
 
 	// Compile
-	err := CompileVibe67WithOptions(inputFile, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	err := CompileC67WithOptions(inputFile, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	if err != nil {
 		return fmt.Errorf("compilation failed: %v", err)
 	}
@@ -310,7 +310,7 @@ func cmdRunShebang(ctx *CommandContext, scriptPath string, scriptArgs []string) 
 	defer func() { SingleFlag = oldSingleFlag }()
 
 	// Compile (quietly unless verbose mode)
-	err := CompileVibe67WithOptions(scriptPath, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	err := CompileC67WithOptions(scriptPath, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	if err != nil {
 		return fmt.Errorf("compilation failed: %v", err)
 	}
@@ -392,7 +392,7 @@ func cmdBuildDir(ctx *CommandContext, dirPath string) error {
 	SingleFlag = false
 	defer func() { SingleFlag = oldSingleFlag }()
 
-	err = CompileVibe67WithOptions(mainFile, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	err = CompileC67WithOptions(mainFile, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
 	if err != nil {
 		return fmt.Errorf("compilation of %s failed: %v", mainFile, err)
 	}
@@ -525,7 +525,7 @@ func cmdTest(ctx *CommandContext, args []string) error {
 		SingleFlag = false // Allow importing from same directory
 
 		// Compile the test runner
-		err = CompileVibe67WithOptions(testRunnerPath, tmpExec, ctx.Platform, ctx.OptTimeout, false)
+		err = CompileC67WithOptions(testRunnerPath, tmpExec, ctx.Platform, ctx.OptTimeout, false)
 		SingleFlag = oldSingleFlag
 
 		if err != nil {
@@ -712,3 +712,12 @@ func generateTestRunner(runnerPath, testFile string, testFunctions []string) err
 	// Write the runner file
 	return os.WriteFile(runnerPath, []byte(builder.String()), 0644)
 }
+
+
+
+
+
+
+
+
+

@@ -1480,7 +1480,7 @@ func main() {
 			inlineFlagProvided = false
 		}
 
-		err = CompileVibe67(tmpFilename, writeToFilename, targetPlatform)
+		err = CompileC67(tmpFilename, writeToFilename, targetPlatform)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
@@ -1517,7 +1517,7 @@ func main() {
 					writeToFilename = strings.TrimSuffix(filepath.Base(file), ".vibe67")
 				}
 
-				err := CompileVibe67(file, writeToFilename, targetPlatform)
+				err := CompileC67(file, writeToFilename, targetPlatform)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "%v\n", err)
 					os.Exit(1)
@@ -1676,3 +1676,12 @@ func watchAndRecompile(sourceFile, outputFile string, platform Platform) error {
 	watcher.Watch()
 	return nil
 }
+
+
+
+
+
+
+
+
+

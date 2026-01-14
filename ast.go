@@ -1147,3 +1147,12 @@ type AliasStmt struct {
 
 func (a *AliasStmt) String() string { return "alias " + a.NewName + "=" + a.TargetName }
 func (a *AliasStmt) statementNode() {}
+
+
+
+
+
+
+
+
+

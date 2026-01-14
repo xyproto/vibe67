@@ -312,7 +312,7 @@ println(double(5))
 
 			// Try to compile - should fail
 			platform := GetDefaultPlatform()
-			err = CompileVibe67(tmpFilePath, tmpOutputPath, platform)
+			err = CompileC67(tmpFilePath, tmpOutputPath, platform)
 
 			// Restore stderr before checking results
 			if devNull != nil {
@@ -356,3 +356,12 @@ func stringContains(s, substr string) bool {
 	}
 	return false
 }
+
+
+
+
+
+
+
+
+

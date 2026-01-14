@@ -38,7 +38,7 @@ func TestARM64BasicCompilation(t *testing.T) {
 
 			// Compile for ARM64 macOS
 			platform := Platform{Arch: ArchARM64, OS: OSDarwin}
-			err := CompileVibe67(tmpFile, outFile, platform)
+			err := CompileC67(tmpFile, outFile, platform)
 			if err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
@@ -85,3 +85,12 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
+
+
+
+
+
+
+
+
+

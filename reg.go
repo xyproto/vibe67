@@ -365,3 +365,12 @@ func IsRegister(machine Arch, name string) bool {
 	_, ok := GetRegister(machine, name)
 	return ok
 }
+
+
+
+
+
+
+
+
+

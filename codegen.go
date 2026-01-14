@@ -67,7 +67,7 @@ type C67Compiler struct {
 	lambdaVars           map[string]bool               // variable name -> is lambda/function
 	parentVariables      map[string]bool               // Track parent-scope vars in parallel loops (use r11 instead of rbp)
 	varTypes             map[string]string             // variable name -> "map" or "list" (legacy)
-	varTypeInfo          map[string]*C67Type           // variable name -> type annotation (new type system)
+	varTypeInfo          map[string]*Vibe67Type        // variable name -> type annotation (new type system)
 	functionSignatures   map[string]*FunctionSignature // function name -> signature (params, variadic)
 	sourceCode           string                        // Store source for recompilation
 	usedFunctions        map[string]bool               // Track which functions are called
@@ -203,7 +203,7 @@ func NewC67Compiler(platform Platform, verbose bool) (*C67Compiler, error) {
 		mutableVars:         make(map[string]bool),
 		lambdaVars:          make(map[string]bool),
 		varTypes:            make(map[string]string),
-		varTypeInfo:         make(map[string]*C67Type),
+		varTypeInfo:         make(map[string]*Vibe67Type),
 		functionSignatures:  make(map[string]*FunctionSignature),
 		usedFunctions:       make(map[string]bool),
 		unknownFunctions:    make(map[string]bool),
@@ -1314,7 +1314,7 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 		fc.currentArena++
 
 		// Recursively collect symbols from arena body
-		// Note: Arena pointers are stored in static storage (_c67_arena_ptrs)
+		// Note: Arena pointers are stored in static storage (_vibe67_arena_ptrs)
 		for _, bodyStmt := range s.Body {
 			if err := fc.collectSymbols(bodyStmt); err != nil {
 				return err
@@ -1981,14 +1981,14 @@ func (fc *C67Compiler) compileArenaStmt(stmt *ArenaStmt) {
 	arenaIndex := fc.currentArena - 1 // Convert arena number to 0-based index
 
 	// Ensure meta-arena has enough capacity
-	// Call _c67_arena_ensure_capacity(arenaIndex + 1)
+	// Call _vibe67_arena_ensure_capacity(arenaIndex + 1)
 	fc.out.MovImmToReg("rdi", fmt.Sprintf("%d", fc.currentArena))
-	fc.out.CallSymbol("_c67_arena_ensure_capacity")
+	fc.out.CallSymbol("_vibe67_arena_ensure_capacity")
 
-	// Load arena pointer from meta-arena: _c67_arena_meta[arenaIndex]
+	// Load arena pointer from meta-arena: _vibe67_arena_meta[arenaIndex]
 	// Each pointer is 8 bytes, so offset = arenaIndex * 8
 	offset := arenaIndex * 8
-	fc.out.LeaSymbolToReg("rax", "_c67_arena_meta")
+	fc.out.LeaSymbolToReg("rax", "_vibe67_arena_meta")
 	fc.out.MovMemToReg("rax", "rax", 0)      // Load the meta-arena pointer
 	fc.out.MovMemToReg("rax", "rax", offset) // Load the arena pointer from slot
 
@@ -2005,10 +2005,10 @@ func (fc *C67Compiler) compileArenaStmt(stmt *ArenaStmt) {
 	fc.currentArena = previousArena
 
 	// Reset arena (resets offset to 0, keeps buffer allocated for reuse)
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta")
 	fc.out.MovMemToReg("rbx", "rbx", 0)      // rbx = meta-arena pointer
 	fc.out.MovMemToReg("rdi", "rbx", offset) // rdi = arena pointer from slot
-	fc.out.CallSymbol("_c67_arena_reset")
+	fc.out.CallSymbol("_vibe67_arena_reset")
 }
 
 func (fc *C67Compiler) compileArenaExpr(expr *ArenaExpr) {
@@ -2029,11 +2029,11 @@ func (fc *C67Compiler) compileArenaExpr(expr *ArenaExpr) {
 
 	// Ensure meta-arena has enough capacity
 	fc.out.MovImmToReg("rdi", fmt.Sprintf("%d", fc.currentArena))
-	fc.out.CallSymbol("_c67_arena_ensure_capacity")
+	fc.out.CallSymbol("_vibe67_arena_ensure_capacity")
 
 	// Load arena pointer from meta-arena
 	offset := arenaIndex * 8
-	fc.out.LeaSymbolToReg("rax", "_c67_arena_meta")
+	fc.out.LeaSymbolToReg("rax", "_vibe67_arena_meta")
 	fc.out.MovMemToReg("rax", "rax", 0)
 	fc.out.MovMemToReg("rax", "rax", offset)
 
@@ -2058,10 +2058,10 @@ func (fc *C67Compiler) compileArenaExpr(expr *ArenaExpr) {
 	fc.currentArena = previousArena
 
 	// Reset arena
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta")
 	fc.out.MovMemToReg("rbx", "rbx", 0)
 	fc.out.MovMemToReg("rdi", "rbx", offset)
-	fc.out.CallSymbol("_c67_arena_reset")
+	fc.out.CallSymbol("_vibe67_arena_reset")
 
 	// Result is already in xmm0 from the last statement
 }
@@ -4089,9 +4089,9 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 			// Align stack for call
 			fc.out.SubImmFromReg("rsp", StackSlotSize)
 
-			// Call _c67_string_concat(rdi, rsi) -> rax
-			fc.trackFunctionCall("_c67_string_concat")
-			fc.out.CallSymbol("_c67_string_concat")
+			// Call _vibe67_string_concat(rdi, rsi) -> rax
+			fc.trackFunctionCall("_vibe67_string_concat")
+			fc.out.CallSymbol("_vibe67_string_concat")
 
 			// Restore stack alignment
 			fc.out.AddImmToReg("rsp", StackSlotSize)
@@ -4493,10 +4493,10 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				// Clean up stack
 				fc.out.AddImmToReg("rsp", 32)
 
-				// Call _c67_list_repeat(list_ptr in rdi, count in rdx)
+				// Call _vibe67_list_repeat(list_ptr in rdi, count in rdx)
 				// We need to implement this helper function
 				fc.out.SubImmFromReg("rsp", StackSlotSize)
-				fc.out.CallSymbol("_c67_list_repeat")
+				fc.out.CallSymbol("_vibe67_list_repeat")
 				fc.out.AddImmToReg("rsp", StackSlotSize)
 
 				// Result pointer is in rax, convert to xmm0
@@ -4574,7 +4574,7 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				fc.out.SubImmFromReg("rsp", 16)
 				fc.out.MovXmmToMem("xmm0", "rsp", 0)
 
-				// Call _c67_string_concat(left_ptr, right_ptr)
+				// Call _vibe67_string_concat(left_ptr, right_ptr)
 				// Load arguments into registers following x86-64 calling convention
 				fc.out.MovMemToReg("rdi", "rsp", 16) // left ptr (first arg)
 				fc.out.MovMemToReg("rsi", "rsp", 0)  // right ptr (second arg)
@@ -4584,8 +4584,8 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				fc.out.SubImmFromReg("rsp", StackSlotSize)
 
 				// Call the helper function (direct call, not through PLT)
-				fc.trackFunctionCall("_c67_string_concat")
-				fc.out.CallSymbol("_c67_string_concat")
+				fc.trackFunctionCall("_vibe67_string_concat")
+				fc.out.CallSymbol("_vibe67_string_concat")
 
 				// Restore stack alignment
 				fc.out.AddImmToReg("rsp", StackSlotSize)
@@ -4660,7 +4660,7 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				fc.out.SubImmFromReg("rsp", 16)
 				fc.out.MovXmmToMem("xmm0", "rsp", 0)
 
-				// Call _c67_list_concat(left_ptr, right_ptr)
+				// Call _vibe67_list_concat(left_ptr, right_ptr)
 				fc.out.MovMemToReg("rdi", "rsp", 16) // left ptr
 				fc.out.MovMemToReg("rsi", "rsp", 0)  // right ptr
 				fc.out.AddImmToReg("rsp", 32)
@@ -4669,8 +4669,8 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				fc.out.SubImmFromReg("rsp", StackSlotSize)
 
 				// Call the helper function
-				// Note: Don't track internal function calls (see comment at _c67_string_eq call)
-				fc.out.CallSymbol("_c67_list_concat")
+				// Note: Don't track internal function calls (see comment at _vibe67_string_eq call)
+				fc.out.CallSymbol("_vibe67_list_concat")
 
 				fc.out.AddImmToReg("rsp", StackSlotSize)
 
@@ -4816,7 +4816,7 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				fc.out.SubImmFromReg("rsp", 16)
 				fc.out.MovXmmToMem("xmm0", "rsp", 0)
 
-				// Call _c67_string_eq(left_ptr, right_ptr)
+				// Call _vibe67_string_eq(left_ptr, right_ptr)
 				fc.out.MovMemToReg("rdi", "rsp", 16) // left ptr
 				fc.out.MovMemToReg("rsi", "rsp", 0)  // right ptr
 				fc.out.AddImmToReg("rsp", 32)
@@ -4826,8 +4826,8 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 
 				// Call the helper function
 				// Track this so we know to emit it
-				fc.trackFunctionCall("_c67_string_eq")
-				fc.out.CallSymbol("_c67_string_eq")
+				fc.trackFunctionCall("_vibe67_string_eq")
+				fc.out.CallSymbol("_vibe67_string_eq")
 
 				// Restore stack alignment
 				fc.out.AddImmToReg("rsp", StackSlotSize)
@@ -5161,7 +5161,7 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 			fc.out.MovMemToReg("rsi", "rsp", 0) // second arg
 			fc.out.AddImmToReg("rsp", 8)
 
-			fc.eb.GenerateCallInstruction("_c67_list_cons")
+			fc.eb.GenerateCallInstruction("_vibe67_list_cons")
 			// Result pointer in rax, move to xmm0 preserving bit pattern
 			fc.out.SubImmFromReg("rsp", 8)
 			fc.out.MovRegToMem("rax", "rsp", 0)
@@ -6427,10 +6427,10 @@ func (fc *C67Compiler) compileCastExpr(expr *CastExpr) {
 		
 		// Convert C67 string to C null-terminated string
 		// xmm0 contains pointer to C67 string map
-		// Call runtime function: _c67_string_to_cstr(xmm0) -> rax
-		fc.trackFunctionCall("_c67_string_to_cstr")
-		fc.trackFunctionCall("_c67_string_to_cstr")
-		fc.out.CallSymbol("_c67_string_to_cstr")
+		// Call runtime function: _vibe67_string_to_cstr(xmm0) -> rax
+		fc.trackFunctionCall("_vibe67_string_to_cstr")
+		fc.trackFunctionCall("_vibe67_string_to_cstr")
+		fc.out.CallSymbol("_vibe67_string_to_cstr")
 		// Convert C string pointer (rax) back to float64 in xmm0
 		fc.out.SubImmFromReg("rsp", StackSlotSize)
 		fc.out.MovRegToMem("rax", "rsp", 0)
@@ -6462,7 +6462,7 @@ func (fc *C67Compiler) compileCastExpr(expr *CastExpr) {
 			return
 		}
 
-		// Convert number to string using _c67_itoa (pure machine code, no libc)
+		// Convert number to string using _vibe67_itoa (pure machine code, no libc)
 		// Allocate buffer for number string (32 bytes enough for any number)
 		fc.out.SubImmFromReg("rsp", 32)
 		fc.out.MovRegToReg("r15", "rsp") // r15 = buffer pointer
@@ -6470,14 +6470,14 @@ func (fc *C67Compiler) compileCastExpr(expr *CastExpr) {
 		// Convert float to int64 (truncate)
 		fc.out.Cvttsd2si("rdi", "xmm0")
 
-		// Call _c67_itoa(rdi=number) -> (rsi=buffer, rdx=length)
+		// Call _vibe67_itoa(rdi=number) -> (rsi=buffer, rdx=length)
 		// Save r15 before call (it contains buffer pointer)
 		fc.out.PushReg("r15")
-		fc.trackFunctionCall("_c67_itoa")
-		fc.eb.GenerateCallInstruction("_c67_itoa")
+		fc.trackFunctionCall("_vibe67_itoa")
+		fc.eb.GenerateCallInstruction("_vibe67_itoa")
 		fc.out.PopReg("r15")
 
-		// _c67_itoa returns: rsi=buffer start, rdx=length
+		// _vibe67_itoa returns: rsi=buffer start, rdx=length
 		// Copy result to our stack buffer
 		fc.out.MovRegToReg("rdi", "r15") // dest
 		fc.out.MovRegToReg("rcx", "rdx") // count
@@ -6685,7 +6685,7 @@ func (fc *C67Compiler) compileSliceExpr(expr *SliceExpr) {
 	fc.out.MovXmmToMem("xmm0", "rsp", 0)
 
 	// Stack layout: [collection_ptr][step][start][end] (rsp points to end)
-	// Call runtime function: _c67_slice_string(collection_ptr, start, end, step) -> new_collection_ptr
+	// Call runtime function: _vibe67_slice_string(collection_ptr, start, end, step) -> new_collection_ptr
 
 	// Load step into rcx (arg4)
 	fc.out.MovMemToXmm("xmm0", "rsp", 16)
@@ -6706,7 +6706,7 @@ func (fc *C67Compiler) compileSliceExpr(expr *SliceExpr) {
 	fc.out.AddImmToReg("rsp", 32)
 
 	// Call runtime function
-	fc.out.CallSymbol("_c67_slice_string")
+	fc.out.CallSymbol("_vibe67_slice_string")
 
 	// Result (new string pointer) is in rax, convert to float64 in xmm0
 	fc.out.SubImmFromReg("rsp", StackSlotSize)
@@ -7178,10 +7178,10 @@ func (fc *C67Compiler) compileUnsafeCast(dest string, cast *CastExpr) {
 			if cast.Type == "cstr" || cast.Type == "cstring" {
 				// Convert C67 string to C null-terminated string
 				// xmm0 contains pointer to C67 string map
-				// _c67_string_to_cstr is an internal runtime function, not external
-				fc.trackFunctionCall("_c67_string_to_cstr")
-				fc.trackFunctionCall("_c67_string_to_cstr")
-				fc.out.CallSymbol("_c67_string_to_cstr")
+				// _vibe67_string_to_cstr is an internal runtime function, not external
+				fc.trackFunctionCall("_vibe67_string_to_cstr")
+				fc.trackFunctionCall("_vibe67_string_to_cstr")
+				fc.out.CallSymbol("_vibe67_string_to_cstr")
 				// Result is C string pointer in rax
 				if dest != "rax" {
 					fc.out.MovRegToReg(dest, "rax")
@@ -7493,12 +7493,12 @@ func (fc *C67Compiler) generateLambdaFunctions() {
 			fc.out.ShlRegByImm("rax", 4) // rax = r14 * 16
 			fc.out.AddImmToReg("rax", 8) // rax = 8 + r14 * 16
 
-			// Allocate from arena: _c67_arena_alloc(arena_ptr, size)
+			// Allocate from arena: _vibe67_arena_alloc(arena_ptr, size)
 			// Save r14 (we need it after the call)
 			fc.out.PushReg("r14")
 
 			// rdi = arena_ptr (requires TWO dereferences)
-			fc.out.LeaSymbolToReg("rdi", "_c67_arena_meta")
+			fc.out.LeaSymbolToReg("rdi", "_vibe67_arena_meta")
 			fc.out.MovMemToReg("rdi", "rdi", 0) // Load meta-arena array pointer
 			fc.out.MovMemToReg("rdi", "rdi", 0) // Load arena[0] struct pointer
 
@@ -7506,8 +7506,8 @@ func (fc *C67Compiler) generateLambdaFunctions() {
 			fc.out.MovRegToReg("rsi", "rax")
 
 			// Call arena allocator
-			fc.trackFunctionCall("_c67_arena_alloc")
-			fc.out.CallSymbol("_c67_arena_alloc")
+			fc.trackFunctionCall("_vibe67_arena_alloc")
+			fc.out.CallSymbol("_vibe67_arena_alloc")
 
 			// rax now contains pointer to allocated list
 			// Restore r14
@@ -7876,7 +7876,7 @@ func (fc *C67Compiler) patchHotFunctionTable() {
 }
 
 func (fc *C67Compiler) generateCacheLookup() {
-	fc.eb.MarkLabel("_c67_cache_lookup")
+	fc.eb.MarkLabel("_vibe67_cache_lookup")
 
 	fc.out.PushReg("rbp")
 	fc.out.MovRegToReg("rbp", "rsp")
@@ -7943,7 +7943,7 @@ func (fc *C67Compiler) generateCacheLookup() {
 }
 
 func (fc *C67Compiler) generateCacheInsert() {
-	fc.eb.MarkLabel("_c67_cache_insert")
+	fc.eb.MarkLabel("_vibe67_cache_insert")
 
 	fc.out.PushReg("rbp")
 	fc.out.MovRegToReg("rbp", "rsp")
@@ -7991,7 +7991,7 @@ func (fc *C67Compiler) generateCacheInsert() {
 }
 
 func (fc *C67Compiler) generateRuntimeHelpers() {
-	// Arena runtime functions are generated inline below (_c67_arena_create, alloc, etc)
+	// Arena runtime functions are generated inline below (_vibe67_arena_create, alloc, etc)
 	// Don't call fc.eb.EmitArenaRuntimeCode() as it's the old stub from main.go
 	// Arena symbols are predeclared earlier in writeELF() to ensure they're available during code generation
 
@@ -8013,13 +8013,13 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		}
 	}
 
-	// Generate _c67_string_concat only if used
-	if fc.usedFunctions["_c67_string_concat"] {
-		// Generate _c67_string_concat(left_ptr, right_ptr) -> new_ptr
+	// Generate _vibe67_string_concat only if used
+	if fc.usedFunctions["_vibe67_string_concat"] {
+		// Generate _vibe67_string_concat(left_ptr, right_ptr) -> new_ptr
 		// Arguments: rdi = left_ptr, rsi = right_ptr
 		// Returns: rax = pointer to new concatenated string
 
-		fc.eb.MarkLabel("_c67_string_concat")
+		fc.eb.MarkLabel("_vibe67_string_concat")
 
 		// Function prologue
 		fc.out.PushReg("rbp")
@@ -8131,15 +8131,15 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		// Function epilogue
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
-	} // end if _c67_string_concat used
+	} // end if _vibe67_string_concat used
 
-	// Generate _c67_string_to_cstr only if used (for printf, f-strings, C FFI)
-	if fc.usedFunctions["_c67_string_to_cstr"] || fc.usedFunctions["println"] || fc.usedFunctions["printf"] {
-		// Generate _c67_string_to_cstr(c67_string_ptr) -> cstr_ptr
+	// Generate _vibe67_string_to_cstr only if used (for printf, f-strings, C FFI)
+	if fc.usedFunctions["_vibe67_string_to_cstr"] || fc.usedFunctions["println"] || fc.usedFunctions["printf"] {
+		// Generate _vibe67_string_to_cstr(c67_string_ptr) -> cstr_ptr
 		// Converts a C67 string (map format) to a null-terminated C string
 		// Argument: xmm0 = C67 string pointer (as float64)
 		// Returns: rax = C string pointer
-		fc.eb.MarkLabel("_c67_string_to_cstr")
+		fc.eb.MarkLabel("_vibe67_string_to_cstr")
 
 		// Function prologue
 		fc.out.PushReg("rbp")
@@ -8331,15 +8331,15 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		// Function epilogue
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
-	} // end if _c67_string_to_cstr used
+	} // end if _vibe67_string_to_cstr used
 
-	// Generate _c67_cstr_to_string only if used (for C FFI string returns)
-	if fc.usedFunctions["_c67_cstr_to_string"] {
-		// Generate _c67_cstr_to_string(cstr_ptr) -> c67_string_ptr
+	// Generate _vibe67_cstr_to_string only if used (for C FFI string returns)
+	if fc.usedFunctions["_vibe67_cstr_to_string"] {
+		// Generate _vibe67_cstr_to_string(cstr_ptr) -> c67_string_ptr
 		// Converts a null-terminated C string to a C67 string (map format)
 		// Argument: rdi = C string pointer
 		// Returns: xmm0 = C67 string pointer (as float64)
-		fc.eb.MarkLabel("_c67_cstr_to_string")
+		fc.eb.MarkLabel("_vibe67_cstr_to_string")
 
 		// Function prologue
 		fc.out.PushReg("rbp")
@@ -8382,7 +8382,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 		// Loop: for each character
 		cstrLoopStart := fc.eb.text.Len()
-		fc.eb.MarkLabel("_cstr_to_c67_loop")
+		fc.eb.MarkLabel("_cstr_to_vibe67_loop")
 
 		// Compare index with length
 		fc.out.Emit([]byte{0x4c, 0x39, 0xf3}) // cmp rbx, r14
@@ -8438,17 +8438,17 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		// Function epilogue
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
-	} // end if _c67_cstr_to_string used
+	} // end if _vibe67_cstr_to_string used
 
-	// Generate _c67_slice_string only if used
-	if fc.usedFunctions["_c67_slice_string"] {
-		// Generate _c67_slice_string(str_ptr, start, end, step) -> new_str_ptr
+	// Generate _vibe67_slice_string only if used
+	if fc.usedFunctions["_vibe67_slice_string"] {
+		// Generate _vibe67_slice_string(str_ptr, start, end, step) -> new_str_ptr
 		// Arguments: rdi = string_ptr, rsi = start_index (int64), rdx = end_index (int64), rcx = step (int64)
 		// Returns: rax = pointer to new sliced string
 		// String format (map): [count (float64)][key0 (float64)][val0 (float64)]...
 		// Note: Currently only step == 1 is fully supported
 
-		fc.eb.MarkLabel("_c67_slice_string")
+		fc.eb.MarkLabel("_vibe67_slice_string")
 
 		// Function prologue
 		fc.out.PushReg("rbp")
@@ -8629,15 +8629,15 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		// Function epilogue
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
-	} // end if _c67_slice_string used
+	} // end if _vibe67_slice_string used
 
-	// Generate _c67_list_concat only if list operations are used
+	// Generate _vibe67_list_concat only if list operations are used
 	// This function is called when concatenating lists at runtime
 	// Arguments: rdi = left_ptr, rsi = right_ptr
 	// Returns: rax = pointer to new concatenated list
 	// List format: [length (8 bytes)][elem0 (8 bytes)][elem1 (8 bytes)]...
-	if fc.usedFunctions["_c67_list_concat"] {
-		fc.eb.MarkLabel("_c67_list_concat")
+	if fc.usedFunctions["_vibe67_list_concat"] {
+		fc.eb.MarkLabel("_vibe67_list_concat")
 
 		// Function prologue
 		fc.out.PushReg("rbp")
@@ -8738,14 +8738,14 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		// Function epilogue
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
-	} // end if _c67_list_concat used
+	} // end if _vibe67_list_concat used
 
-	// Generate _c67_list_repeat only if list repeat operations are used
+	// Generate _vibe67_list_repeat only if list repeat operations are used
 	// Arguments: rdi = list_ptr, rdx = count (integer)
 	// Returns: rax = pointer to new repeated list (heap-allocated)
 	// Simple implementation: just call list_concat repeatedly
-	if fc.usedFunctions["_c67_list_repeat"] {
-		fc.eb.MarkLabel("_c67_list_repeat")
+	if fc.usedFunctions["_vibe67_list_repeat"] {
+		fc.eb.MarkLabel("_vibe67_list_repeat")
 
 		// Function prologue
 		fc.out.PushReg("rbp")
@@ -8777,11 +8777,11 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		loopEndJumpPos := fc.eb.text.Len()
 		fc.out.JumpConditional(JumpEqual, 0)
 
-		// Call _c67_list_concat(result, original)
+		// Call _vibe67_list_concat(result, original)
 		fc.out.MovRegToReg("rdi", "rbx") // first arg = result so far
 		fc.out.MovRegToReg("rsi", "r12") // second arg = original list
 		fc.out.SubImmFromReg("rsp", StackSlotSize)
-		fc.out.CallSymbol("_c67_list_concat")
+		fc.out.CallSymbol("_vibe67_list_concat")
 		fc.out.AddImmToReg("rsp", StackSlotSize)
 		fc.out.MovRegToReg("rbx", "rax") // update result
 
@@ -8820,14 +8820,14 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.PopReg("rbx")
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
-	} // end if _c67_list_repeat used
+	} // end if _vibe67_list_repeat used
 
-	// Generate _c67_string_eq only if string equality checks are used
+	// Generate _vibe67_string_eq only if string equality checks are used
 	// Arguments: rdi = left_ptr, rsi = right_ptr
 	// Returns: xmm0 = 1.0 if equal, 0.0 if not
 	// String format: [count (8 bytes)][key0 (8)][val0 (8)][key1 (8)][val1 (8)]...
-	if fc.usedFunctions["_c67_string_eq"] {
-		fc.eb.MarkLabel("_c67_string_eq")
+	if fc.usedFunctions["_vibe67_string_eq"] {
+		fc.eb.MarkLabel("_vibe67_string_eq")
 
 		fc.out.PushReg("rbp")
 		fc.out.MovRegToReg("rbp", "rsp")
@@ -8955,7 +8955,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
 
-		// Generate upper_string(c67_string_ptr) -> uppercase_c67_string_ptr
+		// Generate upper_string(c67_string_ptr) -> uppercase_vibe67_string_ptr
 		// Converts a C67 string to uppercase
 		// Argument: rdi = C67 string pointer (as integer)
 		// Returns: xmm0 = uppercase C67 string pointer (as float64)
@@ -9049,7 +9049,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
 
-		// Generate lower_string(c67_string_ptr) -> lowercase_c67_string_ptr
+		// Generate lower_string(c67_string_ptr) -> lowercase_vibe67_string_ptr
 		// Converts a C67 string to lowercase
 		// Argument: rdi = C67 string pointer (as integer)
 		// Returns: xmm0 = lowercase C67 string pointer (as float64)
@@ -9143,7 +9143,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
 
-		// Generate trim_string(c67_string_ptr) -> trimmed_c67_string_ptr
+		// Generate trim_string(c67_string_ptr) -> trimmed_vibe67_string_ptr
 		// Removes leading and trailing whitespace
 		// Argument: rdi = C67 string pointer (as integer)
 		// Returns: xmm0 = trimmed C67 string pointer (as float64)
@@ -9353,16 +9353,16 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.PopReg("rbx")
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
-	} // end if _c67_string_eq used
+	} // end if _vibe67_string_eq used
 
 	// Generate arena functions only if arenas are actually used
 	if fc.usesArenas {
-		// Generate _c67_arena_create(capacity) -> arena_ptr
+		// Generate _vibe67_arena_create(capacity) -> arena_ptr
 		// Creates a new arena with the specified capacity
 		// Argument: rdi = capacity (int64)
 		// Returns: rax = arena pointer
 		// Arena structure: [buffer_ptr (8)][capacity (8)][offset (8)][alignment (8)] = 32 bytes header
-		fc.eb.MarkLabel("_c67_arena_create")
+		fc.eb.MarkLabel("_vibe67_arena_create")
 
 		fc.out.PushReg("rbp")
 		fc.out.MovRegToReg("rbp", "rsp")
@@ -9452,7 +9452,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		// Print error message and exit
 		if fc.eb.target.OS() == OSWindows {
 			shadowSpace := fc.allocateShadowSpace()
-			fc.out.LeaSymbolToReg("rcx", "_c67_str_arena_alloc_error")
+			fc.out.LeaSymbolToReg("rcx", "_vibe67_str_arena_alloc_error")
 			fc.trackFunctionCall("printf")
 			fc.eb.GenerateCallInstruction("printf")
 			fc.deallocateShadowSpace(shadowSpace)
@@ -9462,7 +9462,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 			fc.eb.GenerateCallInstruction("exit")
 			fc.deallocateShadowSpace(shadowSpace)
 		} else {
-			fc.out.LeaSymbolToReg("rdi", "_c67_str_arena_alloc_error")
+			fc.out.LeaSymbolToReg("rdi", "_vibe67_str_arena_alloc_error")
 			fc.trackFunctionCall("printf")
 			fc.eb.GenerateCallInstruction("printf")
 			fc.out.MovImmToReg("rdi", "1")
@@ -9470,12 +9470,12 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 			fc.eb.GenerateCallInstruction("exit")
 		}
 
-		// Generate _c67_arena_alloc(arena_ptr, size) -> allocation_ptr
+		// Generate _vibe67_arena_alloc(arena_ptr, size) -> allocation_ptr
 		// Allocates memory from the arena using bump allocation with auto-growing
 		// If arena is full, reallocs buffer to 2x size
 		// Arguments: rdi = arena_ptr, rsi = size (int64)
 		// Returns: rax = allocated memory pointer
-		fc.eb.MarkLabel("_c67_arena_alloc")
+		fc.eb.MarkLabel("_vibe67_arena_alloc")
 
 		fc.out.PushReg("rbp")
 		fc.out.MovRegToReg("rbp", "rsp")
@@ -9697,10 +9697,10 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
 
-		// Generate _c67_arena_destroy(arena_ptr)
+		// Generate _vibe67_arena_destroy(arena_ptr)
 		// Frees all memory associated with the arena
 		// Argument: rdi = arena_ptr
-		fc.eb.MarkLabel("_c67_arena_destroy")
+		fc.eb.MarkLabel("_vibe67_arena_destroy")
 
 		fc.out.PushReg("rbp")
 		fc.out.MovRegToReg("rbp", "rsp")
@@ -9724,10 +9724,10 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
 
-		// Generate _c67_arena_reset(arena_ptr)
+		// Generate _vibe67_arena_reset(arena_ptr)
 		// Resets the arena offset to 0, effectively freeing all allocations
 		// Argument: rdi = arena_ptr
-		fc.eb.MarkLabel("_c67_arena_reset")
+		fc.eb.MarkLabel("_vibe67_arena_reset")
 
 		fc.out.PushReg("rbp")
 		fc.out.MovRegToReg("rbp", "rsp")
@@ -9739,11 +9739,11 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.Ret()
 	} // end if usesArenas (will reopen for arena_ensure_capacity later)
 
-	// Generate _c67_list_cons(element_float, list_ptr_float) -> new_list_ptr
+	// Generate _vibe67_list_cons(element_float, list_ptr_float) -> new_list_ptr
 	// LINKED LIST implementation - creates a cons cell: [head|tail]
 	// Arguments: rdi = element (as float64 bits), rsi = tail pointer (as float64 bits, 0.0 = nil)
 	// Returns: rax = pointer to new cons cell (16 bytes)
-	fc.eb.MarkLabel("_c67_list_cons")
+	fc.eb.MarkLabel("_vibe67_list_cons")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9763,12 +9763,12 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 	// Allocate 16-byte cons cell from arena (use default arena 0)
 	// Cons cell format: [head: float64][tail: float64] = 16 bytes
-	fc.out.LeaSymbolToReg("rdi", "_c67_arena_meta")
+	fc.out.LeaSymbolToReg("rdi", "_vibe67_arena_meta")
 	fc.out.MovMemToReg("rdi", "rdi", 0) // rdi = meta-arena array pointer
 	fc.out.MovMemToReg("rdi", "rdi", 0) // rdi = arena[0] struct pointer
 	fc.out.MovImmToReg("rsi", "16")     // rsi = 16 bytes
-	fc.trackFunctionCall("_c67_arena_alloc")
-	fc.eb.GenerateCallInstruction("_c67_arena_alloc")
+	fc.trackFunctionCall("_vibe67_arena_alloc")
+	fc.eb.GenerateCallInstruction("_vibe67_arena_alloc")
 	// rax now contains pointer to cons cell
 
 	// Write head (element) at [cell+0]
@@ -9798,11 +9798,11 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
 
-	// Generate _c67_list_head(list_ptr_float) -> element_float
+	// Generate _vibe67_list_head(list_ptr_float) -> element_float
 	// LINKED LIST implementation - returns head of cons cell
 	// Argument: rdi = list pointer (as float64 bits, 0.0 = nil)
 	// Returns: xmm0 = first element (or NaN if empty)
-	fc.eb.MarkLabel("_c67_list_head")
+	fc.eb.MarkLabel("_vibe67_list_head")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9829,11 +9829,11 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
 
-	// Generate _c67_list_tail(list_ptr_float) -> tail_ptr_float
+	// Generate _vibe67_list_tail(list_ptr_float) -> tail_ptr_float
 	// LINKED LIST implementation - returns tail of cons cell (O(1) operation)
 	// Argument: rdi = list pointer (as float64 bits, 0.0 = nil)
 	// Returns: xmm0 = tail pointer (as float64, 0.0 = nil)
-	fc.eb.MarkLabel("_c67_list_tail")
+	fc.eb.MarkLabel("_vibe67_list_tail")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9859,11 +9859,11 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
 
-	// Generate _c67_list_length(list_ptr_float) -> length_int
+	// Generate _vibe67_list_length(list_ptr_float) -> length_int
 	// LINKED LIST implementation - walks list and counts nodes (O(n))
 	// Argument: rdi = list pointer (as float64 bits, 0.0 = nil)
 	// Returns: rax = length as int64
-	fc.eb.MarkLabel("_c67_list_length")
+	fc.eb.MarkLabel("_vibe67_list_length")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9897,11 +9897,11 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
 
-	// Generate _c67_list_index(list_ptr_float, index_int) -> element_float
+	// Generate _vibe67_list_index(list_ptr_float, index_int) -> element_float
 	// LINKED LIST implementation - walks to index-th node (O(n))
 	// Arguments: rdi = list pointer (as float64 bits), rsi = index (int64)
 	// Returns: xmm0 = element at index (or NaN if out of bounds)
-	fc.eb.MarkLabel("_c67_list_index")
+	fc.eb.MarkLabel("_vibe67_list_index")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9959,12 +9959,12 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
 
-	// Generate _c67_list_update(list_ptr, index, value, arena_ptr) -> new_list_ptr
+	// Generate _vibe67_list_update(list_ptr, index, value, arena_ptr) -> new_list_ptr
 	// Updates a list element at the given index (functional - returns new list)
 	// Arguments: rdi = list_ptr, rsi = index (integer), xmm0 = new value (float64), rdx = arena_ptr
 	// Returns: rax = new list pointer
 	// Uses specified arena for allocation
-	fc.eb.MarkLabel("_c67_list_update")
+	fc.eb.MarkLabel("_vibe67_list_update")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9995,11 +9995,11 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.AddImmToReg("rax", 8)
 
 	// Allocate from specified arena
-	// Call _c67_arena_alloc(rdi=arena_ptr, rsi=size)
+	// Call _vibe67_arena_alloc(rdi=arena_ptr, rsi=size)
 	fc.out.MovRegToReg("rdi", "r15") // arena ptr in rdi
 	fc.out.MovRegToReg("rsi", "rax") // size in rsi
-	fc.trackFunctionCall("_c67_arena_alloc")
-	fc.eb.GenerateCallInstruction("_c67_arena_alloc")
+	fc.trackFunctionCall("_vibe67_arena_alloc")
+	fc.eb.GenerateCallInstruction("_vibe67_arena_alloc")
 	fc.out.MovRegToReg("r12", "rax") // r12 = new list ptr
 
 	// Write length to new list
@@ -10058,9 +10058,9 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
 
-	// Generate _c67_string_println(string_ptr) - prints string followed by newline
+	// Generate _vibe67_string_println(string_ptr) - prints string followed by newline
 	// Argument: rdi/rcx (platform-dependent) = string pointer (map with [count][0][char0][1][char1]...)
-	fc.eb.MarkLabel("_c67_string_println")
+	fc.eb.MarkLabel("_vibe67_string_println")
 
 	// For Windows, we use a simpler approach: call printf for each character
 	// For Unix, we use write syscall for efficiency
@@ -10101,7 +10101,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		// Call putchar via printf
 		// printf("%c", char)
 		// Create format string "%c"
-		charFmtLabel := fmt.Sprintf("_c67_char_fmt_%d", fc.stringCounter)
+		charFmtLabel := fmt.Sprintf("_vibe67_char_fmt_%d", fc.stringCounter)
 		fc.stringCounter++
 		fc.eb.Define(charFmtLabel, "%c\x00")
 
@@ -10122,7 +10122,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.patchJumpImmediate(strPrintLoopEnd+2, int32(strPrintDonePos-strPrintLoopEndPos))
 
 		// Print newline: printf("\n")
-		newlineFmtLabel := fmt.Sprintf("_c67_newline_fmt_%d", fc.stringCounter)
+		newlineFmtLabel := fmt.Sprintf("_vibe67_newline_fmt_%d", fc.stringCounter)
 		fc.stringCounter++
 		fc.eb.Define(newlineFmtLabel, "\n\x00")
 
@@ -10212,9 +10212,9 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.Ret()
 	}
 
-	// Generate _c67_string_print(string_ptr) - prints string WITHOUT newline
+	// Generate _vibe67_string_print(string_ptr) - prints string WITHOUT newline
 	// Argument: rdi/rcx (platform-dependent) = string pointer (map with [count][0][char0][1][char1]...)
-	fc.eb.MarkLabel("_c67_string_print")
+	fc.eb.MarkLabel("_vibe67_string_print")
 
 	if fc.eb.target.OS() == OSWindows {
 		// Windows version: use printf for each character
@@ -10251,7 +10251,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.Cvttsd2si("rdx", "xmm0") // rdx = character code
 
 		// Call putchar via printf
-		charFmtLabel2 := fmt.Sprintf("_c67_char_fmt_%d", fc.stringCounter)
+		charFmtLabel2 := fmt.Sprintf("_vibe67_char_fmt_%d", fc.stringCounter)
 		fc.stringCounter++
 		fc.eb.Define(charFmtLabel2, "%c\x00")
 
@@ -10341,7 +10341,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.Ret()
 	}
 
-	// Generate _c67_itoa for number to string conversion
+	// Generate _vibe67_itoa for number to string conversion
 	fc.generateItoa()
 
 	// Generate syscall-based print helpers for Linux
@@ -10350,7 +10350,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.generatePrintlnSyscall()
 	}
 
-	// Generate _c67_arena_ensure_capacity if arenas are used
+	// Generate _vibe67_arena_ensure_capacity if arenas are used
 	if fc.usesArenas {
 		fc.generateArenaEnsureCapacity()
 	}
@@ -10359,9 +10359,9 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 // initializeMetaArenaAndGlobalArena initializes the meta-arena and creates arena 0 (default arena)
 func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 	// Define arena metadata symbols now that we know arenas are used
-	fc.eb.DefineWritable("_c67_arena_meta", "\x00\x00\x00\x00\x00\x00\x00\x00")     // Pointer to arena array
-	fc.eb.DefineWritable("_c67_arena_meta_cap", "\x00\x00\x00\x00\x00\x00\x00\x00") // Capacity (number of slots)
-	fc.eb.DefineWritable("_c67_arena_meta_len", "\x00\x00\x00\x00\x00\x00\x00\x00") // Length (number of active arenas)
+	fc.eb.DefineWritable("_vibe67_arena_meta", "\x00\x00\x00\x00\x00\x00\x00\x00")     // Pointer to arena array
+	fc.eb.DefineWritable("_vibe67_arena_meta_cap", "\x00\x00\x00\x00\x00\x00\x00\x00") // Capacity (number of slots)
+	fc.eb.DefineWritable("_vibe67_arena_meta_len", "\x00\x00\x00\x00\x00\x00\x00\x00") // Length (number of active arenas)
 	fc.eb.Define("_arena_null_error", "ERROR: Arena alloc returned NULL\n\x00")
 
 	// Initialize meta-arena system - all arenas are malloc'd at runtime
@@ -10395,12 +10395,12 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 	}
 
 	// Store meta-arena array pointer
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta")
 	fc.out.MovRegToMem("rax", "rbx", 0)
 
 	// Set meta-arena capacity
 	fc.out.MovImmToReg("rcx", fmt.Sprintf("%d", initialCapacity))
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta_cap")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta_cap")
 	fc.out.MovRegToMem("rcx", "rbx", 0)
 
 	// Create default arena (arena 0) - 1MB buffer
@@ -10486,20 +10486,20 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 	fc.out.MovRegToMem("rcx", "rax", 24) // alignment = 8
 
 	// Store arena struct pointer in meta-arena[0]
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta")
 	fc.out.MovMemToReg("rbx", "rbx", 0) // rbx = meta-arena array
 	fc.out.MovRegToMem("rax", "rbx", 0) // meta-arena[0] = arena struct
 
 	// Set meta-arena len = 1 (one active arena)
 	fc.out.MovImmToReg("rcx", "1")
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta_len")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta_len")
 	fc.out.MovRegToMem("rcx", "rbx", 0)
 }
 
 // cleanupAllArenas frees all arenas in the meta-arena
 func (fc *C67Compiler) cleanupAllArenas() {
 	// Load meta-arena pointer
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta")
 	fc.out.MovMemToReg("rbx", "rbx", 0) // rbx = meta-arena pointer
 
 	// Check if meta-arena is NULL (no arenas allocated)
@@ -10508,7 +10508,7 @@ func (fc *C67Compiler) cleanupAllArenas() {
 	fc.out.JumpConditional(JumpEqual, 0) // je skip_cleanup
 
 	// Load meta-arena length
-	fc.out.LeaSymbolToReg("rax", "_c67_arena_meta_len")
+	fc.out.LeaSymbolToReg("rax", "_vibe67_arena_meta_len")
 	fc.out.MovMemToReg("rcx", "rax", 0) // rcx = number of arenas
 
 	// Use callee-saved registers for loop (R14=count, R15=index) to survive Windows function calls
@@ -10589,7 +10589,7 @@ func (fc *C67Compiler) cleanupAllArenas() {
 	fc.patchJumpImmediate(skipCleanupJump+2, int32(skipCleanup-(skipCleanupJump+ConditionalJumpSize)))
 }
 
-// generateItoa generates the _c67_itoa function
+// generateItoa generates the _vibe67_itoa function
 // Converts int64 to decimal string representation
 // Input: rdi = number
 // Output: rsi = buffer pointer, rdx = length
@@ -10598,7 +10598,7 @@ func (fc *C67Compiler) generateItoa() {
 	// Define global buffer for itoa (32 bytes)
 	fc.eb.DefineWritable("_itoa_buffer", string(make([]byte, 32)))
 
-	fc.eb.MarkLabel("_c67_itoa")
+	fc.eb.MarkLabel("_vibe67_itoa")
 
 	// Prologue
 	fc.out.PushReg("rbp")
@@ -10710,11 +10710,11 @@ func (fc *C67Compiler) generateItoa() {
 	fc.out.Ret()
 }
 
-// generateArenaEnsureCapacity generates the _c67_arena_ensure_capacity function
+// generateArenaEnsureCapacity generates the _vibe67_arena_ensure_capacity function
 // This function ensures the meta-arena has enough capacity for the requested depth
 // Argument: rdi = required_depth
 func (fc *C67Compiler) generateArenaEnsureCapacity() {
-	fc.eb.MarkLabel("_c67_arena_ensure_capacity")
+	fc.eb.MarkLabel("_vibe67_arena_ensure_capacity")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -10729,7 +10729,7 @@ func (fc *C67Compiler) generateArenaEnsureCapacity() {
 	fc.out.MovRegToReg("r12", "rdi")
 
 	// Load current capacity
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta_cap")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta_cap")
 	fc.out.MovMemToReg("r13", "rbx", 0) // r13 = current capacity
 
 	// Check if this is first allocation (capacity == 0)
@@ -10738,7 +10738,7 @@ func (fc *C67Compiler) generateArenaEnsureCapacity() {
 	fc.out.JumpConditional(JumpEqual, 0) // je to first_alloc
 
 	// Not first time - load len
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta_len")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta_len")
 	fc.out.MovMemToReg("r14", "rbx", 0) // r14 = current len
 
 	// Check if we already have enough arenas (required <= len)
@@ -10754,7 +10754,7 @@ func (fc *C67Compiler) generateArenaEnsureCapacity() {
 	// Have capacity, just need to initialize more arenas
 	// r12 = required, r14 = current len
 	// Load meta-arena pointer into r15
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta")
 	fc.out.MovMemToReg("r15", "rbx", 0) // r15 = meta-arena pointer
 	fc.out.MovRegToReg("r13", "r14")    // r13 = current len (start index for init loop)
 	fc.generateArenaInitLoop()
@@ -10773,7 +10773,7 @@ func (fc *C67Compiler) generateArenaEnsureCapacity() {
 	fc.generateArenaInitLoop()
 
 	// Update capacity
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta_cap")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta_cap")
 	fc.out.MovRegToMem("r14", "rbx", 0)
 
 	// Jump to return
@@ -10793,7 +10793,7 @@ func (fc *C67Compiler) generateArenaEnsureCapacity() {
 	fc.out.JumpConditional(JumpLessOrEqual, 0) // jle to return (no growth needed)
 
 	// Need to grow: load capacity into r13 for growth path
-	fc.out.LeaSymbolToReg("rbx", "_c67_arena_meta_cap")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta_cap")
 	fc.out.MovMemToReg("r13", "rbx", 0) // r13 = capacity (8)
 
 	// Jump to growth path
@@ -12156,8 +12156,8 @@ func (fc *C67Compiler) compileCachedCall(call *CallExpr) {
 	fc.out.MovMemToXmm("xmm0", "rsp", 0)
 	fc.out.MovqXmmToReg("rsi", "xmm0")
 
-	fc.trackFunctionCall("_c67_cache_lookup")
-	fc.out.CallSymbol("_c67_cache_lookup")
+	fc.trackFunctionCall("_vibe67_cache_lookup")
+	fc.out.CallSymbol("_vibe67_cache_lookup")
 
 	fc.out.CmpRegToImm("rax", 0)
 	cacheHitJump := fc.eb.text.Len()
@@ -12182,8 +12182,8 @@ func (fc *C67Compiler) compileCachedCall(call *CallExpr) {
 	fc.out.MovMemToXmm("xmm0", "rsp", 8)
 	fc.out.MovqXmmToReg("rdx", "xmm0")
 
-	fc.trackFunctionCall("_c67_cache_insert")
-	fc.out.CallSymbol("_c67_cache_insert")
+	fc.trackFunctionCall("_vibe67_cache_insert")
+	fc.out.CallSymbol("_vibe67_cache_insert")
 
 	fc.out.MovMemToXmm("xmm0", "rsp", 8)
 
@@ -12603,14 +12603,14 @@ func (fc *C67Compiler) compileCFunctionCall(libName string, funcName string, arg
 						fc.out.MovMemToReg("rax", "rsp", 0)
 						fc.out.AddImmToReg("rsp", StackSlotSize)
 
-						// Call _c67_string_to_cstr(map_ptr) -> char*
+						// Call _vibe67_string_to_cstr(map_ptr) -> char*
 						fc.out.SubImmFromReg("rsp", StackSlotSize)
 						fc.out.MovRegToMem("rax", "rsp", 0)
 						fc.out.MovMemToReg("rdi", "rsp", 0)
 						fc.out.AddImmToReg("rsp", StackSlotSize)
-						fc.trackFunctionCall("_c67_string_to_cstr")
-						fc.trackFunctionCall("_c67_string_to_cstr")
-						fc.out.CallSymbol("_c67_string_to_cstr")
+						fc.trackFunctionCall("_vibe67_string_to_cstr")
+						fc.trackFunctionCall("_vibe67_string_to_cstr")
+						fc.out.CallSymbol("_vibe67_string_to_cstr")
 						// Result in rax (C string pointer)
 					}
 
@@ -13359,7 +13359,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 			}
 			return
 		} else if argType == "string" {
-			// String variable - call _c67_print_syscall helper
+			// String variable - call _vibe67_print_syscall helper
 			fc.compileExpression(arg)
 			// xmm0 contains string pointer
 
@@ -13373,14 +13373,14 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 			if fc.eb.target.OS() == OSLinux {
 				// Call syscall-based helper
 				shadowSpace := fc.allocateShadowSpace()
-				fc.trackFunctionCall("_c67_print_syscall")
-				fc.eb.GenerateCallInstruction("_c67_print_syscall")
+				fc.trackFunctionCall("_vibe67_print_syscall")
+				fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
 				fc.deallocateShadowSpace(shadowSpace)
 			} else {
 				// Call Windows helper (printf-based)
 				shadowSpace := fc.allocateShadowSpace()
-				fc.trackFunctionCall("_c67_print_syscall")
-				fc.eb.GenerateCallInstruction("_c67_print_syscall")
+				fc.trackFunctionCall("_vibe67_print_syscall")
+				fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
 			return
@@ -13397,13 +13397,13 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 			if fc.eb.target.OS() == OSLinux {
 				shadowSpace := fc.allocateShadowSpace()
-				fc.trackFunctionCall("_c67_print_syscall")
-				fc.eb.GenerateCallInstruction("_c67_print_syscall")
+				fc.trackFunctionCall("_vibe67_print_syscall")
+				fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
 				fc.deallocateShadowSpace(shadowSpace)
 			} else {
 				shadowSpace := fc.allocateShadowSpace()
-				fc.trackFunctionCall("_c67_print_syscall")
-				fc.eb.GenerateCallInstruction("_c67_print_syscall")
+				fc.trackFunctionCall("_vibe67_print_syscall")
+				fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
 			return
@@ -13413,16 +13413,16 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 			// xmm0 contains float64 value
 
 			if fc.eb.target.OS() == OSLinux {
-				// Convert to int64 and use _c67_itoa + write syscall
+				// Convert to int64 and use _vibe67_itoa + write syscall
 				fc.out.Cvttsd2si("rdi", "xmm0")
 
 				// Allocate stack buffer
 				fc.out.SubImmFromReg("rsp", 32)
 				fc.out.MovRegToReg("r15", "rsp")
 
-				// Call _c67_itoa
-				fc.trackFunctionCall("_c67_itoa")
-				fc.eb.GenerateCallInstruction("_c67_itoa")
+				// Call _vibe67_itoa
+				fc.trackFunctionCall("_vibe67_itoa")
+				fc.eb.GenerateCallInstruction("_vibe67_itoa")
 
 				// Write to stdout
 				fc.out.MovImmToReg("rax", "1")
@@ -13548,11 +13548,11 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				// Call helper function (syscall-based on Linux, printf-based on Windows)
 				shadowSpace := fc.allocateShadowSpace()
 				if fc.eb.target.OS() == OSLinux {
-					fc.trackFunctionCall("_c67_print_syscall")
-					fc.eb.GenerateCallInstruction("_c67_print_syscall")
+					fc.trackFunctionCall("_vibe67_print_syscall")
+					fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
 				} else {
-					fc.trackFunctionCall("_c67_string_print")
-					fc.eb.GenerateCallInstruction("_c67_string_print")
+					fc.trackFunctionCall("_vibe67_string_print")
+					fc.eb.GenerateCallInstruction("_vibe67_string_print")
 				}
 				fc.deallocateShadowSpace(shadowSpace)
 			} else if fstrExpr, ok := arg.(*FStringExpr); ok {
@@ -13568,11 +13568,11 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 				shadowSpace := fc.allocateShadowSpace()
 				if fc.eb.target.OS() == OSLinux {
-					fc.trackFunctionCall("_c67_print_syscall")
-					fc.eb.GenerateCallInstruction("_c67_print_syscall")
+					fc.trackFunctionCall("_vibe67_print_syscall")
+					fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
 				} else {
-					fc.trackFunctionCall("_c67_string_print")
-					fc.eb.GenerateCallInstruction("_c67_string_print")
+					fc.trackFunctionCall("_vibe67_string_print")
+					fc.eb.GenerateCallInstruction("_vibe67_string_print")
 				}
 				fc.deallocateShadowSpace(shadowSpace)
 			} else if argType == "list" || argType == "map" {
@@ -13675,16 +13675,16 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				// xmm0 contains float64 value
 
 				if fc.eb.target.OS() == OSLinux {
-					// Convert to int64 and use _c67_itoa + write syscall
+					// Convert to int64 and use _vibe67_itoa + write syscall
 					fc.out.Cvttsd2si("rdi", "xmm0") // Convert float to int64
 
 					// Allocate stack buffer for number string
 					fc.out.SubImmFromReg("rsp", 32)
 					fc.out.MovRegToReg("r15", "rsp") // Save buffer pointer
 
-					// Call _c67_itoa(rdi=number)
-					fc.trackFunctionCall("_c67_itoa")
-					fc.eb.GenerateCallInstruction("_c67_itoa")
+					// Call _vibe67_itoa(rdi=number)
+					fc.trackFunctionCall("_vibe67_itoa")
+					fc.eb.GenerateCallInstruction("_vibe67_itoa")
 					// Returns: rsi=string start, rdx=length
 
 					// Write to stdout: write(1, rsi, rdx)
@@ -13908,8 +13908,8 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				// %s: C67 string -> C string conversion
 				// xmm0 contains pointer to C67 string map [count][key0][val0][key1][val1]...
 				// Call helper function to convert to null-terminated C string
-				fc.trackFunctionCall("_c67_string_to_cstr")
-				fc.out.CallSymbol("_c67_string_to_cstr")
+				fc.trackFunctionCall("_vibe67_string_to_cstr")
+				fc.out.CallSymbol("_vibe67_string_to_cstr")
 				// Result in rax is C string pointer
 				fc.out.MovRegToReg(intRegs[intArgCount], "rax")
 				intArgCount++
@@ -14079,16 +14079,16 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 					fc.compileExpression(arg)
 					// Result in xmm0 (float64)
 
-					// Convert to int64 and use _c67_itoa + write syscall
+					// Convert to int64 and use _vibe67_itoa + write syscall
 					fc.out.Cvttsd2si("rdi", "xmm0")
 
 					// Allocate stack buffer
 					fc.out.SubImmFromReg("rsp", 32)
 					fc.out.MovRegToReg("r15", "rsp")
 
-					// Call _c67_itoa(rdi=number)
-					fc.trackFunctionCall("_c67_itoa")
-					fc.eb.GenerateCallInstruction("_c67_itoa")
+					// Call _vibe67_itoa(rdi=number)
+					fc.trackFunctionCall("_vibe67_itoa")
+					fc.eb.GenerateCallInstruction("_vibe67_itoa")
 					// Returns: rsi=string start, rdx=length
 
 					// Write to stderr: write(2, rsi, rdx)
@@ -14135,16 +14135,16 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.compileExpression(arg)
 				// Result in xmm0 (float64)
 
-				// Convert to int64 and use _c67_itoa + write syscall
+				// Convert to int64 and use _vibe67_itoa + write syscall
 				fc.out.Cvttsd2si("rdi", "xmm0")
 
 				// Allocate stack buffer
 				fc.out.SubImmFromReg("rsp", 32)
 				fc.out.MovRegToReg("r15", "rsp")
 
-				// Call _c67_itoa(rdi=number)
-				fc.trackFunctionCall("_c67_itoa")
-				fc.eb.GenerateCallInstruction("_c67_itoa")
+				// Call _vibe67_itoa(rdi=number)
+				fc.trackFunctionCall("_vibe67_itoa")
+				fc.eb.GenerateCallInstruction("_vibe67_itoa")
 				// Returns: rsi=string start, rdx=length
 
 				// Write to stderr: write(2, rsi, rdx)
@@ -14286,8 +14286,8 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 						if needsConversion {
 							// Convert C67 string to C string
-							fc.trackFunctionCall("_c67_string_to_cstr")
-							fc.eb.GenerateCallInstruction("_c67_string_to_cstr")
+							fc.trackFunctionCall("_vibe67_string_to_cstr")
+							fc.eb.GenerateCallInstruction("_vibe67_string_to_cstr")
 							if targetReg != "" && strings.HasPrefix(targetReg, "xmm") {
 								fc.out.MovqRegToXmm(targetReg, "rax")
 							} else if targetReg != "" {
@@ -14359,8 +14359,8 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 							if needsConversion {
 								// Convert C67 string to C string
-								fc.trackFunctionCall("_c67_string_to_cstr")
-								fc.eb.GenerateCallInstruction("_c67_string_to_cstr")
+								fc.trackFunctionCall("_vibe67_string_to_cstr")
+								fc.eb.GenerateCallInstruction("_vibe67_string_to_cstr")
 							} else {
 								// Already a char* from C FFI - just convert from float64 representation to pointer
 								fc.out.MovqXmmToReg("rax", "xmm0")
@@ -14810,7 +14810,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.compileExpression(call.Args[0])
 		// Convert float64 capacity to int64
 		fc.out.Cvttsd2si("rdi", "xmm0")
-		fc.out.CallSymbol("_c67_arena_create")
+		fc.out.CallSymbol("_vibe67_arena_create")
 		// Result in rax, convert to float64
 		fc.out.Cvtsi2sd("xmm0", "rax")
 
@@ -14826,7 +14826,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		// Second arg: size
 		fc.compileExpression(call.Args[1])
 		fc.out.Cvttsd2si("rsi", "xmm0")
-		fc.out.CallSymbol("_c67_arena_alloc")
+		fc.out.CallSymbol("_vibe67_arena_alloc")
 		// Result in rax, convert to float64
 		fc.out.Cvtsi2sd("xmm0", "rax")
 
@@ -14838,7 +14838,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		}
 		fc.compileExpression(call.Args[0])
 		fc.out.Cvttsd2si("rdi", "xmm0")
-		fc.out.CallSymbol("_c67_arena_destroy")
+		fc.out.CallSymbol("_vibe67_arena_destroy")
 		// No return value, set xmm0 to 0
 		fc.out.XorpdXmm("xmm0", "xmm0")
 
@@ -14850,7 +14850,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		}
 		fc.compileExpression(call.Args[0])
 		fc.out.Cvttsd2si("rdi", "xmm0")
-		fc.out.CallSymbol("_c67_arena_reset")
+		fc.out.CallSymbol("_vibe67_arena_reset")
 		// No return value, set xmm0 to 0
 		fc.out.XorpdXmm("xmm0", "xmm0")
 
@@ -15617,7 +15617,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 		// Allocate 8 bytes in arena for result
 		offset := (fc.currentArena - 1) * 8
-		fc.out.LeaSymbolToReg("rdi", "_c67_arena_meta")
+		fc.out.LeaSymbolToReg("rdi", "_vibe67_arena_meta")
 		fc.out.MovMemToReg("rdi", "rdi", 0)
 		fc.out.MovMemToReg("rdi", "rdi", offset)
 		fc.out.MovImmToReg("rsi", "8")
@@ -15626,7 +15626,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.SubImmFromReg("rsp", StackSlotSize)
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 
-		fc.out.CallSymbol("_c67_arena_alloc")
+		fc.out.CallSymbol("_vibe67_arena_alloc")
 
 		// rax = pointer, load result and store it
 		fc.out.MovMemToXmm("xmm0", "rsp", 0)
@@ -15713,11 +15713,11 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 		// Allocate Result map (64 bytes)
 		offset := (fc.currentArena - 1) * 8
-		fc.out.LeaSymbolToReg("rdi", "_c67_arena_meta")
+		fc.out.LeaSymbolToReg("rdi", "_vibe67_arena_meta")
 		fc.out.MovMemToReg("rdi", "rdi", 0)
 		fc.out.MovMemToReg("rdi", "rdi", offset)
 		fc.out.MovImmToReg("rsi", "64")
-		fc.out.CallSymbol("_c67_arena_alloc")
+		fc.out.CallSymbol("_vibe67_arena_alloc")
 
 		fc.out.MovRegToReg("rbx", "rax") // save map pointer
 
@@ -15772,11 +15772,11 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 		// Allocate Result map (64 bytes)
 		offset := (fc.currentArena - 1) * 8
-		fc.out.LeaSymbolToReg("rdi", "_c67_arena_meta")
+		fc.out.LeaSymbolToReg("rdi", "_vibe67_arena_meta")
 		fc.out.MovMemToReg("rdi", "rdi", 0)
 		fc.out.MovMemToReg("rdi", "rdi", offset)
 		fc.out.MovImmToReg("rsi", "64")
-		fc.out.CallSymbol("_c67_arena_alloc")
+		fc.out.CallSymbol("_vibe67_arena_alloc")
 
 		fc.out.MovRegToReg("rbx", "rax") // save map pointer
 
@@ -16267,11 +16267,11 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 		fc.out.MovMemToReg("rdi", "rsp", 0)
 		fc.out.AddImmToReg("rsp", StackSlotSize)
-		fc.trackFunctionCall("_c67_string_to_cstr")
-		fc.out.CallSymbol("_c67_string_to_cstr")
+		fc.trackFunctionCall("_vibe67_string_to_cstr")
+		fc.out.CallSymbol("_vibe67_string_to_cstr")
 
 		// Call strtod(str, NULL) to parse the string
-		// rdi = C string (already in rax from _c67_string_to_cstr)
+		// rdi = C string (already in rax from _vibe67_string_to_cstr)
 		fc.out.MovRegToReg("rdi", "rax")
 		fc.out.XorRegWithReg("rsi", "rsi") // endptr = NULL
 		fc.trackFunctionCall("strtod")
@@ -16692,10 +16692,10 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		// Save size to stack
 		fc.out.PushReg("rdi")
 
-		// Load arena pointer from meta-arena: _c67_arena_meta[currentArena-1]
+		// Load arena pointer from meta-arena: _vibe67_arena_meta[currentArena-1]
 		arenaIndex := fc.currentArena - 1 // Convert to 0-based index
 		offset := arenaIndex * 8
-		fc.out.LeaSymbolToReg("rdi", "_c67_arena_meta")
+		fc.out.LeaSymbolToReg("rdi", "_vibe67_arena_meta")
 		fc.out.MovMemToReg("rdi", "rdi", 0) // Load the meta-arena pointer
 
 		fc.out.MovMemToReg("rdi", "rdi", offset) // Load the arena pointer from slot
@@ -16704,7 +16704,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.PopReg("rsi") // size in rsi
 
 		// Call arena_alloc (with auto-growing via realloc)
-		fc.out.CallSymbol("_c67_arena_alloc")
+		fc.out.CallSymbol("_vibe67_arena_alloc")
 
 		// DEBUG: Force return a fixed value
 		if false {
@@ -16738,9 +16738,9 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovMemToReg("rdi", "rsp", 0) // C string pointer will be in rax after call
 		fc.out.AddImmToReg("rsp", StackSlotSize)
 
-		// Call _c67_string_to_cstr (result in rax)
-		fc.trackFunctionCall("_c67_string_to_cstr")
-		fc.out.CallSymbol("_c67_string_to_cstr")
+		// Call _vibe67_string_to_cstr (result in rax)
+		fc.trackFunctionCall("_vibe67_string_to_cstr")
+		fc.out.CallSymbol("_vibe67_string_to_cstr")
 
 		// Now rax = C string pointer
 		// Pop flags from stack to rsi
@@ -16782,8 +16782,8 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.AddImmToReg("rsp", StackSlotSize)
 
 		// Convert to C string
-		fc.trackFunctionCall("_c67_string_to_cstr")
-		fc.out.CallSymbol("_c67_string_to_cstr")
+		fc.trackFunctionCall("_vibe67_string_to_cstr")
+		fc.out.CallSymbol("_vibe67_string_to_cstr")
 
 		// Pop handle to rdi
 		fc.out.Emit([]byte{0x41, 0x58})  // pop r8
@@ -16889,7 +16889,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 		// Convert C string to C67 string
 		// rdi already has lineptr
-		fc.out.CallSymbol("_c67_cstr_to_string")
+		fc.out.CallSymbol("_vibe67_cstr_to_string")
 		// Result in xmm0
 
 		// Save result
@@ -16947,15 +16947,15 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 		fc.out.MovMemToReg("rdi", "rsp", 0)
 		fc.out.AddImmToReg("rsp", StackSlotSize)
-		fc.trackFunctionCall("_c67_string_to_cstr")
-		fc.out.CallSymbol("_c67_string_to_cstr")
+		fc.trackFunctionCall("_vibe67_string_to_cstr")
+		fc.out.CallSymbol("_vibe67_string_to_cstr")
 
 		// Allocate stack frame: 32 bytes (fd, size, buffer, result)
 		fc.out.SubImmFromReg("rsp", 32)
 
 		// syscall open(path, O_RDONLY=0, mode=0)
 		// rax=2 (sys_open), rdi=path, rsi=flags, rdx=mode
-		fc.out.MovRegToReg("rdi", "rax")   // path from _c67_string_to_cstr
+		fc.out.MovRegToReg("rdi", "rax")   // path from _vibe67_string_to_cstr
 		fc.out.XorRegWithReg("rsi", "rsi") // O_RDONLY = 0
 		fc.out.XorRegWithReg("rdx", "rdx") // mode = 0
 		fc.out.MovImmToReg("rax", "2")     // sys_open = 2
@@ -17017,7 +17017,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 		// Convert buffer to C67 string
 		fc.out.MovMemToReg("rdi", "rsp", 16) // buffer from [rsp+16]
-		fc.out.CallSymbol("_c67_cstr_to_string")
+		fc.out.CallSymbol("_vibe67_cstr_to_string")
 		// Result in xmm0
 
 		// Save result at [rsp+24]
@@ -17067,8 +17067,8 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 		fc.out.MovMemToReg("rdi", "rsp", 0)
 		fc.out.AddImmToReg("rsp", StackSlotSize)
-		fc.trackFunctionCall("_c67_string_to_cstr")
-		fc.out.CallSymbol("_c67_string_to_cstr")
+		fc.trackFunctionCall("_vibe67_string_to_cstr")
+		fc.out.CallSymbol("_vibe67_string_to_cstr")
 		fc.out.PushReg("rax") // Save content C string
 
 		// Evaluate and convert path
@@ -17077,8 +17077,8 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovXmmToMem("xmm0", "rsp", 0)
 		fc.out.MovMemToReg("rdi", "rsp", 0)
 		fc.out.AddImmToReg("rsp", StackSlotSize)
-		fc.trackFunctionCall("_c67_string_to_cstr")
-		fc.out.CallSymbol("_c67_string_to_cstr")
+		fc.trackFunctionCall("_vibe67_string_to_cstr")
+		fc.out.CallSymbol("_vibe67_string_to_cstr")
 
 		// Open file: fopen(path, "w")
 		fc.out.MovRegToReg("rdi", "rax") // path
@@ -17547,13 +17547,13 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.XorRegWithReg("rax", "rax")
 		fc.out.Cvtsi2sd("xmm0", "rax")
 
-	case "__c67_map_update":
-		// __c67_map_update(list, index, value) - Update a list element (functional update)
+	case "__vibe67_map_update":
+		// __vibe67_map_update(list, index, value) - Update a list element (functional update)
 		// Calls runtime function: c67_list_update(list_ptr, index, value)
 		// Arguments: rdi=list_ptr, rsi=index, xmm0=value
 		// Returns: rax=new_list_ptr (converted to xmm0)
 		if len(call.Args) != 3 {
-			compilerError("__c67_map_update() requires exactly 3 arguments (list, index, value)")
+			compilerError("__vibe67_map_update() requires exactly 3 arguments (list, index, value)")
 		}
 
 		// Compile arguments in reverse order (will use stack)
@@ -17585,13 +17585,13 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		// Load current arena pointer into rdx (4th argument)
 		arenaIndex := fc.currentArena - 1
 		arenaOffset := arenaIndex * 8
-		fc.out.LeaSymbolToReg("rdx", "_c67_arena_meta")
+		fc.out.LeaSymbolToReg("rdx", "_vibe67_arena_meta")
 		fc.out.MovMemToReg("rdx", "rdx", 0)           // rdx = meta-arena pointer
 		fc.out.MovMemToReg("rdx", "rdx", arenaOffset) // rdx = arena pointer from slot
 
 		// Call the runtime function
-		fc.trackFunctionCall("_c67_list_update")
-		fc.eb.GenerateCallInstruction("_c67_list_update")
+		fc.trackFunctionCall("_vibe67_list_update")
+		fc.eb.GenerateCallInstruction("_vibe67_list_update")
 
 		// Convert result (rax = pointer) to float64 in xmm0
 		fc.out.SubImmFromReg("rsp", 8)
@@ -19272,7 +19272,7 @@ func CompileC67WithOptions(inputPath string, outputPath string, platform Platfor
 				}
 
 				// Find all .c67 files in the repository
-				c67Files, err := FindC67Files(repoPath)
+				c67Files, err := FindVibe67Files(repoPath)
 				if err != nil {
 					return fmt.Errorf("failed to find .c67 files in %s: %v", repoPath, err)
 				}
@@ -19417,3 +19417,12 @@ func (fc *C67Compiler) compileRiscv64(program *Program, outputPath string) error
 }
 
 // writeMachOARM64 writes an ARM64 Mach-O executable for macOS
+
+
+
+
+
+
+
+
+

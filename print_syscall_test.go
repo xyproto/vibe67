@@ -334,7 +334,7 @@ func compileTestBinary(t *testing.T, code string) string {
 		OS:   osType,
 		Arch: archType,
 	}
-	if err := CompileVibe67WithOptions(srcFile, binPath, platform, 0, false); err != nil {
+	if err := CompileC67WithOptions(srcFile, binPath, platform, 0, false); err != nil {
 		t.Fatalf("Compilation failed: %v", err)
 	}
 
@@ -361,3 +361,12 @@ func runCommand(cmd *exec.Cmd) (stdout, stderr string, exitCode int) {
 
 	return
 }
+
+
+
+
+
+
+
+
+

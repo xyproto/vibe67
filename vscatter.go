@@ -237,3 +237,12 @@ func (o *Out) vscatterRISCVToMem(src, base, indices string, scale int32, mask st
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

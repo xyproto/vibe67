@@ -41,3 +41,12 @@ func NewArchitecture(machine string) (Architecture, error) {
 		return nil, fmt.Errorf("unsupported architecture: %s", machine)
 	}
 }
+
+
+
+
+
+
+
+
+

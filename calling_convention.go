@@ -171,7 +171,7 @@ func NewCallSiteManager(cc CallingConvention) *CallSiteManager {
 
 // PrepareCall saves caller-saved registers that are currently in use
 // Returns the total stack space allocated (including shadow space)
-func (csm *CallSiteManager) PrepareCall(fc *Vibe67Compiler, liveRegs []string) int {
+func (csm *CallSiteManager) PrepareCall(fc *C67Compiler, liveRegs []string) int {
 	// Determine which caller-saved registers need saving
 	callerSaved := csm.cc.GetCallerSavedRegs()
 	callerSavedMap := make(map[string]bool)
@@ -220,7 +220,7 @@ func (csm *CallSiteManager) PrepareCall(fc *Vibe67Compiler, liveRegs []string) i
 }
 
 // RestoreAfterCall restores saved registers and deallocates stack space
-func (csm *CallSiteManager) RestoreAfterCall(fc *Vibe67Compiler) {
+func (csm *CallSiteManager) RestoreAfterCall(fc *C67Compiler) {
 	// Restore registers
 	for _, reg := range csm.savedRegs {
 		offset := csm.savedOffsets[reg]
@@ -241,3 +241,12 @@ func (csm *CallSiteManager) RestoreAfterCall(fc *Vibe67Compiler) {
 func isXmmReg(reg string) bool {
 	return len(reg) >= 3 && reg[0:3] == "xmm"
 }
+
+
+
+
+
+
+
+
+

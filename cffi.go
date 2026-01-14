@@ -1101,3 +1101,12 @@ func resolveTypeName(offset dwarf.Offset, data *dwarf.Data) string {
 
 	return "unknown"
 }
+
+
+
+
+
+
+
+
+

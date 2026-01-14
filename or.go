@@ -310,3 +310,12 @@ func (o *Out) orRISCVRegWithImm(dst string, imm int32) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

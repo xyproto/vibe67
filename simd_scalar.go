@@ -820,3 +820,12 @@ func (o *Out) fxorRISCV(dst, src string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

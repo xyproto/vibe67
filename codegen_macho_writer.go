@@ -15,7 +15,7 @@ import (
 // on ARM64 (Apple Silicon) architecture.
 
 // resolveDylibPath resolves a library name to its dylib path on macOS
-func (fc *Vibe67Compiler) resolveDylibPath(libName string) string {
+func (fc *C67Compiler) resolveDylibPath(libName string) string {
 	// Common library path mappings for macOS
 	switch strings.ToLower(libName) {
 	case "sdl3":
@@ -62,7 +62,7 @@ func (fc *Vibe67Compiler) resolveDylibPath(libName string) string {
 }
 
 // Confidence that this function is working: 60%
-func (fc *Vibe67Compiler) writeMachOARM64(outputPath string) error {
+func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 	// Build neededFunctions list from call patches (actual function calls made)
 	// Extract unique function names from callPatches
 	neededSet := make(map[string]bool)
@@ -314,3 +314,12 @@ func (fc *Vibe67Compiler) writeMachOARM64(outputPath string) error {
 }
 
 // writeELFRiscv64 writes a RISC-V64 ELF executable
+
+
+
+
+
+
+
+
+

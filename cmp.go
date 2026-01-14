@@ -500,3 +500,12 @@ func (o *Out) cmovbeX86(dst, src string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

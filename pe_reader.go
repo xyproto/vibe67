@@ -441,3 +441,12 @@ func ParseDLL(filepath string) ([]ExportedFunction, error) {
 
 	return exports.Functions, nil
 }
+
+
+
+
+
+
+
+
+

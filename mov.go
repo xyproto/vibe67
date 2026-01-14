@@ -621,3 +621,12 @@ func (o *Out) MovzxByteToQword(dstReg, srcReg string) {
 		compilerError("MovzxByteToQword not fully implemented for RISC-V yet")
 	}
 }
+
+
+
+
+
+
+
+
+

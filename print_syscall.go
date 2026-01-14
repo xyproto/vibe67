@@ -8,9 +8,9 @@ import (
 
 // generatePrintSyscall generates a print function
 // Linux: uses write syscall, Windows: uses printf
-// Signature: _c67_print_syscall(str_ptr) -> void
+// Signature: _vibe67_print_syscall(str_ptr) -> void
 func (fc *C67Compiler) generatePrintSyscall() {
-	fc.eb.MarkLabel("_c67_print_syscall")
+	fc.eb.MarkLabel("_vibe67_print_syscall")
 
 	if fc.eb.target.OS() == OSWindows {
 		// Windows version: use printf for each character
@@ -47,7 +47,7 @@ func (fc *C67Compiler) generatePrintSyscall() {
 		fc.out.Cvttsd2si("rdx", "xmm0") // rdx = character code
 
 		// Call putchar via printf("%c", char)
-		charFmtLabel := fmt.Sprintf("_c67_char_fmt_%d", fc.stringCounter)
+		charFmtLabel := fmt.Sprintf("_vibe67_char_fmt_%d", fc.stringCounter)
 		fc.stringCounter++
 		fc.eb.Define(charFmtLabel, "%c\x00")
 
@@ -74,7 +74,7 @@ func (fc *C67Compiler) generatePrintSyscall() {
 		fc.out.Ret()
 
 		if VerboseMode {
-			fmt.Fprintf(os.Stderr, "DEBUG: Generated _c67_print_syscall (Windows version)\n")
+			fmt.Fprintf(os.Stderr, "DEBUG: Generated _vibe67_print_syscall (Windows version)\n")
 		}
 		return
 	}
@@ -146,15 +146,15 @@ func (fc *C67Compiler) generatePrintSyscall() {
 	fc.out.Ret()
 
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: Generated _c67_print_syscall\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: Generated _vibe67_print_syscall\n")
 	}
 }
 
 // generatePrintlnSyscall generates a println function
 // Linux: uses write syscall, Windows: uses printf
-// Signature: _c67_println_syscall(str_ptr) -> void
+// Signature: _vibe67_println_syscall(str_ptr) -> void
 func (fc *C67Compiler) generatePrintlnSyscall() {
-	fc.eb.MarkLabel("_c67_println_syscall")
+	fc.eb.MarkLabel("_vibe67_println_syscall")
 
 	if fc.eb.target.OS() == OSWindows {
 		// Windows version: use printf for each character + newline
@@ -191,7 +191,7 @@ func (fc *C67Compiler) generatePrintlnSyscall() {
 		fc.out.Cvttsd2si("rdx", "xmm0") // rdx = character code
 
 		// Call putchar via printf("%c", char)
-		charFmtLabel := fmt.Sprintf("_c67_char_fmt_%d", fc.stringCounter)
+		charFmtLabel := fmt.Sprintf("_vibe67_char_fmt_%d", fc.stringCounter)
 		fc.stringCounter++
 		fc.eb.Define(charFmtLabel, "%c\x00")
 
@@ -211,7 +211,7 @@ func (fc *C67Compiler) generatePrintlnSyscall() {
 		fc.patchJumpImmediate(printlnLoopEnd+2, int32(printlnDonePos-printlnLoopEndPos))
 
 		// Print newline: printf("\n")
-		newlineFmtLabel := fmt.Sprintf("_c67_newline_fmt_%d", fc.stringCounter)
+		newlineFmtLabel := fmt.Sprintf("_vibe67_newline_fmt_%d", fc.stringCounter)
 		fc.stringCounter++
 		fc.eb.Define(newlineFmtLabel, "\n\x00")
 
@@ -229,7 +229,7 @@ func (fc *C67Compiler) generatePrintlnSyscall() {
 		fc.out.Ret()
 
 		if VerboseMode {
-			fmt.Fprintf(os.Stderr, "DEBUG: Generated _c67_println_syscall (Windows version)\n")
+			fmt.Fprintf(os.Stderr, "DEBUG: Generated _vibe67_println_syscall (Windows version)\n")
 		}
 		return
 	}
@@ -310,12 +310,12 @@ func (fc *C67Compiler) generatePrintlnSyscall() {
 	fc.out.Ret()
 
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: Generated _c67_println_syscall\n")
+		fmt.Fprintf(os.Stderr, "DEBUG: Generated _vibe67_println_syscall\n")
 	}
 }
 
 // generatePrintfSyscall generates printf using print + f-string infrastructure
-// This leverages the existing f-string compilation which calls _c67_concat_strings
+// This leverages the existing f-string compilation which calls _vibe67_concat_strings
 // Signature: printf(fstring_ptr) -> void
 func (fc *C67Compiler) generatePrintfSyscall() {
 	// printf is just print with f-string support
@@ -327,3 +327,12 @@ func (fc *C67Compiler) generatePrintfSyscall() {
 		fmt.Fprintf(os.Stderr, "DEBUG: printf uses inline f-string + print\n")
 	}
 }
+
+
+
+
+
+
+
+
+

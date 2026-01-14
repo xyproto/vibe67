@@ -179,3 +179,12 @@ var (
 	TypeCStringValue = &Vibe67Type{Kind: TypeCString, CType: "char*"}
 	TypeUnknownValue = &Vibe67Type{Kind: TypeUnknown}
 )
+
+
+
+
+
+
+
+
+

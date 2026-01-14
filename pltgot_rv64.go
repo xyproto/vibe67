@@ -15,3 +15,12 @@ func (ds *DynamicSections) generatePLTRiscv64(functions []string, gotBase uint64
 		fmt.Fprintf(os.Stderr, "WARNING: RISC-V PLT generation not yet implemented\n")
 	}
 }
+
+
+
+
+
+
+
+
+

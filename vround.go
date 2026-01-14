@@ -314,3 +314,12 @@ func (o *Out) vroundRISCVVectorToVector(dst, src string, mode int) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

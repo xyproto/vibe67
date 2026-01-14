@@ -830,3 +830,12 @@ func (a *ARM64Backend) Syscall() {
 	instr := uint32(0xD4000001)
 	a.writeInstruction(instr)
 }
+
+
+
+
+
+
+
+
+

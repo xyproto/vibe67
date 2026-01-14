@@ -924,3 +924,12 @@ func (l *Lexer) NextToken() Token {
 
 	return Token{Type: TOKEN_EOF, Line: l.line, Column: tokenColumn}
 }
+
+
+
+
+
+
+
+
+

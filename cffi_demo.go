@@ -103,3 +103,12 @@ extern const char* SDL_GetError(void);
 
 	fmt.Println("\n=== Demo Complete ===")
 }
+
+
+
+
+
+
+
+
+

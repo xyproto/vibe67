@@ -176,3 +176,12 @@ func TestPCRelocationPatchingRISCV(t *testing.T) {
 		t.Errorf("ADDI lower mismatch: got 0x%x, expected 0x%x", lower, expectedLower)
 	}
 }
+
+
+
+
+
+
+
+
+

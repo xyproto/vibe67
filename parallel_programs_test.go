@@ -42,7 +42,7 @@ func TestParallelPrograms(t *testing.T) {
 			}
 
 			platform := GetDefaultPlatform()
-			if err := CompileVibe67(srcPath, exePath, platform); err != nil {
+			if err := CompileC67(srcPath, exePath, platform); err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
 
@@ -82,7 +82,7 @@ func TestExistingParallelPrograms(t *testing.T) {
 			exePath := filepath.Join(tmpDir, name)
 
 			platform := GetDefaultPlatform()
-			if err := CompileVibe67(srcPath, exePath, platform); err != nil {
+			if err := CompileC67(srcPath, exePath, platform); err != nil {
 				t.Fatalf("Compilation failed: %v", err)
 			}
 
@@ -96,3 +96,12 @@ func TestExistingParallelPrograms(t *testing.T) {
 		})
 	}
 }
+
+
+
+
+
+
+
+
+

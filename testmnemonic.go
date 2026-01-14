@@ -274,3 +274,12 @@ func (o *Out) testRISCVRegWithImm(dst string, imm int64) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+

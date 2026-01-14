@@ -405,3 +405,12 @@ func (cm *CFFIManager) ValidateFunction(name string) error {
 
 	return nil
 }
+
+
+
+
+
+
+
+
+

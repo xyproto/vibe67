@@ -159,7 +159,7 @@ func compileTestCode(t *testing.T, code string) string {
 		OS:   osType,
 		Arch: archType,
 	}
-	if err := CompileVibe67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
+	if err := CompileC67WithOptions(srcFile, exePath, platform, 0, false); err != nil {
 		t.Fatalf("Compilation failed: %v", err)
 	}
 
@@ -188,3 +188,12 @@ func runCommandSeparate(cmd *exec.Cmd) (stdout, stderr string, exitCode int) {
 
 	return
 }
+
+
+
+
+
+
+
+
+

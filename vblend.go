@@ -272,3 +272,12 @@ func (o *Out) vblendRISCVWithMask(dst, src1, src2, mask string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
+
+
+
+
+
+
+
+
+
