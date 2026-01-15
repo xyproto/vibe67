@@ -679,8 +679,8 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	fc.scopedMoved = []map[string]bool{make(map[string]bool)}
 
 	// Arenas will be enabled on-demand when needed (string concat, list operations, etc.)
-	// Disabled by default for simple programs
-	fc.usesArenas = false
+	// Always enabled to ensure compatibility
+	fc.usesArenas = true
 
 	// Check if main() is called at top level (to decide whether to auto-call main)
 	fc.mainCalledAtTopLevel = fc.detectMainCallInTopLevel(program.Statements)
@@ -944,8 +944,10 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// Save exit code on stack before cleanup (rdi will be clobbered by cleanup calls)
 	fc.out.PushReg("rdi")
 
-	// Cleanup all arenas in meta-arena at program exit
-	fc.cleanupAllArenas()
+	// Cleanup all arenas in meta-arena at program exit (only if arenas were used)
+	if fc.usesArenas {
+		fc.cleanupAllArenas()
+	}
 
 	// Restore exit code to rdi
 	fc.out.PopReg("rdi")
