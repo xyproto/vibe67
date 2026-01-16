@@ -891,7 +891,8 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 
 	// Jump over lambda functions to reach the main evaluation code
 	skipLambdasJump := fc.eb.text.Len()
-	fc.out.JumpUnconditional(0) // Will be patched
+	fmt.Fprintf(os.Stderr, "LAMBDA SKIP: Jump at pos=%d (0x%X)\n", skipLambdasJump, skipLambdasJump)
+	fc.out.JumpUnconditional(0)
 	skipLambdasEnd := fc.eb.text.Len()
 
 	// Generate lambda functions here (before exit, but jumped over)
@@ -899,48 +900,39 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 
 	// Patch the jump to skip over lambdas
 	skipLambdasTarget := fc.eb.text.Len()
-	fc.patchJumpImmediate(skipLambdasJump+1, int32(skipLambdasTarget-skipLambdasEnd))
+	displacement := int32(skipLambdasTarget - skipLambdasEnd)
+	fmt.Fprintf(os.Stderr, "LAMBDA SKIP: Patching jump at pos=%d, target=%d (0x%X), displacement=%d (0x%X)\n",
+		skipLambdasJump+1, skipLambdasTarget, skipLambdasTarget, displacement, displacement)
+	fc.patchJumpImmediate(skipLambdasJump+1, displacement)
 
 	// Evaluate main (if it exists) to get the exit code BEFORE cleaning up arenas
-	// main can be a direct value (main = 42) or a function (main = { 42 })
 	_, exists := fc.variables["main"]
+	fmt.Fprintf(os.Stderr, "MAIN EVAL: exists=%v, pos before=%d (0x%X)\n", exists, fc.eb.text.Len(), fc.eb.text.Len())
 	if exists {
-		// main exists - check if it's a lambda/function or a direct value
 		if fc.lambdaVars["main"] {
-			// main is a lambda/function
-			if VerboseMode {
-				fmt.Fprintf(os.Stderr, "DEBUG: main is a lambda, mainCalledAtTopLevel=%v\n", fc.mainCalledAtTopLevel)
-			}
-			// Only auto-call if main() was NOT explicitly called at top level
 			if !fc.mainCalledAtTopLevel {
-				// Auto-call main with no arguments
-				if VerboseMode {
-					fmt.Fprintf(os.Stderr, "DEBUG: Auto-calling main()\n")
-				}
+				fmt.Fprintf(os.Stderr, "MAIN EVAL: Auto-calling main() at pos=%d\n", fc.eb.text.Len())
 				fc.compileExpression(&CallExpr{Function: "main", Args: []Expression{}})
 			} else {
-				// main() was already called - use exit code 0
-				if VerboseMode {
-					fmt.Fprintf(os.Stderr, "DEBUG: Skipping auto-call of main() (already called at top level)\n")
-				}
+				fmt.Fprintf(os.Stderr, "MAIN EVAL: main already called, setting xmm0=0 at pos=%d\n", fc.eb.text.Len())
 				fc.out.XorRegWithReg("xmm0", "xmm0")
 			}
 		} else {
-			// main is a direct value - just load it
+			fmt.Fprintf(os.Stderr, "MAIN EVAL: Loading main value at pos=%d\n", fc.eb.text.Len())
 			fc.compileExpression(&IdentExpr{Name: "main"})
 		}
-		// Result is in xmm0 (float64)
 	} else {
-		// No main - use exit code 0
+		fmt.Fprintf(os.Stderr, "MAIN EVAL: No main, setting xmm0=0 at pos=%d\n", fc.eb.text.Len())
 		fc.out.XorRegWithReg("xmm0", "xmm0")
 	}
+	fmt.Fprintf(os.Stderr, "MAIN EVAL: after evaluation, pos=%d (0x%X)\n", fc.eb.text.Len(), fc.eb.text.Len())
 
 	// Convert float64 result in xmm0 to int32 in rdi (for exit code)
-	// cvttsd2si rdi, xmm0 (convert with truncation scalar double to signed int)
+	posBeforeConv := fc.eb.text.Len()
 	fc.out.Emit([]byte{0xf2, 0x48, 0x0f, 0x2c, 0xf8})
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: Exit code conversion complete, value in rdi\n")
-	}
+	posAfterConv := fc.eb.text.Len()
+	fmt.Fprintf(os.Stderr, "EXIT CONVERSION: pos before=%d (0x%X), after=%d (0x%X), wrote %d bytes\n",
+		posBeforeConv, posBeforeConv, posAfterConv, posAfterConv, posAfterConv-posBeforeConv)
 
 	// Lambda functions were already generated and jumped over before main evaluation
 
