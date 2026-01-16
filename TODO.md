@@ -2,45 +2,31 @@
 
 ## Priority 0: CRITICAL - Windows PE Code Generation Bug
 
-**BLOCKER:** All Windows executables crash with ILLEGAL_INSTRUCTION at RVA 0x112F
+**BLOCKER:** All Windows executables crash
 
-### The Bug
-10-byte gap between functions at RVA 0x112D-0x1136 containing:
-- 5 bytes: D8 FF FF FF 90 (garbage)
-- 5 bytes: F2 48 0F 2C F8 (cvttsd2si rdi, xmm0 - exit code conversion from codegen.go:940)
+### EXACT LOCATION FOUND
+Position 301-305 (RVA 0x112D-0x1131): main() auto-call
+- Should generate: E8 XX XX XX XX (CALL rel32) or FF 15 XX XX XX XX (CALL [rip+disp])
+- Actually contains: D8 FF FF FF 90 (x87 FPU prefix + garbage)
 
-This exit conversion instruction appears ONLY in the gap (not at actual exit point).
-Bug is deterministic - same bytes every compile.
+Code that writes it: codegen.go:920 `compileExpression(&CallExpr{Function: "main"})`
 
-### Investigation Results
-PE format is 100% correct:
-- Stack frame setup fixed (arena init after prologue)
-- Section alignment fixed (restored missing alignTo calls)
-- Import tables correct (ExitProcess, malloc, free all mapped)
-- Shadow space allocated before all Windows calls
-- Runtime helpers generated before cleanup code
-
-### Root Cause
-bytes.Buffer doesn't have gaps - something actively writes to wrong position.
-Exit code conversion at line 940 appears at file offset 0x532 instead of end of main.
-
-### Fix Strategy
-1. Add buffer position logging around codegen.go:940
-2. Trace fc.eb.text.Len() before and after exit conversion emit
-3. Check if buffer position gets reset/modified between lambda and main code
-4. Compare position where we THINK we're writing vs actual file offset
-5. Look for duplicate Emit() of same instruction bytes
-
-### Quick Test
-Compile with logging:
-```go
-fmt.Fprintf(os.Stderr, "DEBUG: About to emit exit conversion at pos=%d\n", fc.eb.text.Len())
-fc.out.Emit([]byte{0xf2, 0x48, 0x0f, 0x2c, 0xf8})
-fmt.Fprintf(os.Stderr, "DEBUG: After emit exit conversion, pos=%d\n", fc.eb.text.Len())
+### Trace Evidence
+```
+LAMBDA SKIP: Jump at pos=260, target=301, displacement=36
+MAIN EVAL: Auto-calling main() at pos=301
+MAIN EVAL: after evaluation, pos=306 (5 bytes written)
+EXIT CONVERSION: pos=306-310 (correct)
 ```
 
-If position is around 0x12F (303 bytes), that's where the garbage is.
-If position is much higher (1000+), then something else is writing to 0x12F.
+### Two Possibilities
+1. `compileCallExpr` generates D8 instead of E8/FF (opcode bug)
+2. Something overwrites pos 301-305 after CALL is generated (corruption)
+
+### Next Step
+Add logging inside compileCallExpr to see:
+- What opcode it writes for main() call
+- Whether bytes get corrupted later
 
 ---
 
