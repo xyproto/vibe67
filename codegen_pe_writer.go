@@ -67,6 +67,11 @@ func (fc *C67Compiler) writePE(program *Program, outputPath string) error {
 		libraries[dllName] = funcs
 	}
 
+	fmt.Fprintf(os.Stderr, "DEBUG: Windows imports by library:\n")
+	for dll, funcs := range libraries {
+		fmt.Fprintf(os.Stderr, "DEBUG:   %s: %v\n", dll, funcs)
+	}
+
 	if VerboseMode {
 		fmt.Fprintf(os.Stderr, "Windows imports by library:\n")
 		for dll, funcs := range libraries {

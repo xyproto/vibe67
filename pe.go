@@ -760,12 +760,19 @@ func BuildPEImportData(libraries map[string][]string, idataRVA uint32) ([]byte, 
 			// Store IAT RVA for this function
 			iatRVA := iatBase + uint32(funcIndex*8)
 			iatMap[funcName] = iatRVA
-			if VerboseMode {
-				fmt.Fprintf(os.Stderr, "DEBUG:   %s -> IAT RVA=0x%x, hint RVA=0x%x\n", funcName, iatRVA, idataRVA+hintOffset)
+			
+			if funcName == "ExitProcess" || funcName == "malloc" {
+				fmt.Fprintf(os.Stderr, "DEBUG:   %s -> IAT RVA=0x%X (iatBase=0x%X + %d*8), hint RVA=0x%X\n", 
+					funcName, iatRVA, iatBase, funcIndex, idataRVA+hintOffset)
 			}
 
 			// RVA to hint/name entry
-			binary.Write(&buf, binary.LittleEndian, uint64(idataRVA+hintOffset))
+			hintRVA := uint64(idataRVA + hintOffset)
+			binary.Write(&buf, binary.LittleEndian, hintRVA)
+			
+			if funcName == "ExitProcess" || funcName == "malloc" {
+				fmt.Fprintf(os.Stderr, "DEBUG:   Writing %s IAT: hintRVA=0x%X, buf position=0x%X\n", funcName, hintRVA, buf.Len()-8)
+			}
 
 			entrySize := 2 + len(funcName) + 1
 			if entrySize%2 != 0 {
