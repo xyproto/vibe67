@@ -845,8 +845,14 @@ func (eb *ExecutableBuilder) PatchPECallsToIAT(iatMap map[string]uint32, textVir
 			funcName = funcName[:len(funcName)-5]
 		}
 
+		fmt.Fprintf(os.Stderr, "PATCH: %s at pos=%d (0x%X), bytes before patch: %02X %02X %02X %02X %02X %02X\n",
+			funcName, patch.position, patch.position,
+			textBytes[patch.position-2], textBytes[patch.position-1],
+			textBytes[patch.position], textBytes[patch.position+1], textBytes[patch.position+2], textBytes[patch.position+3])
+
 		// Check if this is an internal function label
 		if targetOffset := eb.LabelOffset(funcName); targetOffset >= 0 {
+			fmt.Fprintf(os.Stderr, "  INTERNAL: target offset=%d, converting to direct call\n", targetOffset)
 			// Internal function - convert from indirect to direct call
 			// Windows GenerateCallInstruction emits: FF 15 XX XX XX XX (6 bytes: indirect call through memory)
 			// For internal functions, we need: E8 XX XX XX XX 90 (6 bytes: direct call + NOP for alignment)
@@ -854,6 +860,9 @@ func (eb *ExecutableBuilder) PatchPECallsToIAT(iatMap map[string]uint32, textVir
 
 			// Convert FF 15 (indirect) to E8 (direct) for internal calls
 			if patch.position >= 2 && textBytes[patch.position-2] == 0xFF && textBytes[patch.position-1] == 0x15 {
+				fmt.Fprintf(os.Stderr, "  Before conversion at %d: %02X %02X %02X %02X %02X %02X\n",
+					patch.position-2, textBytes[patch.position-2], textBytes[patch.position-1],
+					textBytes[patch.position], textBytes[patch.position+1], textBytes[patch.position+2], textBytes[patch.position+3])
 				textBytes[patch.position-2] = 0xE8 // CALL rel32 opcode
 				// Position -1 will become part of the displacement (first byte)
 			}
@@ -876,6 +885,10 @@ func (eb *ExecutableBuilder) PatchPECallsToIAT(iatMap map[string]uint32, textVir
 				textBytes[patch.position+1] = byte((disp32 >> 16) & 0xFF) // Third byte
 				textBytes[patch.position+2] = byte((disp32 >> 24) & 0xFF) // Fourth byte
 				textBytes[patch.position+3] = 0x90                        // NOP to keep size at 6 bytes
+
+				fmt.Fprintf(os.Stderr, "  After conversion: %02X %02X %02X %02X %02X %02X (disp=%d)\n",
+					textBytes[patch.position-2], textBytes[patch.position-1],
+					textBytes[patch.position], textBytes[patch.position+1], textBytes[patch.position+2], textBytes[patch.position+3], displacement)
 
 				if VerboseMode {
 					fmt.Fprintf(os.Stderr, "  Patched internal call to %s: offset=%d, displacement=%d (converted to direct)\n", funcName, targetOffset, displacement)

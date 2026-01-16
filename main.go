@@ -946,6 +946,7 @@ func (eb *ExecutableBuilder) GenerateCallInstruction(funcName string) error {
 			w.Write(0x15)               // ModR/M: [RIP + disp32]
 			w.WriteUnsigned(0x12345678) // Placeholder - will be patched to IAT RVA
 		} else {
+			fmt.Fprintf(os.Stderr, "ERROR: Generating E8 (direct call) for %s, OS=%d (OSWindows=%d)\n", funcName, eb.target.OS(), OSWindows)
 			w.Write(0xE8)               // CALL rel32
 			w.WriteUnsigned(0x12345678) // Placeholder - will be patched
 		}

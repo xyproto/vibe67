@@ -527,25 +527,43 @@ func envBool(name string) bool {
 }
 
 func (o *Out) callSymbolX86(symbol string) {
-	// Emit CALL rel32 instruction (E8)
-	posBeforeE8 := o.eb.text.Len()
-	o.Write(0xE8)
-	posAfterE8 := o.eb.text.Len()
-
-	// Reserve 4 bytes for the relative offset (will be patched later)
-	callPos := o.eb.text.Len()
-	o.WriteUnsigned(0x12345678) // Match placeholder used in x86_64_codegen.go
-
-	if envBool("DEBUG") && (symbol == "_vibe67_arena_ensure_capacity" || symbol == "malloc$stub") {
-		fmt.Fprintf(os.Stderr, "DEBUG mov.go: CallSymbol(%s): posBeforeE8=%d, posAfterE8=%d, callPos=%d (recorded)\n",
-			symbol, posBeforeE8, posAfterE8, callPos)
+	// Emit CALL instruction
+	// On Windows: use indirect call (FF 15) for consistency with GenerateCallInstruction
+	// On other OS: use direct call (E8)
+	posBeforeCall := o.eb.text.Len()
+	
+	if o.target.OS() == OSWindows {
+		// Emit FF 15 (CALL [RIP+disp32]) - same as GenerateCallInstruction
+		o.Write(0xFF)
+		o.Write(0x15)
+		callPos := o.eb.text.Len()
+		o.WriteUnsigned(0x12345678) // Placeholder for displacement
+		
+		if envBool("DEBUG") && (symbol == "_vibe67_arena_ensure_capacity" || symbol == "malloc$stub") {
+			fmt.Fprintf(os.Stderr, "DEBUG mov.go: CallSymbol(%s) Windows: FF 15 at %d, callPos=%d\n",
+				symbol, posBeforeCall, callPos)
+		}
+		
+		o.eb.callPatches = append(o.eb.callPatches, CallPatch{
+			position:   callPos,
+			targetName: symbol,
+		})
+	} else {
+		// Emit E8 (CALL rel32)
+		o.Write(0xE8)
+		callPos := o.eb.text.Len()
+		o.WriteUnsigned(0x12345678) // Placeholder
+		
+		if envBool("DEBUG") && (symbol == "_vibe67_arena_ensure_capacity" || symbol == "malloc$stub") {
+			fmt.Fprintf(os.Stderr, "DEBUG mov.go: CallSymbol(%s): E8 at %d, callPos=%d\n",
+				symbol, posBeforeCall, callPos)
+		}
+		
+		o.eb.callPatches = append(o.eb.callPatches, CallPatch{
+			position:   callPos,
+			targetName: symbol,
+		})
 	}
-
-	// Register this call site for patching
-	o.eb.callPatches = append(o.eb.callPatches, CallPatch{
-		position:   callPos,
-		targetName: symbol,
-	})
 }
 
 // Cld clears the direction flag (for string operations)
