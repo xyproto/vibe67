@@ -826,17 +826,15 @@ sum_list = (list, acc) -> (list.length) {
 
 ### Function Definition
 
-Functions are defined using `=` (immutable by default) with `->` for lambdas:
+Functions can be defined using `=` with lambdas, or with optional `fun` keyword for clarity:
 
-```c67
-// Named function with -> for lambda
+```vibe67
+// Traditional lambda syntax
 square = x -> x * x
-
-// Multiple parameters
 add = (x, y) -> x + y
 
-// With block body
-factorial = n -> {
+// With optional 'fun' keyword for clarity
+fun factorial = n -> {
     result := 1
     @ i in 1..n {
         result *= i
@@ -844,20 +842,14 @@ factorial = n -> {
     result
 }
 
+// fun keyword doesn't change semantics, just visual clarity
+fun process = data -> data * 2
+// Same as: process = data -> data * 2
+
 // No-argument lambda: () and -> can be omitted when assigning blocks
 greet = { println("Hello!") }
-// Equivalent to: greet = () -> { println("Hello!") }
-
-hello = {
-    println("Hello")
-    println("World")
-}
-// Equivalent to: hello = () -> { println("Hello"); println("World") }
-
-// Explicit no-param lambda with ->
-worker = -> @ { process_forever() }     // Background worker
-init = -> setup_resources()             // Initialization function
-cleanup = -> release_all()              // Cleanup callback
+fun init = { setup() }
+// Both equivalent to: name = () -> { ... }
 ```
 
 ### Lambda Expressions
@@ -1073,9 +1065,10 @@ nums = [1, 2, 3, 4, 5]
 
 ### Loop Control
 
-C67 uses `ret @` with loop labels instead of `break`/`continue`:
+Vibe67 supports both traditional and modern loop control syntax:
 
-```c67
+**Traditional syntax** (using `ret @`):
+```vibe67
 // Exit current loop
 @ i in 0..<100 {
     i > 50 { ret @ }      // Exit current loop
@@ -1092,16 +1085,31 @@ C67 uses `ret @` with loop labels instead of `break`/`continue`:
         println(i, j)
     }
 }
-
-// ret without @ returns from function
-compute = n -> {
-    @ i in 0..<100 {
-        i == n { ret i }  // Return from function with value
-        i == 50 { ret @ } // Exit loop only, continue function
-    }
-    ret 0  // Return from function
-}
 ```
+
+**Modern syntax sugar** (keywords `break`, `continue`, `foreach`):
+```vibe67
+// break/continue syntax (aliases for ret @)
+foreach i in 0..<100 {
+    i > 50 { break }       // Same as: ret @
+    i % 2 == 0 { continue } // Same as: ret @ []  (continue)
+    println(i)
+}
+
+// Nested with explicit labels
+foreach i in 0..<10 {      // Loop @1
+    foreach j in 0..<10 {  // Loop @2
+        j == 5 { break }      // Exit inner loop
+        i == 5 { break @1 }   // Exit outer loop
+        println(i, j)
+    }
+}
+
+// foreach is syntax sugar for @ ... in
+foreach x in items { process(x) }  // Same as: @ x in items { process(x) }
+```
+
+**Recommendation:** Use `foreach/break/continue` for familiar C-style loops, use `@ / ret @` for advanced control flow.
 
 **Loop Label Numbering:**
 
@@ -1112,9 +1120,10 @@ Loops are automatically numbered from **outermost to innermost**:
 - `@` = current/innermost loop (same as highest number)
 
 **Loop Control Syntax:**
-- `ret @` or `ret @1` - Exit innermost loop
-- `ret @2` - Exit second loop level (jump out to @1)
+- `ret @` or `break` or `break @1` - Exit innermost loop
+- `ret @2` or `break @2` - Exit second loop level (jump out to @1)
 - `ret @N value` - Exit loop N with return value
+- `continue` or `continue @1` - Continue to next iteration
 - `ret value` - Return from function (not loop)
 
 ### Loop `max` Keyword
@@ -2006,16 +2015,16 @@ CStructs have C-compatible memory layout:
 
 ### Arena Allocators and Minimal Builtins
 
-**CRITICAL DESIGN PRINCIPLE:** C67 keeps builtin functions to an ABSOLUTE MINIMUM.
+**CRITICAL DESIGN PRINCIPLE:** Vibe67 keeps builtin functions to an ABSOLUTE MINIMUM.
 
-**Memory management:**
-- NO `malloc`, `free`, `realloc`, or `calloc` as builtins
-- Use arena allocators (recommended): `allocate()` within `arena {}` blocks
-- Or use C FFI (explicit): `c.malloc`, `c.free`, `c.realloc`, `c.calloc`
-- For zero-initialized memory, use `c.calloc(count, size)` instead of `c.malloc(size)`
+**Memory management with syntax sugar:**
+- `malloc(size)` - Arena allocator (syntax sugar for allocate within arena)
+- `free(ptr)` - No-op (arena cleanup happens automatically)
+- For explicit C memory: use `c.malloc`, `c.free`, `c.realloc`, `c.calloc`
+- For zero-initialized memory: use `c.calloc(count, size)`
 
-```c67
-// Recommended: arena allocator
+```vibe67
+// Explicit arena syntax (recommended for large scopes)
 result = arena {
     data = allocate(1024)
     process(data)
@@ -2023,13 +2032,19 @@ result = arena {
 }
 // All arena memory freed here
 
-// Alternative: explicit C FFI
+// Convenient syntax sugar - uses arena automatically
+buffer := malloc(1024)
+// free(buffer) is no-op, arena cleanup happens automatically
+
+// Explicit C FFI (when you need manual control)
 ptr := c.malloc(1024)
 defer c.free(ptr)
 
 // For C structs that need zero-initialization:
 event := c.calloc(1, 128)! as SDL_Event  // Allocates and zeros 128 bytes
 ```
+
+**Note:** `malloc()`/`free()` keywords use arena allocator behind the scenes. This provides familiar syntax while maintaining arena safety. Only use `c.malloc`/`c.free` when you need explicit manual memory management.
 
 **List operations:**
 - Use builtin functions: `head(xs)` for first element, `tail(xs)` for remaining elements

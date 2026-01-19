@@ -533,7 +533,10 @@ arena_statement = "arena" block ;
 
 loop_statement  = "@" block
                 | "@" identifier "in" expression [ "max" expression ] block
-                | "@" expression [ "max" expression ] block ;
+                | "@" expression [ "max" expression ] block
+                | "foreach" identifier "in" expression [ "max" expression ] block
+                | "break" [ "@" [ integer ] ]
+                | "continue" [ "@" [ integer ] ] ;
 
 parallel_statement = "||" identifier "in" expression block ;
 
@@ -545,7 +548,7 @@ type_cast       = "int8" | "int16" | "int32" | "int64"
                 | "number" | "string" | "list" | "address"
                 | "packed" | "aligned" ;
 
-assignment      = identifier [ ":" type_annotation ] ("=" | ":=" | "<-") expression
+assignment      = [ "fun" ] identifier [ ":" type_annotation ] ("=" | ":=" | "<-") expression
                 | identifier ("+=" | "-=" | "*=" | "/=" | "%=" | "**=") expression
                 | indexed_expr "<-" expression
                 | identifier_list ("=" | ":=" | "<-") expression ;  // Multiple assignment
@@ -918,6 +921,7 @@ No multi-line comments.
 
 ```
 ret arena unsafe cstruct class as max this defer spawn import shadow yes no
+fun break continue foreach malloc free
 ```
 
 **Note:** In C67, lambda definitions use `->` (thin arrow) and match arms use `=>` (fat arrow), similar to Rust syntax, except that `~>` is used for the default case.
@@ -966,19 +970,23 @@ x: num = num * 2       // OK - type annotation vs variable
 
 ## Memory Management and Builtins
 
-**CRITICAL DESIGN PRINCIPLE:** C67 keeps builtin functions to an ABSOLUTE MINIMUM.
+**CRITICAL DESIGN PRINCIPLE:** Vibe67 keeps builtin functions to an ABSOLUTE MINIMUM.
 
-**Memory allocation:**
-- NO `malloc`, `free`, `realloc`, or `calloc` as builtins
-- Use arena allocators: `allocate()` within `arena {}` blocks (recommended)
-- Or use C FFI: `c.malloc`, `c.free`, `c.realloc`, `c.calloc` (explicit)
+**Memory allocation syntax sugar:**
+- `malloc(size)` - allocates using arena allocator (syntax sugar for allocate within arena)
+- `free(ptr)` - no-op (arena cleanup happens automatically)
+- For explicit C memory: use `c.malloc`, `c.free`, `c.realloc`, `c.calloc`
 
-```c67
-// Recommended: arena allocator
+```vibe67
+// Arena allocator (recommended) - explicit syntax
 result = arena {
     data = allocate(1024)
     process(data)
 }
+
+// Arena allocator - convenient sugar
+data := malloc(1024)  // Uses arena allocator automatically
+// free(data) is no-op, arena cleans up
 
 // Alternative: explicit C FFI
 ptr := c.malloc(1024)
