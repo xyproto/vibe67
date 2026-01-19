@@ -915,8 +915,23 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	if exists {
 		if fc.lambdaVars["main"] {
 			if !fc.mainCalledAtTopLevel {
-				// TEMPORARY FIX: Skip auto-call to avoid corruption
-				fc.out.XorRegWithReg("xmm0", "xmm0")
+				// Auto-call main lambda: load closure and call it
+				offset := fc.variables["main"]
+				fc.out.MovMemToXmm("xmm0", "rbp", -offset)
+				
+				// Convert closure pointer from float64 to integer in rax
+				fc.out.SubImmFromReg("rsp", 16)
+				fc.out.MovXmmToMem("xmm0", "rsp", 0)
+				fc.out.MovMemToReg("rax", "rsp", 0)
+				fc.out.AddImmToReg("rsp", 16)
+				
+				// Load function pointer from closure object (offset 0)
+				fc.out.MovMemToReg("r11", "rax", 0)
+				// Load environment pointer from closure object (offset 8)
+				fc.out.MovMemToReg("r15", "rax", 8)
+				
+				// Call the function pointer in r11
+				fc.out.CallRegister("r11")
 			} else {
 				fc.out.XorRegWithReg("xmm0", "xmm0")
 			}
