@@ -617,6 +617,68 @@ func (fc *C67Compiler) expressionCallsMain(expr Expression) bool {
 	}
 }
 
+func (fc *C67Compiler) trackDependenciesInStatement(stmt Statement) {
+	switch s := stmt.(type) {
+	case *AssignStmt:
+		fc.trackDependenciesInExpr(s.Value)
+	case *ExpressionStmt:
+		fc.trackDependenciesInExpr(s.Expr)
+	}
+}
+
+func (fc *C67Compiler) trackDependenciesInExpr(expr Expression) {
+	if expr == nil {
+		return
+	}
+	
+	switch e := expr.(type) {
+	case *CallExpr:
+		// Track function call
+		fc.trackFunctionCall(e.Function)
+		for _, arg := range e.Args {
+			fc.trackDependenciesInExpr(arg)
+		}
+	case *DirectCallExpr:
+		fc.trackDependenciesInExpr(e.Callee)
+		for _, arg := range e.Args {
+			fc.trackDependenciesInExpr(arg)
+		}
+	case *BinaryExpr:
+		fc.trackDependenciesInExpr(e.Left)
+		fc.trackDependenciesInExpr(e.Right)
+	case *LambdaExpr:
+		fc.trackDependenciesInExpr(e.Body)
+	case *BlockExpr:
+		for _, stmt := range e.Statements {
+			fc.trackDependenciesInStatement(stmt)
+		}
+	case *MatchExpr:
+		fc.trackDependenciesInExpr(e.Condition)
+		for _, clause := range e.Clauses {
+			if clause.Guard != nil {
+				fc.trackDependenciesInExpr(clause.Guard)
+			}
+			if clause.Result != nil {
+				fc.trackDependenciesInExpr(clause.Result)
+			}
+		}
+		if e.DefaultExpr != nil {
+			fc.trackDependenciesInExpr(e.DefaultExpr)
+		}
+	case *LoopExpr:
+		for _, stmt := range e.Body {
+			fc.trackDependenciesInStatement(stmt)
+		}
+	case *ListExpr:
+		for _, elem := range e.Elements {
+			fc.trackDependenciesInExpr(elem)
+		}
+	case *IndexExpr:
+		fc.trackDependenciesInExpr(e.List)
+		fc.trackDependenciesInExpr(e.Index)
+	}
+}
+
 // collectAllFunctions does a pre-pass to collect all function definitions
 // This enables forward references - functions can be called before they're defined
 func (fc *C67Compiler) collectAllFunctions(program *Program) {
@@ -679,8 +741,6 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	fc.scopedMoved = []map[string]bool{make(map[string]bool)}
 
 	// Arenas will be enabled on-demand when needed (string concat, list operations, etc.)
-	// Always enabled to ensure compatibility
-	fc.usesArenas = true
 
 	// Check if main() is called at top level (to decide whether to auto-call main)
 	fc.mainCalledAtTopLevel = fc.detectMainCallInTopLevel(program.Statements)
@@ -710,6 +770,74 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// Reorder statements to put function definitions first
 	// This ensures all functions are defined before being called
 	program.Statements = fc.reorderStatementsForForwardRefs(program.Statements)
+
+	return fc.compileInternal(program, outputPath, false)
+}
+
+func (fc *C67Compiler) CompileDepsOnly(program *Program) error {
+	// Pre-pass: Collect C imports
+	fc.processCImports(program)
+	
+	// Collect all functions
+	fc.collectAllFunctions(program)
+	
+	// Reorder statements
+	program.Statements = fc.reorderStatementsForForwardRefs(program.Statements)
+	
+	// Do a lightweight compile just to track dependencies
+	return fc.compileInternal(program, "", true)
+}
+
+func (fc *C67Compiler) compileInternal(program *Program, outputPath string, depsOnly bool) error {
+	// Clear moved variables tracking for this compilation
+	fc.movedVars = make(map[string]bool)
+	fc.scopedMoved = []map[string]bool{make(map[string]bool)}
+
+	// Arenas will be enabled on-demand when needed (string concat, list operations, etc.)
+
+	// Check if main() is called at top level (to decide whether to auto-call main)
+	fc.mainCalledAtTopLevel = fc.detectMainCallInTopLevel(program.Statements)
+	if VerboseMode {
+		fmt.Fprintf(os.Stderr, "DEBUG: mainCalledAtTopLevel = %v\n", fc.mainCalledAtTopLevel)
+	}
+
+	// Transfer namespace information from program to compiler
+	if program.FunctionNamespaces != nil {
+		fc.functionNamespace = program.FunctionNamespaces
+	}
+
+	if fc.debug {
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "DEBUG Compile: starting compilation with %d statements\n", len(program.Statements))
+		}
+	}
+
+	// Pre-pass: Collect C imports to set up library handles and extract constants
+	// This MUST happen before architecture-specific compilation
+	fc.processCImports(program)
+
+	// Pre-pass: Collect all function definitions to enable forward references
+	// This allows functions to be called before they're defined in the source
+	fc.collectAllFunctions(program)
+
+	// Reorder statements to put function definitions first
+	// This ensures all functions are defined before being called
+	program.Statements = fc.reorderStatementsForForwardRefs(program.Statements)
+
+	// If depsOnly, just collect symbols and return
+	if depsOnly {
+		// Collect all symbols to track dependencies
+		for _, stmt := range program.Statements {
+			if err := fc.collectSymbols(stmt); err != nil {
+				return err
+			}
+		}
+		// Walk through statements to track function calls
+		for _, stmt := range program.Statements {
+			fc.trackDependenciesInStatement(stmt)
+		}
+		return nil
+	}
 
 	// Use ARM64 code generator if target is ARM64
 	if fc.eb.target.Arch() == ArchARM64 {
@@ -1018,6 +1146,11 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	// For ELF, this is done in writeELF() after second lambda pass
 	// For PE, runtime helpers are now generated BEFORE cleanup code (see line ~953)
 	// so that arena function labels exist when cleanup code calls them
+
+	// If depsOnly, we're done - just return for analysis
+	if depsOnly {
+		return nil
+	}
 
 	// Write executable in appropriate format based on target OS
 	if VerboseMode {
@@ -7486,6 +7619,7 @@ func (fc *C67Compiler) generateLambdaFunctions() {
 		// Variadic parameter collects remaining arguments into a list
 		// Convention: remaining args passed in xmm regs, count in r14
 		if lambda.VariadicParam != "" {
+			fmt.Fprintf(os.Stderr, "DEBUG: Lambda '%s' has variadic param '%s'\n", lambda.Name, lambda.VariadicParam)
 			if VerboseMode {
 				fmt.Fprintf(os.Stderr, "DEBUG generateLambdaFunctions: '%s' HAS variadic param '%s' (fixedParams=%d)\n", lambda.Name, lambda.VariadicParam, paramCount)
 			}
@@ -8011,13 +8145,10 @@ func (fc *C67Compiler) generateCacheInsert() {
 }
 
 func (fc *C67Compiler) generateRuntimeHelpers() {
+	fmt.Fprintf(os.Stderr, "DEBUG: *** generateRuntimeHelpers() called ***\n")
+	fmt.Fprintf(os.Stderr, "DEBUG: Used functions: %v\n", fc.usedFunctions)
+	fmt.Fprintf(os.Stderr, "DEBUG: usesArenas=%v\n", fc.usesArenas)
 	// Arena runtime functions are generated inline below (_vibe67_arena_create, alloc, etc)
-	// Don't call fc.eb.EmitArenaRuntimeCode() as it's the old stub from main.go
-	// Arena symbols are predeclared earlier in writeELF() to ensure they're available during code generation
-
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG: Used functions: %v\n", fc.usedFunctions)
-	}
 
 	// Generate syscall-based printf runtime on Linux
 	fc.GeneratePrintfSyscallRuntime()
@@ -8035,6 +8166,9 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 	// Generate _vibe67_string_concat only if used
 	if fc.usedFunctions["_vibe67_string_concat"] {
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "DEBUG: Generating _vibe67_string_concat\n")
+		}
 		// Generate _vibe67_string_concat(left_ptr, right_ptr) -> new_ptr
 		// Arguments: rdi = left_ptr, rsi = right_ptr
 		// Returns: rax = pointer to new concatenated string
@@ -8153,8 +8287,12 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.Ret()
 	} // end if _vibe67_string_concat used
 
-	// Generate _vibe67_string_to_cstr only if used (for printf, f-strings, C FFI)
-	if fc.usedFunctions["_vibe67_string_to_cstr"] || fc.usedFunctions["println"] || fc.usedFunctions["printf"] {
+	// Generate _vibe67_string_to_cstr only if explicitly used (for f-strings, C FFI)
+	// Note: println/printf don't use this - they have their own inline implementations
+	if fc.usedFunctions["_vibe67_string_to_cstr"] {
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "DEBUG: Generating _vibe67_string_to_cstr\n")
+		}
 		// Generate _vibe67_string_to_cstr(c67_string_ptr) -> cstr_ptr
 		// Converts a C67 string (map format) to a null-terminated C string
 		// Argument: xmm0 = C67 string pointer (as float64)
@@ -9377,6 +9515,9 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 	// Generate arena functions only if arenas are actually used
 	if fc.usesArenas {
+		if VerboseMode {
+			fmt.Fprintf(os.Stderr, "DEBUG: Generating arena functions (usesArenas=true)\n")
+		}
 		// Define error message string
 		fc.eb.Define("_vibe67_str_arena_alloc_error", "ERROR: Arena buffer allocation failed\n\x00")
 		
@@ -9762,11 +9903,13 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.Ret()
 	} // end if usesArenas (will reopen for arena_ensure_capacity later)
 
-	// Generate _vibe67_list_cons(element_float, list_ptr_float) -> new_list_ptr
-	// LINKED LIST implementation - creates a cons cell: [head|tail]
-	// Arguments: rdi = element (as float64 bits), rsi = tail pointer (as float64 bits, 0.0 = nil)
-	// Returns: rax = pointer to new cons cell (16 bytes)
-	fc.eb.MarkLabel("_vibe67_list_cons")
+	// Generate _vibe67_list_cons only if used
+	if fc.usedFunctions["_vibe67_list_cons"] {
+		// Generate _vibe67_list_cons(element_float, list_ptr_float) -> new_list_ptr
+		// LINKED LIST implementation - creates a cons cell: [head|tail]
+		// Arguments: rdi = element (as float64 bits), rsi = tail pointer (as float64 bits, 0.0 = nil)
+		// Returns: rax = pointer to new cons cell (16 bytes)
+		fc.eb.MarkLabel("_vibe67_list_cons")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9820,12 +9963,15 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Function epilogue
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
+	} // end if _vibe67_list_cons used
 
-	// Generate _vibe67_list_head(list_ptr_float) -> element_float
-	// LINKED LIST implementation - returns head of cons cell
-	// Argument: rdi = list pointer (as float64 bits, 0.0 = nil)
-	// Returns: xmm0 = first element (or NaN if empty)
-	fc.eb.MarkLabel("_vibe67_list_head")
+	// Generate _vibe67_list_head only if used
+	if fc.usedFunctions["_vibe67_list_head"] {
+		// Generate _vibe67_list_head(list_ptr_float) -> element_float
+		// LINKED LIST implementation - returns head of cons cell
+		// Argument: rdi = list pointer (as float64 bits, 0.0 = nil)
+		// Returns: xmm0 = first element (or NaN if empty)
+		fc.eb.MarkLabel("_vibe67_list_head")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9851,12 +9997,15 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Function epilogue
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
+	} // end if _vibe67_list_head used
 
-	// Generate _vibe67_list_tail(list_ptr_float) -> tail_ptr_float
-	// LINKED LIST implementation - returns tail of cons cell (O(1) operation)
-	// Argument: rdi = list pointer (as float64 bits, 0.0 = nil)
-	// Returns: xmm0 = tail pointer (as float64, 0.0 = nil)
-	fc.eb.MarkLabel("_vibe67_list_tail")
+	// Generate _vibe67_list_tail only if used
+	if fc.usedFunctions["_vibe67_list_tail"] {
+		// Generate _vibe67_list_tail(list_ptr_float) -> tail_ptr_float
+		// LINKED LIST implementation - returns tail of cons cell (O(1) operation)
+		// Argument: rdi = list pointer (as float64 bits, 0.0 = nil)
+		// Returns: xmm0 = tail pointer (as float64, 0.0 = nil)
+		fc.eb.MarkLabel("_vibe67_list_tail")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9881,12 +10030,15 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Function epilogue
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
+	} // end if _vibe67_list_tail used
 
-	// Generate _vibe67_list_length(list_ptr_float) -> length_int
-	// LINKED LIST implementation - walks list and counts nodes (O(n))
-	// Argument: rdi = list pointer (as float64 bits, 0.0 = nil)
-	// Returns: rax = length as int64
-	fc.eb.MarkLabel("_vibe67_list_length")
+	// Generate _vibe67_list_length only if used
+	if fc.usedFunctions["_vibe67_list_length"] {
+		// Generate _vibe67_list_length(list_ptr_float) -> length_int
+		// LINKED LIST implementation - walks list and counts nodes (O(n))
+		// Argument: rdi = list pointer (as float64 bits, 0.0 = nil)
+		// Returns: rax = length as int64
+		fc.eb.MarkLabel("_vibe67_list_length")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9919,12 +10071,15 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Return length in rax
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
+	} // end if _vibe67_list_length used
 
-	// Generate _vibe67_list_index(list_ptr_float, index_int) -> element_float
-	// LINKED LIST implementation - walks to index-th node (O(n))
-	// Arguments: rdi = list pointer (as float64 bits), rsi = index (int64)
-	// Returns: xmm0 = element at index (or NaN if out of bounds)
-	fc.eb.MarkLabel("_vibe67_list_index")
+	// Generate _vibe67_list_index only if used
+	if fc.usedFunctions["_vibe67_list_index"] {
+		// Generate _vibe67_list_index(list_ptr_float, index_int) -> element_float
+		// LINKED LIST implementation - walks to index-th node (O(n))
+		// Arguments: rdi = list pointer (as float64 bits), rsi = index (int64)
+		// Returns: xmm0 = element at index (or NaN if out of bounds)
+		fc.eb.MarkLabel("_vibe67_list_index")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -9981,13 +10136,16 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.AddImmToReg("rsp", 8)
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
+	} // end if _vibe67_list_index used
 
-	// Generate _vibe67_list_update(list_ptr, index, value, arena_ptr) -> new_list_ptr
-	// Updates a list element at the given index (functional - returns new list)
-	// Arguments: rdi = list_ptr, rsi = index (integer), xmm0 = new value (float64), rdx = arena_ptr
-	// Returns: rax = new list pointer
-	// Uses specified arena for allocation
-	fc.eb.MarkLabel("_vibe67_list_update")
+	// Generate _vibe67_list_update only if used
+	if fc.usedFunctions["_vibe67_list_update"] {
+		// Generate _vibe67_list_update(list_ptr, index, value, arena_ptr) -> new_list_ptr
+		// Updates a list element at the given index (functional - returns new list)
+		// Arguments: rdi = list_ptr, rsi = index (integer), xmm0 = new value (float64), rdx = arena_ptr
+		// Returns: rax = new list pointer
+		// Uses specified arena for allocation
+		fc.eb.MarkLabel("_vibe67_list_update")
 
 	// Function prologue
 	fc.out.PushReg("rbp")
@@ -10080,10 +10238,13 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.PopReg("rbx")
 	fc.out.PopReg("rbp")
 	fc.out.Ret()
+	} // end if _vibe67_list_update used
 
-	// Generate _vibe67_string_println(string_ptr) - prints string followed by newline
-	// Argument: rdi/rcx (platform-dependent) = string pointer (map with [count][0][char0][1][char1]...)
-	fc.eb.MarkLabel("_vibe67_string_println")
+	// Generate _vibe67_string_println only if used
+	if fc.usedFunctions["_vibe67_string_println"] {
+		// Generate _vibe67_string_println(string_ptr) - prints string followed by newline
+		// Argument: rdi/rcx (platform-dependent) = string pointer (map with [count][0][char0][1][char1]...)
+		fc.eb.MarkLabel("_vibe67_string_println")
 
 	// For Windows, we use a simpler approach: call printf for each character
 	// For Unix, we use write syscall for efficiency
@@ -10234,10 +10395,13 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
 	}
+	} // end if _vibe67_string_println used
 
-	// Generate _vibe67_string_print(string_ptr) - prints string WITHOUT newline
-	// Argument: rdi/rcx (platform-dependent) = string pointer (map with [count][0][char0][1][char1]...)
-	fc.eb.MarkLabel("_vibe67_string_print")
+	// Generate _vibe67_string_print only if used
+	if fc.usedFunctions["_vibe67_string_print"] {
+		// Generate _vibe67_string_print(string_ptr) - prints string WITHOUT newline
+		// Argument: rdi/rcx (platform-dependent) = string pointer (map with [count][0][char0][1][char1]...)
+		fc.eb.MarkLabel("_vibe67_string_print")
 
 	if fc.eb.target.OS() == OSWindows {
 		// Windows version: use printf for each character
@@ -10363,9 +10527,12 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.PopReg("rbp")
 		fc.out.Ret()
 	}
+	} // end if _vibe67_string_print used
 
-	// Generate _vibe67_itoa for number to string conversion
-	fc.generateItoa()
+	// Generate _vibe67_itoa for number to string conversion (only if used)
+	if fc.usedFunctions["_vibe67_itoa"] {
+		fc.generateItoa()
+	}
 
 	// Generate syscall-based print helpers for Linux
 	if fc.eb.target.OS() == OSLinux {
@@ -14538,16 +14705,33 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.hasExplicitExit = true // Mark that program has explicit exit
 		if len(call.Args) > 0 {
 			fc.compileExpression(call.Args[0])
-			// Convert float64 in xmm0 to int64 in rdi
-			fc.out.Cvttsd2si("rdi", "xmm0") // truncate float to int
+			// Convert float64 in xmm0 to int64
+			if fc.eb.target.OS() == OSWindows {
+				fc.out.Cvttsd2si("rcx", "xmm0") // Windows: exit code in rcx
+			} else {
+				fc.out.Cvttsd2si("rdi", "xmm0") // Unix: exit code in rdi
+			}
 		} else {
-			fc.out.XorRegWithReg("rdi", "rdi")
+			if fc.eb.target.OS() == OSWindows {
+				fc.out.XorRegWithReg("rcx", "rcx")
+			} else {
+				fc.out.XorRegWithReg("rdi", "rdi")
+			}
 		}
-		// Restore stack pointer to frame pointer (rsp % 16 == 8 for proper call alignment)
+		// Restore stack pointer to frame pointer
 		// Don't pop rbp since exit() never returns
 		fc.out.MovRegToReg("rsp", "rbp")
-		fc.trackFunctionCall("exit")
-		fc.eb.GenerateCallInstruction("exit")
+		
+		// On Windows, use ExitProcess from kernel32 (not exit from msvcrt which needs CRT init)
+		if fc.eb.target.OS() == OSWindows {
+			fc.allocateShadowSpace()
+			fc.cFunctionLibs["ExitProcess"] = "kernel32"
+			fc.trackFunctionCall("ExitProcess")
+			fc.eb.GenerateCallInstruction("ExitProcess")
+		} else {
+			fc.trackFunctionCall("exit")
+			fc.eb.GenerateCallInstruction("exit")
+		}
 
 	case "append":
 		// Confidence that this function is working: 100%
@@ -19168,10 +19352,10 @@ func addNamespaceToFunctions(program *Program, namespace string) {
 }
 
 func CompileC67(inputPath string, outputPath string, platform Platform) (err error) {
-	return CompileC67WithOptions(inputPath, outputPath, platform, WPOTimeout, VerboseMode)
+	return CompileC67WithOptions(inputPath, outputPath, platform, WPOTimeout, VerboseMode, false)
 }
 
-func CompileC67WithOptions(inputPath string, outputPath string, platform Platform, wpoTimeout float64, verbose bool) (err error) {
+func CompileC67WithOptions(inputPath string, outputPath string, platform Platform, wpoTimeout float64, verbose bool, depsOnly bool) (err error) {
 	// Set verbose mode
 	oldVerbose := VerboseMode
 	if verbose {
@@ -19424,6 +19608,16 @@ func CompileC67WithOptions(inputPath string, outputPath string, platform Platfor
 	compiler.wpoTimeout = wpoTimeout
 	compiler.errors.SetSourceCode(combinedSource)
 
+	if depsOnly {
+		// Build dependency info without writing output
+		err = compiler.CompileDepsOnly(program)
+		if err != nil {
+			return fmt.Errorf("dependency analysis failed: %v", err)
+		}
+		compiler.PrintDependencyInfo()
+		return nil
+	}
+
 	err = compiler.Compile(program, outputPath)
 	if err != nil {
 		return fmt.Errorf("compilation failed: %v", err)
@@ -19444,6 +19638,73 @@ func CompileC67WithOptions(inputPath string, outputPath string, platform Platfor
 	}
 
 	return nil
+}
+
+func (fc *C67Compiler) PrintDependencyInfo() {
+	fmt.Println("=== Dependency Analysis ===")
+	fmt.Println()
+	
+	fmt.Printf("Used Functions: %d\n", len(fc.usedFunctions))
+	funcs := make([]string, 0, len(fc.usedFunctions))
+	for fn := range fc.usedFunctions {
+		funcs = append(funcs, fn)
+	}
+	sort.Strings(funcs)
+	for _, fn := range funcs {
+		fmt.Printf("  - %s\n", fn)
+	}
+	fmt.Println()
+	
+	fmt.Printf("Call Order: %d function calls\n", len(fc.callOrder))
+	if len(fc.callOrder) > 0 && len(fc.callOrder) <= 50 {
+		for i, fn := range fc.callOrder {
+			fmt.Printf("  %d. %s\n", i+1, fn)
+		}
+		fmt.Println()
+	} else if len(fc.callOrder) > 50 {
+		fmt.Println("  (showing first 20 and last 20)")
+		for i := 0; i < 20; i++ {
+			fmt.Printf("  %d. %s\n", i+1, fc.callOrder[i])
+		}
+		fmt.Println("  ...")
+		for i := len(fc.callOrder) - 20; i < len(fc.callOrder); i++ {
+			fmt.Printf("  %d. %s\n", i+1, fc.callOrder[i])
+		}
+		fmt.Println()
+	}
+	
+	fmt.Printf("Unknown Functions: %d\n", len(fc.unknownFunctions))
+	if len(fc.unknownFunctions) > 0 {
+		unknown := make([]string, 0, len(fc.unknownFunctions))
+		for fn := range fc.unknownFunctions {
+			unknown = append(unknown, fn)
+		}
+		sort.Strings(unknown)
+		for _, fn := range unknown {
+			fmt.Printf("  - %s\n", fn)
+		}
+		fmt.Println()
+	}
+	
+	fmt.Printf("Lambda Functions: %d\n", len(fc.lambdaFuncs))
+	for _, lf := range fc.lambdaFuncs {
+		fmt.Printf("  - %s (params: %d)\n", lf.Name, len(lf.Params))
+	}
+	fmt.Println()
+	
+	fmt.Printf("C Imports: %d\n", len(fc.cImports))
+	for alias, lib := range fc.cImports {
+		fmt.Printf("  %s -> %s\n", alias, lib)
+	}
+	fmt.Println()
+	
+	fmt.Println("Feature Tracking:")
+	fmt.Printf("  - Uses arenas: %v\n", fc.usesArenas)
+	fmt.Printf("  - Uses string concat: %v\n", fc.usesStringConcat)
+	fmt.Printf("  - Uses printf: %v\n", fc.usesPrintf)
+	fmt.Printf("  - Uses arena alloc: %v\n", fc.usesArenaAlloc)
+	fmt.Printf("  - Uses CPU features: %v\n", fc.usesCPUFeatures)
+	fmt.Println()
 }
 
 // compileARM64 compiles a program for ARM64 architecture

@@ -1,5 +1,10 @@
 package main
 
+import (
+	"fmt"
+	"sort"
+)
+
 type DependencyGraph struct {
 	graph    map[string]map[string]bool
 	roots    map[string]bool
@@ -60,6 +65,60 @@ func (dg *DependencyGraph) GetReachable() map[string]bool {
 	}
 
 	return reachable
+}
+
+func (dg *DependencyGraph) PrintDependencyTree() {
+	fmt.Println("=== Dependency Tree ===")
+	fmt.Println()
+	
+	fmt.Println("Entry Points:")
+	for root := range dg.roots {
+		fmt.Printf("  - %s\n", root)
+	}
+	fmt.Println()
+	
+	reachable := dg.GetReachable()
+	unreachable := make(map[string]bool)
+	
+	for funcName := range dg.graph {
+		if !reachable[funcName] {
+			unreachable[funcName] = true
+		}
+	}
+	
+	fmt.Printf("Reachable Functions: %d\n", len(reachable))
+	funcs := make([]string, 0, len(reachable))
+	for fn := range reachable {
+		funcs = append(funcs, fn)
+	}
+	sort.Strings(funcs)
+	for _, fn := range funcs {
+		callees := dg.graph[fn]
+		if len(callees) > 0 {
+			calleeList := make([]string, 0, len(callees))
+			for c := range callees {
+				calleeList = append(calleeList, c)
+			}
+			sort.Strings(calleeList)
+			fmt.Printf("  %s -> %v\n", fn, calleeList)
+		} else {
+			fmt.Printf("  %s (leaf)\n", fn)
+		}
+	}
+	fmt.Println()
+	
+	if len(unreachable) > 0 {
+		fmt.Printf("Dead Code (Eliminated): %d functions\n", len(unreachable))
+		deadFuncs := make([]string, 0, len(unreachable))
+		for fn := range unreachable {
+			deadFuncs = append(deadFuncs, fn)
+		}
+		sort.Strings(deadFuncs)
+		for _, fn := range deadFuncs {
+			fmt.Printf("  - %s\n", fn)
+		}
+		fmt.Println()
+	}
 }
 
 

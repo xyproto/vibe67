@@ -1,0 +1,30 @@
+DEBUG: Skipping arena init on Windows (usesArenas=false)
+DEBUG: *** generateRuntimeHelpers() called ***
+DEBUG: Used functions: map[]
+DEBUG: usesArenas=false
+DEBUG: Windows imports by library:
+DEBUG:   msvcrt.dll: [printf]
+DEBUG:   kernel32.dll: [ExitProcess]
+Aligned: codeSize=1024 (0x400), dataSize=512 (0x200)
+Section layout: textRawAddr=0x400, dataRawAddr=0x800
+DEBUG:   ExitProcess -> IAT RVA=0x304C (iatBase=0x304C + 0*8), hint RVA=0x307C
+DEBUG:   Writing ExitProcess IAT: hintRVA=0x307C, buf position=0x4C
+[1] After header: pos=456
+[2] After section headers: pos=576
+[3] Padding 448 bytes
+[4] After padding: pos=1024 (should be 0x400)
+PATCH: _vibe67_arena_alloc at pos=186 (0xBA), bytes before patch: FF 15 78 56 34 12
+  ERROR: Function _vibe67_arena_alloc not found in IAT or internal labels
+PATCH: _vibe67_arena_alloc at pos=510 (0x1FE), bytes before patch: FF 15 78 56 34 12
+  ERROR: Function _vibe67_arena_alloc not found in IAT or internal labels
+PATCH: printf at pos=687 (0x2AF), bytes before patch: FF 15 78 56 34 12
+  IAT: printf iatRVA=0x306C, dispPos=0x2AF, ripRVA=0x12B3, disp=0x1DB9 (7609)
+PATCH: printf at pos=716 (0x2CC), bytes before patch: FF 15 78 56 34 12
+  IAT: printf iatRVA=0x306C, dispPos=0x2CC, ripRVA=0x12D0, disp=0x1D9C (7580)
+PATCH: printf at pos=802 (0x322), bytes before patch: FF 15 78 56 34 12
+  IAT: printf iatRVA=0x306C, dispPos=0x322, ripRVA=0x1326, disp=0x1D46 (7494)
+PATCH: ExitProcess at pos=987 (0x3DB), bytes before patch: FF 15 78 56 34 12
+  IAT: ExitProcess iatRVA=0x304C, dispPos=0x3DB, ripRVA=0x13DF, disp=0x1C6D (7277)
+Error: compilation failed: compilation failed: failed to write PE file: PE generation failed:
+  Unresolved functions (2): _vibe67_arena_alloc, _vibe67_arena_alloc
+

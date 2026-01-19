@@ -1272,6 +1272,7 @@ func main() {
 	var singleShort = flag.Bool("s", false, "shorthand for --single")
 	var compressFlag = flag.Bool("compress", false, "enable executable compression (experimental)")
 	_ = flag.Bool("tiny", false, "size optimization mode: remove debug strings and minimize runtime checks for demoscene/64k")
+	var depsFlag = flag.Bool("d", false, "show dependency tree and DCE info, then exit (no file generation)")
 	flag.Parse()
 
 	// Set global update-deps flag (use whichever was specified)
@@ -1424,7 +1425,7 @@ func main() {
 			if outputFlagProvided {
 				cliOutputPath = outputFilename
 			}
-			err := RunCLI(inputFiles, targetPlatform, VerboseMode, QuietMode, *optTimeout, UpdateDepsFlag, SingleFlag, cliOutputPath)
+			err := RunCLI(inputFiles, targetPlatform, VerboseMode, QuietMode, *optTimeout, UpdateDepsFlag, SingleFlag, cliOutputPath, *depsFlag)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
@@ -1442,7 +1443,7 @@ func main() {
 			if outputFlagProvided {
 				cliOutputPath = outputFilename
 			}
-			err := RunCLI([]string{"."}, targetPlatform, VerboseMode, QuietMode, *optTimeout, UpdateDepsFlag, SingleFlag, cliOutputPath)
+			err := RunCLI([]string{"."}, targetPlatform, VerboseMode, QuietMode, *optTimeout, UpdateDepsFlag, SingleFlag, cliOutputPath, *depsFlag)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
@@ -1450,7 +1451,7 @@ func main() {
 			return
 		}
 		// No .vibe67 files - show help
-		RunCLI([]string{"help"}, targetPlatform, VerboseMode, QuietMode, *optTimeout, UpdateDepsFlag, SingleFlag, "")
+		RunCLI([]string{"help"}, targetPlatform, VerboseMode, QuietMode, *optTimeout, UpdateDepsFlag, SingleFlag, "", *depsFlag)
 		return
 	}
 
@@ -1491,7 +1492,7 @@ func main() {
 			inlineFlagProvided = false
 		}
 
-		err = CompileC67(tmpFilename, writeToFilename, targetPlatform)
+		err = CompileC67WithOptions(tmpFilename, writeToFilename, targetPlatform, *optTimeout, VerboseMode, *depsFlag)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			os.Exit(1)
@@ -1528,7 +1529,7 @@ func main() {
 					writeToFilename = strings.TrimSuffix(filepath.Base(file), ".vibe67")
 				}
 
-				err := CompileC67(file, writeToFilename, targetPlatform)
+				err := CompileC67WithOptions(file, writeToFilename, targetPlatform, *optTimeout, VerboseMode, *depsFlag)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "%v\n", err)
 					os.Exit(1)

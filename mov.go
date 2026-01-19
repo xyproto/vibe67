@@ -527,6 +527,9 @@ func envBool(name string) bool {
 }
 
 func (o *Out) callSymbolX86(symbol string) {
+	if strings.Contains(symbol, "arena") {
+		fmt.Fprintf(os.Stderr, "DEBUG: CallSymbol(%s) at text position %d (0x%X)\n", symbol, o.eb.text.Len(), o.eb.text.Len())
+	}
 	// Emit CALL instruction
 	// On Windows: use indirect call (FF 15) for consistency with GenerateCallInstruction
 	// On other OS: use direct call (E8)

@@ -34,11 +34,12 @@ type CommandContext struct {
 	UpdateDeps bool
 	SingleFile bool
 	OutputPath string
+	DepsOnly   bool
 }
 
 // RunCLI is the main entry point for the user-friendly CLI
 // It determines which command to run based on arguments
-func RunCLI(args []string, platform Platform, verbose, quiet bool, optTimeout float64, updateDeps, singleFile bool, outputPath string) error {
+func RunCLI(args []string, platform Platform, verbose, quiet bool, optTimeout float64, updateDeps, singleFile bool, outputPath string, depsOnly bool) error {
 	ctx := &CommandContext{
 		Args:       args,
 		Platform:   platform,
@@ -48,6 +49,7 @@ func RunCLI(args []string, platform Platform, verbose, quiet bool, optTimeout fl
 		UpdateDeps: updateDeps,
 		SingleFile: singleFile,
 		OutputPath: outputPath,
+		DepsOnly:   depsOnly,
 	}
 
 	// No arguments - show help
@@ -182,7 +184,7 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 	// Compile - if multiple files, concatenate and compile
 	var err error
 	if len(inputFiles) == 1 {
-		err = CompileC67WithOptions(inputFiles[0], outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+		err = CompileC67WithOptions(inputFiles[0], outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose, ctx.DepsOnly)
 	} else {
 		// Multi-file: concatenate sources
 		var combinedSource strings.Builder
@@ -215,7 +217,7 @@ func cmdBuild(ctx *CommandContext, args []string) error {
 		tmpFile.Close()
 
 		// Compile the combined file
-		err = CompileC67WithOptions(tmpPath, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+		err = CompileC67WithOptions(tmpPath, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose, ctx.DepsOnly)
 	}
 
 	if err != nil {
@@ -261,7 +263,7 @@ func cmdRun(ctx *CommandContext, args []string) error {
 	}
 
 	// Compile
-	err := CompileC67WithOptions(inputFile, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	err := CompileC67WithOptions(inputFile, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose, ctx.DepsOnly)
 	if err != nil {
 		return fmt.Errorf("compilation failed: %v", err)
 	}
@@ -310,7 +312,7 @@ func cmdRunShebang(ctx *CommandContext, scriptPath string, scriptArgs []string) 
 	defer func() { SingleFlag = oldSingleFlag }()
 
 	// Compile (quietly unless verbose mode)
-	err := CompileC67WithOptions(scriptPath, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	err := CompileC67WithOptions(scriptPath, tmpExec, ctx.Platform, ctx.OptTimeout, ctx.Verbose, ctx.DepsOnly)
 	if err != nil {
 		return fmt.Errorf("compilation failed: %v", err)
 	}
@@ -392,7 +394,7 @@ func cmdBuildDir(ctx *CommandContext, dirPath string) error {
 	SingleFlag = false
 	defer func() { SingleFlag = oldSingleFlag }()
 
-	err = CompileC67WithOptions(mainFile, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose)
+	err = CompileC67WithOptions(mainFile, outputPath, ctx.Platform, ctx.OptTimeout, ctx.Verbose, ctx.DepsOnly)
 	if err != nil {
 		return fmt.Errorf("compilation of %s failed: %v", mainFile, err)
 	}
@@ -525,7 +527,7 @@ func cmdTest(ctx *CommandContext, args []string) error {
 		SingleFlag = false // Allow importing from same directory
 
 		// Compile the test runner
-		err = CompileC67WithOptions(testRunnerPath, tmpExec, ctx.Platform, ctx.OptTimeout, false)
+		err = CompileC67WithOptions(testRunnerPath, tmpExec, ctx.Platform, ctx.OptTimeout, false, ctx.DepsOnly)
 		SingleFlag = oldSingleFlag
 
 		if err != nil {
@@ -611,6 +613,7 @@ FLAGS (can be used with any command):
     -o, --output <file>    Output executable filename (default: input name without .vibe67)
     -v, --verbose          Verbose mode (show detailed compilation info)
     -q, --quiet            Quiet mode (suppress progress messages)
+    -d                     Show dependency tree and DCE info, then exit (no file creation)
     --arch <arch>          Target architecture: amd64, arm64, riscv64 (default: amd64)
     --os <os>              Target OS: linux, darwin, freebsd (default: linux)
     --target <platform>    Target platform: amd64-linux, arm64-macos, etc.
