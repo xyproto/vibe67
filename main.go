@@ -296,9 +296,31 @@ func (eb *ExecutableBuilder) PatchPCRelocations(textAddr, rodataAddr uint64, rod
 		}
 
 		if !found {
-			if VerboseMode {
-				fmt.Fprintf(os.Stderr, "Warning: Symbol %s not found for PC relocation\n", reloc.symbolName)
+			fmt.Fprintf(os.Stderr, "ERROR: Symbol %s not found for PC relocation at offset 0x%X\n", reloc.symbolName, reloc.offset)
+			fmt.Fprintf(os.Stderr, "  Available labels (%d): ", len(eb.labels))
+			count := 0
+			for k := range eb.labels {
+				if count < 10 {
+					fmt.Fprintf(os.Stderr, "%s ", k)
+				}
+				count++
 			}
+			if count > 10 {
+				fmt.Fprintf(os.Stderr, "... (%d more)", count-10)
+			}
+			fmt.Fprintln(os.Stderr)
+			fmt.Fprintf(os.Stderr, "  Available consts (%d): ", len(eb.consts))
+			count = 0
+			for k := range eb.consts {
+				if count < 10 {
+					fmt.Fprintf(os.Stderr, "%s ", k)
+				}
+				count++
+			}
+			if count > 10 {
+				fmt.Fprintf(os.Stderr, "... (%d more)", count-10)
+			}
+			fmt.Fprintln(os.Stderr)
 			continue
 		}
 

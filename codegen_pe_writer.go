@@ -43,6 +43,10 @@ func (fc *C67Compiler) writePE(program *Program, outputPath string) error {
 		if strings.HasPrefix(funcName, "_vibe67") || strings.HasPrefix(funcName, "vibe67_") {
 			continue
 		}
+		// Skip Vibe67 built-in functions (they generate internal code)
+		if funcName == "println" || funcName == "print" || funcName == "len" || funcName == "push" || funcName == "pop" {
+			continue
+		}
 
 		// Check if this function belongs to a specific library
 		if libName, ok := fc.cFunctionLibs[funcName]; ok {

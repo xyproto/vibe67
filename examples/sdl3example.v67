@@ -69,7 +69,7 @@ running := 1
 // Use ! to get raw pointer bits (preserves all 64 bits)
 // Cast to our partial cstruct type for field access to common header
 // NOTE: sizeof(SDL_Event) returns our partial cstruct size (16), not the real size (128)
-event := c.malloc(128)! as SDL_Event
+event := (c.malloc(128) as SDL_Event)
 null_ptr := 0
 
 @ running > 0 max inf {

@@ -1,0 +1,5 @@
+double = x -> x * 2
+main = {
+  result := double(21)
+  println(result)
+}

@@ -1,39 +1,21 @@
 # TODO
 
-# TODO
+## Priority 0: CRITICAL - Windows PE Debugging
 
-## Priority 0: CRITICAL - Windows PE Completely Broken
+**CURRENT TASK:** Fix Windows PE executable crashes using bottom-up incremental testing.
 
-**STATUS:** Windows PE has NEVER worked. All tests fail (20+ investigated). All executables crash immediately.
+### Strategy
+1. Test minimal programs first (`main = { 42 }`)
+2. Add complexity incrementally (variables, functions, C FFI)
+3. Use sanity checks (-d flag shows DCE, validation detects bad addresses)
+4. Compare disassembly with working Linux ELF
+5. Test each level before moving to next
 
-### Investigation Summary (20 commits)
-PE format: ✅ 100% correct (headers, sections, IAT, entry point, stack, shadow space)
-Code generation: ❌ Produces corrupted/invalid bytes at multiple locations
-
-### Known Issues
-1. main() auto-call: Generates D8 FF FF FF 90 instead of valid CALL - WORKAROUND: skip it
-2. Arena init: Crashes at RVA 0x117C with invalid bytes `48 8B 3F 48 8B 3F 5E D5`
-3. malloc calls: Not resolving correctly OR call patching corrupts them
-
-### Crash Evidence
-- WITH arena init: Crash at 0x117C (our code) - ILLEGAL_INSTRUCTION
-- WITHOUT arena init: Crash in Windows DLL - ACCESS_VIOLATION
-- Simplest program (`x = 42`): Crashes
-- All Go tests: FAIL
-
-### Theories
-- PatchPECallsToIAT corrupts generated CALL instructions
-- IAT displacement math wrong for some calls
-- bytes.Buffer getting corrupted during generation
-- Fundamental incompatibility in Windows call generation
-
-### Options
-1. Compare with working Linux ELF byte-by-byte
-2. Generate minimal PE with zero malloc calls to isolate
-3. Rewrite PE call patching from scratch
-4. Declare Windows unsupported until major refactor
-
-**Recommendation:** Focus on Linux/ELF for now. Windows PE needs complete debugging or rewrite.
+### C FFI Design Decision
+- **SIMPLIFIED:** C FFI always uses raw pointers (no "!" suffix syntax)
+- Drop the "0=!" and "0=" operator ideas
+- Keep: `cptr`, `cstring` types + `as` casting at boundaries
+- C functions return/receive raw pointers directly
 
 ---
 

@@ -96,6 +96,7 @@ type C67Compiler struct {
 	cContext             bool                          // When true, compile expressions for C FFI (affects strings, pointers, ints)
 	currentArena         int                           // Current arena index (starts at 1 for global arena = meta-arena[0])
 	usesArenas           bool                          // Track if program uses any arena blocks
+	arenaInitCallOffset  int                           // Offset where we can patch in arena init call
 	arenaStack           []ArenaScope                  // Stack of active arena scopes
 	globalArenaInit      bool                          // Track if global arena has been initialized
 	importedFunctions    []string                      // Track imported C functions (malloc, free, etc.)
@@ -890,12 +891,11 @@ func (fc *C67Compiler) compileInternal(program *Program, outputPath string, deps
 	// This enables dynamic optimization for available CPU features
 	// Skip on Windows to avoid potential issues
 
-	fc.eb.DefineWritable("cpu_has_fma", "\x00")    // FMA3 support (Haswell 2013+)
-	fc.eb.DefineWritable("cpu_has_avx2", "\x00")   // AVX2 support (Haswell 2013+)
-	fc.eb.DefineWritable("cpu_has_popcnt", "\x00") // POPCNT support (Nehalem 2008+)
-	fc.eb.DefineWritable("cpu_has_avx512", "\x00") // AVX-512F support (Skylake-X 2017+)
-
 	if fc.eb.target.OS() != OSWindows {
+		fc.eb.DefineWritable("cpu_has_fma", "\x00")    // FMA3 support (Haswell 2013+)
+		fc.eb.DefineWritable("cpu_has_avx2", "\x00")   // AVX2 support (Haswell 2013+)
+		fc.eb.DefineWritable("cpu_has_popcnt", "\x00") // POPCNT support (Nehalem 2008+)
+		fc.eb.DefineWritable("cpu_has_avx512", "\x00") // AVX-512F support (Skylake-X 2017+)
 		// Check CPUID leaf 1 for FMA and POPCNT
 		fc.out.MovImmToReg("rax", "1")     // CPUID leaf 1
 		fc.out.XorRegWithReg("rcx", "rcx") // subleaf 0
@@ -990,17 +990,12 @@ func (fc *C67Compiler) compileInternal(program *Program, outputPath string, deps
 	}
 
 	// currentArena is already set to 1 in NewC67Compiler (representing meta-arena[0])
-	// Arena initialization is needed only if we actually use arenas
-	// (e.g., for string concat, list operations, etc.)
-	// IMPORTANT: This must come AFTER stack frame setup so malloc calls work correctly on Windows
-	if fc.usesArenas {
-		if VerboseMode || fc.eb.target.OS() == OSWindows {
-			fmt.Fprintf(os.Stderr, "DEBUG: Initializing arenas (usesArenas=%v, OS=%s)\n", fc.usesArenas, fc.eb.target.OS())
-		}
-		fc.initializeMetaArenaAndGlobalArena()
-	} else if fc.eb.target.OS() == OSWindows {
-		fmt.Fprintf(os.Stderr, "DEBUG: Skipping arena init on Windows (usesArenas=%v)\n", fc.usesArenas)
-	}
+	// Arena initialization will be added later if needed (tracked by usesArenas flag)
+	// We'll patch in a call to _vibe67_init_arenas before main if arenas are used
+	fc.arenaInitCallOffset = fc.eb.text.Len()
+	// Reserve space for potential arena init call (5 bytes: E8 xx xx xx xx)
+	// We'll patch this later if usesArenas becomes true
+	fc.out.Emit([]byte{0x90, 0x90, 0x90, 0x90, 0x90}) // 5 NOPs as placeholder
 
 	fc.pushDeferScope()
 
@@ -1039,34 +1034,18 @@ func (fc *C67Compiler) compileInternal(program *Program, outputPath string, deps
 	fc.patchJumpImmediate(skipLambdasJump+1, int32(skipLambdasTarget-skipLambdasEnd))
 
 	// Evaluate main (if it exists) to get the exit code BEFORE cleaning up arenas
-	_, exists := fc.variables["main"]
-	if exists {
-		if fc.lambdaVars["main"] {
-			if !fc.mainCalledAtTopLevel {
-				// Auto-call main lambda: load closure and call it
-				offset := fc.variables["main"]
-				fc.out.MovMemToXmm("xmm0", "rbp", -offset)
-				
-				// Convert closure pointer from float64 to integer in rax
-				fc.out.SubImmFromReg("rsp", 16)
-				fc.out.MovXmmToMem("xmm0", "rsp", 0)
-				fc.out.MovMemToReg("rax", "rsp", 0)
-				fc.out.AddImmToReg("rsp", 16)
-				
-				// Load function pointer from closure object (offset 0)
-				fc.out.MovMemToReg("r11", "rax", 0)
-				// Load environment pointer from closure object (offset 8)
-				fc.out.MovMemToReg("r15", "rax", 8)
-				
-				// Call the function pointer in r11
-				fc.out.CallRegister("r11")
-			} else {
-				fc.out.XorRegWithReg("xmm0", "xmm0")
-			}
-		} else {
-			fc.compileExpression(&IdentExpr{Name: "main"})
-		}
+	if fc.lambdaVars["main"] {
+		// main is a function/lambda - call it
+		fc.trackFunctionCall("main") // Mark main as used for DCE
+		
+		// Direct function call: lea rax, [main]; call rax
+		fc.out.LeaSymbolToReg("rax", "main")
+		fc.out.CallRegister("rax")
+	} else if _, exists := fc.variables["main"]; exists {
+		// main is a regular variable
+		fc.compileExpression(&IdentExpr{Name: "main"})
 	} else {
+		// No main - return 0
 		fc.out.XorRegWithReg("xmm0", "xmm0")
 	}
 
@@ -1217,8 +1196,57 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 				return fmt.Errorf("variable '%s' already defined (use <- to update) [currently at offset %d]", s.Name, fc.variables[s.Name])
 			}
 
+			// Check if this is a lambda/function - they don't need storage
+			isLambda := false
+			switch lambdaExpr := s.Value.(type) {
+			case *LambdaExpr:
+				isLambda = true
+				fc.lambdaVars[s.Name] = true
+				
+				// Register lambda for code generation
+				funcName := s.Name
+				fc.functionSignatures[funcName] = &FunctionSignature{
+					ParamCount:    len(lambdaExpr.Params),
+					VariadicParam: lambdaExpr.VariadicParam,
+					IsVariadic:    lambdaExpr.VariadicParam != "",
+				}
+				
+				if lambdaExpr.VariadicParam != "" {
+					fc.usesArenas = true
+				}
+				
+				pureFunctions := make(map[string]bool)
+				pureFunctions[funcName] = true
+				isPure := len(lambdaExpr.CapturedVars) == 0 && fc.isExpressionPure(lambdaExpr.Body, pureFunctions)
+				
+				capturedVarTypes := make(map[string]string)
+				for _, varName := range lambdaExpr.CapturedVars {
+					if typ, exists := fc.varTypes[varName]; exists {
+						capturedVarTypes[varName] = typ
+					} else {
+						capturedVarTypes[varName] = "number"
+					}
+				}
+				
+				fc.lambdaFuncs = append(fc.lambdaFuncs, LambdaFunc{
+					Name:             funcName,
+					Params:           lambdaExpr.Params,
+					VariadicParam:    lambdaExpr.VariadicParam,
+					Body:             lambdaExpr.Body,
+					CapturedVars:     lambdaExpr.CapturedVars,
+					CapturedVarTypes: capturedVarTypes,
+					IsNested:         lambdaExpr.IsNestedLambda,
+					IsPure:           isPure,
+				})
+				
+			case *PatternLambdaExpr, *MultiLambdaExpr:
+				isLambda = true
+				fc.lambdaVars[s.Name] = true
+			}
+
 			// Track module-level variables (defined outside any lambda) - allocate in .data
-			if fc.currentLambda == nil {
+			// BUT: lambdas/functions are compiled to code, not stored as data
+			if fc.currentLambda == nil && !isLambda {
 				fc.moduleLevelVars[s.Name] = true
 				// Allocate in .data section
 				dataOffset := len(fc.dataSection)
@@ -1228,7 +1256,7 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 				// Don't use stack offset for globals
 				fc.variables[s.Name] = -1 // Mark as global
 				fc.mutableVars[s.Name] = true
-			} else {
+			} else if !isLambda {
 				// Local variable - use stack
 				fc.updateStackOffset(16)
 				offset := fc.stackOffset
@@ -1262,12 +1290,6 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 					fmt.Fprintf(os.Stderr, "DEBUG: Setting varTypes[%s] = %s (mutable)\n", s.Name, exprType)
 				}
 			}
-
-			// Track if this is a lambda/function
-			switch s.Value.(type) {
-			case *LambdaExpr, *PatternLambdaExpr, *MultiLambdaExpr:
-				fc.lambdaVars[s.Name] = true
-			}
 		} else {
 			// = - Define immutable variable (can shadow existing immutable, but not mutable)
 			if exists && fc.mutableVars[s.Name] {
@@ -1277,8 +1299,62 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 			} else {
 				// Create new immutable variable
 
+				// Check if this is a lambda/function - they don't need storage
+				isLambda := false
+				switch lambdaExpr := s.Value.(type) {
+				case *LambdaExpr:
+					isLambda = true
+					fc.lambdaVars[s.Name] = true
+					
+					// Register lambda for code generation
+					funcName := s.Name
+					fc.functionSignatures[funcName] = &FunctionSignature{
+						ParamCount:    len(lambdaExpr.Params),
+						VariadicParam: lambdaExpr.VariadicParam,
+						IsVariadic:    lambdaExpr.VariadicParam != "",
+					}
+					
+					// Variadic functions need arena allocation
+					if lambdaExpr.VariadicParam != "" {
+						fc.usesArenas = true
+					}
+					
+					// Detect if lambda is pure
+					pureFunctions := make(map[string]bool)
+					pureFunctions[funcName] = true
+					isPure := len(lambdaExpr.CapturedVars) == 0 && fc.isExpressionPure(lambdaExpr.Body, pureFunctions)
+					
+					// Capture types of captured variables
+					capturedVarTypes := make(map[string]string)
+					for _, varName := range lambdaExpr.CapturedVars {
+						if typ, exists := fc.varTypes[varName]; exists {
+							capturedVarTypes[varName] = typ
+						} else {
+							capturedVarTypes[varName] = "number"
+						}
+					}
+					
+					// Add to lambdaFuncs
+					fc.lambdaFuncs = append(fc.lambdaFuncs, LambdaFunc{
+						Name:             funcName,
+						Params:           lambdaExpr.Params,
+						VariadicParam:    lambdaExpr.VariadicParam,
+						Body:             lambdaExpr.Body,
+						CapturedVars:     lambdaExpr.CapturedVars,
+						CapturedVarTypes: capturedVarTypes,
+						IsNested:         lambdaExpr.IsNestedLambda,
+						IsPure:           isPure,
+					})
+					
+				case *PatternLambdaExpr, *MultiLambdaExpr:
+					isLambda = true
+					fc.lambdaVars[s.Name] = true
+					// PatternLambda and MultiLambda will be handled during compileExpression
+				}
+
 				// Track module-level variables (defined outside any lambda) - allocate in .data
-				if fc.currentLambda == nil {
+				// BUT: lambdas/functions are compiled to code, not stored as data
+				if fc.currentLambda == nil && !isLambda {
 					fc.moduleLevelVars[s.Name] = true
 					// Allocate in .data section
 					dataOffset := len(fc.dataSection)
@@ -1288,7 +1364,7 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 					// Don't use stack offset for globals
 					fc.variables[s.Name] = -1 // Mark as global
 					fc.mutableVars[s.Name] = false
-				} else {
+				} else if !isLambda {
 					// Local variable - use stack
 					fc.updateStackOffset(16)
 					offset := fc.stackOffset
@@ -1324,12 +1400,6 @@ func (fc *C67Compiler) collectSymbols(stmt Statement) error {
 					if VerboseMode {
 						fmt.Fprintf(os.Stderr, "DEBUG: Setting varTypes[%s] = %s (immutable)\n", s.Name, exprType)
 					}
-				}
-
-				// Track if this is a lambda/function
-				switch s.Value.(type) {
-				case *LambdaExpr, *PatternLambdaExpr, *MultiLambdaExpr:
-					fc.lambdaVars[s.Name] = true
 				}
 			}
 		}
@@ -1717,6 +1787,15 @@ func (fc *C67Compiler) compileStatement(stmt Statement) {
 			if VerboseMode {
 				fmt.Fprintf(os.Stderr, "DEBUG compileStatement: compiling assignment '%s' (type: %T)\n", s.Name, s.Value)
 			}
+		}
+
+		// Check if this is a lambda/function
+		// Lambdas were already registered during collectSymbols, so skip them here
+		if fc.lambdaVars[s.Name] {
+			if VerboseMode {
+				fmt.Fprintf(os.Stderr, "DEBUG: Skipping lambda '%s' (already registered)\n", s.Name)
+			}
+			return
 		}
 
 		// Check if it's a global variable
@@ -8148,6 +8227,48 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fmt.Fprintf(os.Stderr, "DEBUG: *** generateRuntimeHelpers() called ***\n")
 	fmt.Fprintf(os.Stderr, "DEBUG: Used functions: %v\n", fc.usedFunctions)
 	fmt.Fprintf(os.Stderr, "DEBUG: usesArenas=%v\n", fc.usesArenas)
+	
+	// Define arena metadata symbols if arenas are used
+	// These must be defined before PatchPCRelocations is called
+	if fc.usesArenas {
+		fc.eb.DefineWritable("_vibe67_arena_meta", "\x00\x00\x00\x00\x00\x00\x00\x00")     // Pointer to arena array
+		fc.eb.DefineWritable("_vibe67_arena_meta_cap", "\x00\x00\x00\x00\x00\x00\x00\x00") // Capacity (number of slots)
+		fc.eb.DefineWritable("_vibe67_arena_meta_len", "\x00\x00\x00\x00\x00\x00\x00\x00") // Length (number of active arenas)
+		fc.eb.Define("_arena_null_error", "ERROR: Arena alloc returned NULL\n\x00")
+		fc.eb.Define("_malloc_failed_msg", "FATAL: malloc failed\n\x00")
+		
+		// Generate the runtime initialization function for arenas
+		// This will be called from _start before main
+		fc.generateArenaInitFunction()
+		
+		// Patch the NOP placeholder with a CALL to _vibe67_init_arenas
+		if fc.arenaInitCallOffset > 0 {
+			// Get the address of _vibe67_init_arenas
+			initFuncOffset, ok := fc.eb.labels["_vibe67_init_arenas"]
+			if ok {
+				// Calculate relative offset for CALL instruction
+				// CALL is 5 bytes: E8 xx xx xx xx (rel32)
+				// Offset is relative to NEXT instruction (after the CALL)
+				callFrom := fc.arenaInitCallOffset + 5
+				callTo := initFuncOffset
+				disp := int32(callTo - callFrom)
+				
+				// Patch the 5 NOPs with CALL instruction
+				textBytes := fc.eb.text.Bytes()
+				textBytes[fc.arenaInitCallOffset] = 0xE8 // CALL rel32
+				textBytes[fc.arenaInitCallOffset+1] = byte(disp)
+				textBytes[fc.arenaInitCallOffset+2] = byte(disp >> 8)
+				textBytes[fc.arenaInitCallOffset+3] = byte(disp >> 16)
+				textBytes[fc.arenaInitCallOffset+4] = byte(disp >> 24)
+				
+				fmt.Fprintf(os.Stderr, "DEBUG: Patched arena init call at offset 0x%X to call 0x%X (disp=%d)\n",
+					fc.arenaInitCallOffset, initFuncOffset, disp)
+			} else {
+				fmt.Fprintf(os.Stderr, "WARNING: Could not find _vibe67_init_arenas label\n")
+			}
+		}
+	}
+	
 	// Arena runtime functions are generated inline below (_vibe67_arena_create, alloc, etc)
 
 	// Generate syscall-based printf runtime on Linux
@@ -10547,22 +10668,14 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 }
 
 // initializeMetaArenaAndGlobalArena initializes the meta-arena and creates arena 0 (default arena)
+// This function is DEPRECATED - use generateArenaInitFunction() instead
+// This generates INLINE initialization code in _start (before main())
 func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
-	// Define arena metadata symbols now that we know arenas are used
-	fc.eb.DefineWritable("_vibe67_arena_meta", "\x00\x00\x00\x00\x00\x00\x00\x00")     // Pointer to arena array
-	fc.eb.DefineWritable("_vibe67_arena_meta_cap", "\x00\x00\x00\x00\x00\x00\x00\x00") // Capacity (number of slots)
-	fc.eb.DefineWritable("_vibe67_arena_meta_len", "\x00\x00\x00\x00\x00\x00\x00\x00") // Length (number of active arenas)
-	fc.eb.Define("_arena_null_error", "ERROR: Arena alloc returned NULL\n\x00")
-
+	// NOTE: Symbols are now defined in generateRuntimeHelpers()
+	// This function now only generates the initialization CODE
+	
 	// Initialize meta-arena system - all arenas are malloc'd at runtime
 	const initialCapacity = 4
-
-	// DEBUG: Print that we're starting initialization
-	if false { // Set to true for debugging
-		fc.out.LeaSymbolToReg("rdi", "_str_debug_default_arena")
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
-	}
 
 	// Allocate meta-arena array (platform-specific)
 	if fc.eb.target.OS() == OSWindows {
@@ -10700,6 +10813,145 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 	fc.out.MovImmToReg("rcx", "1")
 	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta_len")
 	fc.out.MovRegToMem("rcx", "rbx", 0)
+}
+
+// generateArenaInitFunction generates a standalone function _vibe67_init_arenas
+// that initializes the meta-arena system. This should be called from _start before main.
+func (fc *C67Compiler) generateArenaInitFunction() {
+	fc.eb.MarkLabel("_vibe67_init_arenas")
+	
+	// Function prologue
+	fc.out.PushReg("rbp")
+	fc.out.MovRegToReg("rbp", "rsp")
+	fc.out.PushReg("rbx")
+	fc.out.PushReg("r12")
+	
+	const initialCapacity = 4
+	
+	// Allocate meta-arena array (platform-specific)
+	if fc.eb.target.OS() == OSWindows {
+		// Windows: use HeapAlloc from kernel32
+		shadowSpace := fc.allocateShadowSpace()
+		fc.cFunctionLibs["GetProcessHeap"] = "kernel32"
+		fc.trackFunctionCall("GetProcessHeap")
+		fc.eb.GenerateCallInstruction("GetProcessHeap")
+		fc.deallocateShadowSpace(shadowSpace)
+		fc.out.MovRegToReg("r12", "rax") // Save heap handle in r12
+		
+		shadowSpace = fc.allocateShadowSpace()
+		fc.out.MovRegToReg("rcx", "r12") // hHeap
+		fc.out.MovImmToReg("rdx", "0") // dwFlags = 0
+		fc.out.MovImmToReg("r8", fmt.Sprintf("%d", 8*initialCapacity)) // dwBytes
+		fc.cFunctionLibs["HeapAlloc"] = "kernel32"
+		fc.trackFunctionCall("HeapAlloc")
+		fc.eb.GenerateCallInstruction("HeapAlloc")
+		fc.deallocateShadowSpace(shadowSpace)
+	} else {
+		// Linux: use mmap syscall
+		fc.out.MovImmToReg("rdi", "0")
+		fc.out.MovImmToReg("rsi", fmt.Sprintf("%d", 8*initialCapacity))
+		fc.out.MovImmToReg("rdx", "3")
+		fc.out.MovImmToReg("r10", "34")
+		fc.out.MovImmToReg("r8", "-1")
+		fc.out.MovImmToReg("r9", "0")
+		fc.out.MovImmToReg("rax", "9")
+		fc.out.Syscall()
+	}
+	
+	// Store meta-arena array pointer
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta")
+	fc.out.MovRegToMem("rax", "rbx", 0)
+	
+	// Set meta-arena capacity
+	fc.out.MovImmToReg("rcx", fmt.Sprintf("%d", initialCapacity))
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta_cap")
+	fc.out.MovRegToMem("rcx", "rbx", 0)
+	
+	// Create default arena (arena 0) - 1MB buffer
+	if fc.eb.target.OS() == OSWindows {
+		shadowSpace := fc.allocateShadowSpace()
+		fc.out.MovRegToReg("rcx", "r12") // hHeap
+		fc.out.MovImmToReg("rdx", "0") // dwFlags = 0
+		fc.out.MovImmToReg("r8", "1048576") // dwBytes = 1MB
+		fc.trackFunctionCall("HeapAlloc")
+		fc.eb.GenerateCallInstruction("HeapAlloc")
+		fc.deallocateShadowSpace(shadowSpace)
+	} else {
+		fc.out.MovImmToReg("rdi", "0")
+		fc.out.MovImmToReg("rsi", "1048576")
+		fc.out.MovImmToReg("rdx", "3")
+		fc.out.MovImmToReg("r10", "34")
+		fc.out.MovImmToReg("r8", "-1")
+		fc.out.MovImmToReg("r9", "0")
+		fc.out.MovImmToReg("rax", "9")
+		fc.out.Syscall()
+	}
+	
+	// Check if allocation failed
+	fc.out.TestRegReg("rax", "rax")
+	allocOkJump := fc.eb.text.Len()
+	fc.out.JumpConditional(JumpNotEqual, 0) // jne alloc_ok
+	
+	// Allocation failed - exit
+	if fc.eb.target.OS() == OSWindows {
+		shadowSpace := fc.allocateShadowSpace()
+		fc.out.MovImmToReg("rcx", "1") // exit code 1
+		fc.trackFunctionCall("ExitProcess")
+		fc.eb.GenerateCallInstruction("ExitProcess")
+		fc.deallocateShadowSpace(shadowSpace)
+	} else {
+		fc.out.MovImmToReg("rdi", "1")
+		fc.out.MovImmToReg("rax", "60")
+		fc.out.Syscall()
+	}
+	
+	// alloc_ok:
+	allocOkLabel := fc.eb.text.Len()
+	fc.patchJumpImmediate(allocOkJump+2, int32(allocOkLabel-(allocOkJump+6)))
+	
+	// Save arena buffer in r13
+	fc.out.MovRegToReg("r13", "rax")
+	
+	// Allocate arena struct (32 bytes)
+	if fc.eb.target.OS() == OSWindows {
+		shadowSpace := fc.allocateShadowSpace()
+		fc.out.MovRegToReg("rcx", "r12") // hHeap
+		fc.out.MovImmToReg("rdx", "0") // dwFlags = 0
+		fc.out.MovImmToReg("r8", "32") // dwBytes
+		fc.trackFunctionCall("HeapAlloc")
+		fc.eb.GenerateCallInstruction("HeapAlloc")
+		fc.deallocateShadowSpace(shadowSpace)
+	} else {
+		fc.out.MovImmToReg("rdi", "32")
+		fc.trackFunctionCall("malloc")
+		fc.eb.GenerateCallInstruction("malloc")
+	}
+	
+	// Initialize arena struct
+	fc.out.MovRegToMem("r13", "rax", 0) // base = buffer
+	fc.out.MovImmToReg("rcx", "1048576")
+	fc.out.MovRegToMem("rcx", "rax", 8) // capacity = 1MB
+	fc.out.XorRegWithReg("rcx", "rcx")
+	fc.out.MovRegToMem("rcx", "rax", 16) // used = 0
+	fc.out.MovImmToReg("rcx", "8")
+	fc.out.MovRegToMem("rcx", "rax", 24) // alignment = 8
+	
+	// Store arena struct pointer in meta-arena[0]
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta")
+	fc.out.MovMemToReg("rbx", "rbx", 0) // rbx = meta-arena array
+	fc.out.MovRegToMem("rax", "rbx", 0) // meta-arena[0] = arena struct
+	
+	// Set meta-arena len = 1
+	fc.out.MovImmToReg("rcx", "1")
+	fc.out.LeaSymbolToReg("rbx", "_vibe67_arena_meta_len")
+	fc.out.MovRegToMem("rcx", "rbx", 0)
+	
+	// Function epilogue
+	fc.out.PopReg("r12")
+	fc.out.PopReg("rbx")
+	fc.out.MovRegToReg("rsp", "rbp")
+	fc.out.PopReg("rbp")
+	fc.out.Ret()
 }
 
 // cleanupAllArenas frees all arenas in the meta-arena
