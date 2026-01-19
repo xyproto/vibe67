@@ -841,11 +841,15 @@ func (fc *C67Compiler) Compile(program *Program, outputPath string) error {
 	//   After push rbp: rsp -= 8, now rsp is 16-byte aligned
 	//   After push rbx: rsp -= 8, now rsp+8 is 16-byte aligned
 	//   We need rsp to be 16-byte aligned before calls, so subtract 8 more
-	// Windows PE: On entry, rsp is already 16-byte aligned (no return address)
-	//   After push rbp: rsp -= 8, now rsp is at offset 8 (misaligned)
-	//   After push rbx: rsp -= 8, now rsp is 16-byte aligned
-	//   No additional adjustment needed
+	// Windows PE: OS calls entry point with CALL, so there IS a return address
+	//   On entry: rsp = aligned+8 (return address on stack)
+	//   After push rbp: rsp -= 8, now rsp is 16-byte aligned
+	//   After push rbx: rsp -= 8, now rsp is at offset 8 (misaligned)
+	//   Before any call, rsp must be 16-byte aligned, so subtract 8
 	if fc.eb.target.OS() != OSWindows {
+		fc.out.SubImmFromReg("rsp", 8)
+	} else {
+		// Windows also needs 8-byte adjustment after prologue
 		fc.out.SubImmFromReg("rsp", 8)
 	}
 
