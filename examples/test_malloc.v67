@@ -1,7 +1,0 @@
-main = {
-    printf("Before malloc\n")
-    ptr = c.malloc(16)
-    printf("After malloc\n")
-    c.free(ptr)
-    printf("Done\n")
-}

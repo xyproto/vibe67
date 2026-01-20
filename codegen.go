@@ -17380,53 +17380,37 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		EmitPointerToFloat64(fc.out, "xmm0", "rax")
 
 	case "malloc":
-		// malloc(size) - C malloc for heap allocation
+		// malloc(size) - Allocate from default arena (arena 1 = meta-arena[0])
 		if len(call.Args) != 1 {
 			compilerError("malloc() requires 1 argument (size)")
 		}
 
+		fc.usesArenas = true
+
+		// Compile size argument
 		fc.compileExpression(call.Args[0])
-		fc.out.Cvttsd2si("rdi", "xmm0")
-		
-		if fc.eb.target.OS() == OSWindows {
-			fc.out.MovRegToReg("rcx", "rdi")
-			shadowSpace := fc.allocateShadowSpace()
-			fc.cFunctionLibs["malloc"] = "msvcrt"
-			fc.trackFunctionCall("malloc")
-			fc.eb.GenerateCallInstruction("malloc")
-			fc.deallocateShadowSpace(shadowSpace)
-		} else {
-			fc.cFunctionLibs["malloc"] = "libc"
-			fc.trackFunctionCall("malloc")
-			fc.eb.GenerateCallInstruction("malloc")
-		}
-		
-		EmitPointerToFloat64(fc.out, "xmm0", "rax")
+		fc.out.Cvttsd2si("rsi", "xmm0") // size in rsi
+
+		// Load default arena pointer from meta-arena[0]
+		fc.out.LeaSymbolToReg("rdi", "_vibe67_arena_meta")
+		fc.out.MovMemToReg("rdi", "rdi", 0) // rdi = meta-arena array pointer
+		fc.out.MovMemToReg("rdi", "rdi", 0) // rdi = arena struct pointer (meta-arena[0])
+
+		// Call _vibe67_arena_alloc(arena=rdi, size=rsi) -> returns pointer in xmm0
+		fc.trackFunctionCall("_vibe67_arena_alloc")
+		fc.eb.GenerateCallInstruction("_vibe67_arena_alloc")
 
 	case "free":
-		// free(ptr) - C free for heap deallocation
+		// free(ptr) - No-op, arena cleanup happens automatically
 		if len(call.Args) != 1 {
 			compilerError("free() requires 1 argument (ptr)")
 		}
 		
+		// Evaluate argument for side effects, then discard
 		fc.compileExpression(call.Args[0])
-		fc.out.Cvttsd2si("rdi", "xmm0")
 		
-		if fc.eb.target.OS() == OSWindows {
-			fc.out.MovRegToReg("rcx", "rdi")
-			shadowSpace := fc.allocateShadowSpace()
-			fc.cFunctionLibs["free"] = "msvcrt"
-			fc.trackFunctionCall("free")
-			fc.eb.GenerateCallInstruction("free")
-			fc.deallocateShadowSpace(shadowSpace)
-		} else {
-			fc.cFunctionLibs["free"] = "libc"
-			fc.trackFunctionCall("free")
-			fc.eb.GenerateCallInstruction("free")
-		}
-		
-		fc.out.XorRegWithReg("rax", "rax")
-		EmitPointerToFloat64(fc.out, "xmm0", "rax")
+		// No-op: arena cleanup is automatic
+		fc.out.XorRegWithReg("xmm0", "xmm0")
 
 	case "dlopen":
 		// dlopen(path, flags) - Open a dynamic library
