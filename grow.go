@@ -32,8 +32,7 @@ func (fc *C67Compiler) generateMetaArenaGrowth() {
 	fc.out.MovMemToReg("rdi", "rbx", 0) // rdi = old meta-arena pointer
 	fc.out.MovRegToReg("rsi", "r14")
 	fc.out.ShlImmReg("rsi", 3) // rsi = new_capacity * 8
-	fc.trackFunctionCall("realloc")
-	fc.eb.GenerateCallInstruction("realloc")
+	fc.callFunction("realloc", "")
 
 	// Check if realloc failed
 	fc.out.TestRegReg("rax", "rax")
@@ -117,8 +116,7 @@ func (fc *C67Compiler) generateArenaInitLoop() {
 func (fc *C67Compiler) generateFirstMetaArenaAlloc() {
 	// Allocate meta-arena with 8 slots initially
 	fc.out.MovImmToReg("rdi", "64") // 8 slots * 8 bytes = 64
-	fc.trackFunctionCall("malloc")
-	fc.eb.GenerateCallInstruction("malloc")
+	fc.callFunction("malloc", "")
 
 	// Check if malloc failed
 	fc.out.TestRegReg("rax", "rax")
@@ -215,8 +213,7 @@ func (fc *C67Compiler) generateIndividualArenaGrowth(arenaGrowJump int) int {
 	// rdi = new_capacity, r8 = old buffer_ptr
 	fc.out.MovRegToReg("rsi", "rdi") // rsi = new_capacity
 	fc.out.MovRegToReg("rdi", "r8")  // rdi = old buffer_ptr
-	fc.trackFunctionCall("realloc")
-	fc.eb.GenerateCallInstruction("realloc")
+	fc.callFunction("realloc", "")
 
 	// Check if realloc failed
 	fc.out.TestRegReg("rax", "rax")

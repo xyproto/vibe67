@@ -53,8 +53,7 @@ func (fc *C67Compiler) generatePrintSyscall() {
 
 		fc.out.SubImmFromReg("rsp", 32) // Shadow space
 		fc.out.LeaSymbolToReg("rcx", charFmtLabel)
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 		fc.out.AddImmToReg("rsp", 32)
 
 		// Increment and loop
@@ -197,8 +196,7 @@ func (fc *C67Compiler) generatePrintlnSyscall() {
 
 		fc.out.SubImmFromReg("rsp", 32) // Shadow space
 		fc.out.LeaSymbolToReg("rcx", charFmtLabel)
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 		fc.out.AddImmToReg("rsp", 32)
 
 		// Increment and loop
@@ -217,8 +215,7 @@ func (fc *C67Compiler) generatePrintlnSyscall() {
 
 		fc.out.SubImmFromReg("rsp", 32)
 		fc.out.LeaSymbolToReg("rcx", newlineFmtLabel)
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 		fc.out.AddImmToReg("rsp", 32)
 
 		// Restore and return

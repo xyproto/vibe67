@@ -1113,16 +1113,12 @@ func (fc *C67Compiler) compileInternal(program *Program, outputPath string, deps
 			fc.allocateShadowSpace()
 			
 			// Register ExitProcess as coming from kernel32
-			fc.cFunctionLibs["ExitProcess"] = "kernel32"
-			
 			// Call ExitProcess from kernel32.dll
-			fc.trackFunctionCall("ExitProcess")
-			fc.eb.GenerateCallInstruction("ExitProcess")
+			fc.callFunction("ExitProcess", "kernel32")
 			// Note: ExitProcess never returns, so no cleanup needed
 		} else {
 			// Linux/Unix: call exit() with code in rdi
-			fc.trackFunctionCall("exit")
-			fc.eb.GenerateCallInstruction("exit")
+			fc.callFunction("exit", "")
 		}
 	} else {
 		// Use direct syscall exit on Linux (works with syscall-based printf)
@@ -2415,8 +2411,7 @@ func (fc *C67Compiler) compileSpawnStmt(stmt *SpawnStmt) {
 	// Flush all output streams before exiting
 	// Call fflush(NULL) to flush all streams
 	fc.out.MovImmToReg("rdi", "0") // NULL = 0
-	fc.trackFunctionCall("fflush")
-	fc.eb.GenerateCallInstruction("fflush")
+	fc.callFunction("fflush", "")
 
 	// Exit child process with status 0
 	fc.out.MovImmToReg("rax", "60") // exit syscall number
@@ -2750,13 +2745,11 @@ func (fc *C67Compiler) compileRangeLoop(stmt *LoopStmt, rangeExpr *RangeExpr) {
 			// Exceeded max iterations - print error and exit
 			// printf("Error: Loop exceeded max iterations\n")
 			fc.out.LeaSymbolToReg("rdi", "_loop_max_exceeded_msg")
-			fc.trackFunctionCall("printf")
-			fc.eb.GenerateCallInstruction("printf")
+			fc.callFunction("printf", "")
 
 			// exit(1)
 			fc.out.MovImmToReg("rdi", "1")
-			fc.trackFunctionCall("exit")
-			fc.eb.GenerateCallInstruction("exit")
+			fc.callFunction("exit", "")
 
 			// Patch the jump to skip error handling
 			notExceededPos := fc.eb.text.Len()
@@ -3439,8 +3432,7 @@ func (fc *C67Compiler) compileParallelRangeLoop(stmt *LoopStmt, rangeExpr *Range
 		fc.out.MovImmToReg("rsi", "0")                         // attr = NULL (arg 2)
 		fc.out.LeaSymbolToReg("rdx", "_parallel_thread_entry") // start_routine (arg 3)
 		fc.out.MovRegToReg("rcx", "r13")                       // arg = thread args (arg 4)
-		fc.trackFunctionCall("pthread_create")
-		fc.eb.GenerateCallInstruction("pthread_create")
+		fc.callFunction("pthread_create", "")
 
 		// Check if pthread_create succeeded (returns 0 on success)
 		fc.out.TestRegReg("rax", "rax")
@@ -3449,8 +3441,7 @@ func (fc *C67Compiler) compileParallelRangeLoop(stmt *LoopStmt, rangeExpr *Range
 
 		// pthread_create failed - print error and exit
 		fc.out.MovImmToReg("rdi", "1")
-		fc.trackFunctionCall("exit")
-		fc.eb.GenerateCallInstruction("exit")
+		fc.callFunction("exit", "")
 
 		// Success - continue to next thread
 		createSuccessPos := fc.eb.text.Len()
@@ -5071,8 +5062,7 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 				fc.out.MovRegToReg("rdx", "rcx")
 				fc.out.ShlImmReg("rdx", 4)
 
-				fc.trackFunctionCall("memcpy")
-				fc.eb.GenerateCallInstruction("memcpy")
+				fc.callFunction("memcpy", "")
 
 				fc.out.PopReg("rcx")
 				fc.out.PopReg("rsi")
@@ -5461,8 +5451,7 @@ func (fc *C67Compiler) compileExpression(expr Expression) {
 		case "**":
 			// Power: call pow(base, exponent) from libm
 			// xmm0 = base, xmm1 = exponent -> result in xmm0
-			fc.trackFunctionCall("pow")
-			fc.eb.GenerateCallInstruction("pow")
+			fc.callFunction("pow", "")
 		case "::":
 			// Cons: prepend element to list
 			// xmm0 = element, xmm1 = list pointer
@@ -6789,8 +6778,7 @@ func (fc *C67Compiler) compileCastExpr(expr *CastExpr) {
 		// Call _vibe67_itoa(rdi=number) -> (rsi=buffer, rdx=length)
 		// Save r15 before call (it contains buffer pointer)
 		fc.out.PushReg("r15")
-		fc.trackFunctionCall("_vibe67_itoa")
-		fc.eb.GenerateCallInstruction("_vibe67_itoa")
+		fc.callFunction("_vibe67_itoa", "")
 		fc.out.PopReg("r15")
 
 		// _vibe67_itoa returns: rsi=buffer start, rdx=length
@@ -7389,13 +7377,11 @@ func (fc *C67Compiler) emitNullPointerCheck(reg string) {
 	// Null pointer detected - print error and exit
 	fc.out.LeaSymbolToReg("rdi", "_null_ptr_msg")
 	fc.out.XorRegWithReg("rax", "rax") // AL=0 for variadic function
-	fc.trackFunctionCall("printf")
-	fc.eb.GenerateCallInstruction("printf")
+	fc.callFunction("printf", "")
 
 	// exit(1)
 	fc.out.MovImmToReg("rdi", "1")
-	fc.trackFunctionCall("exit")
-	fc.eb.GenerateCallInstruction("exit")
+	fc.callFunction("exit", "")
 
 	// Patch the jump to skip error handling
 	okPos := fc.eb.text.Len()
@@ -7426,21 +7412,17 @@ func (fc *C67Compiler) emitBoundsCheck(indexReg, lengthReg string) {
 	negativePos := fc.eb.text.Len()
 	fc.out.LeaSymbolToReg("rdi", "_bounds_negative_msg")
 	fc.out.XorRegWithReg("rax", "rax") // AL=0 for variadic function
-	fc.trackFunctionCall("printf")
-	fc.eb.GenerateCallInstruction("printf")
+	fc.callFunction("printf", "")
 	fc.out.MovImmToReg("rdi", "1")
-	fc.trackFunctionCall("exit")
-	fc.eb.GenerateCallInstruction("exit")
+	fc.callFunction("exit", "")
 
 	// Index >= length error handler
 	tooLargePos := fc.eb.text.Len()
 	fc.out.LeaSymbolToReg("rdi", "_bounds_too_large_msg")
 	fc.out.XorRegWithReg("rax", "rax") // AL=0 for variadic function
-	fc.trackFunctionCall("printf")
-	fc.eb.GenerateCallInstruction("printf")
+	fc.callFunction("printf", "")
 	fc.out.MovImmToReg("rdi", "1")
-	fc.trackFunctionCall("exit")
-	fc.eb.GenerateCallInstruction("exit")
+	fc.callFunction("exit", "")
 
 	// Continue here if index is valid
 	okPos := fc.eb.text.Len()
@@ -8724,8 +8706,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 		// Calculate string length using strlen(r12)
 		fc.out.MovRegToReg("rdi", "r12") // Set argument for strlen
-		fc.trackFunctionCall("strlen")
-		fc.eb.GenerateCallInstruction("strlen")
+		fc.callFunction("strlen", "")
 		fc.out.MovRegToReg("r14", "rax") // r14 = string length
 
 		// Allocate C67 string map: 8 + (length * 16) bytes
@@ -9754,9 +9735,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		if fc.eb.target.OS() == OSWindows {
 			// Windows: use HeapAlloc from kernel32 (doesn't need CRT initialization)
 			shadowSpace := fc.allocateShadowSpace()
-			fc.cFunctionLibs["GetProcessHeap"] = "kernel32"
-			fc.trackFunctionCall("GetProcessHeap")
-			fc.eb.GenerateCallInstruction("GetProcessHeap")
+			fc.callFunction("GetProcessHeap", "kernel32")
 			fc.deallocateShadowSpace(shadowSpace)
 			fc.out.MovRegToReg("r13", "rax") // Save heap handle in r13
 			
@@ -9764,9 +9743,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 			fc.out.MovRegToReg("rcx", "r13") // hHeap
 			fc.out.MovImmToReg("rdx", "0")   // dwFlags = 0
 			fc.out.MovImmToReg("r8", "32")   // dwBytes = 32
-			fc.cFunctionLibs["HeapAlloc"] = "kernel32"
-			fc.trackFunctionCall("HeapAlloc")
-			fc.eb.GenerateCallInstruction("HeapAlloc")
+			fc.callFunction("HeapAlloc", "kernel32")
 			fc.deallocateShadowSpace(shadowSpace)
 		} else {
 			// Linux: use mmap (4096 bytes = 1 page)
@@ -9796,8 +9773,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 			fc.out.MovImmToReg("rdx", "0")   // dwFlags = 0
 			fc.out.MovRegToReg("r8", "r12")  // dwBytes = capacity
 			fc.cFunctionLibs["HeapAlloc"] = "kernel32"
-			fc.trackFunctionCall("HeapAlloc")
-			fc.eb.GenerateCallInstruction("HeapAlloc")
+			fc.callFunction("HeapAlloc", "")
 			fc.deallocateShadowSpace(shadowSpace)
 		} else {
 			// Linux: use mmap
@@ -9841,21 +9817,17 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		if fc.eb.target.OS() == OSWindows {
 			shadowSpace := fc.allocateShadowSpace()
 			fc.out.LeaSymbolToReg("rcx", "_vibe67_str_arena_alloc_error")
-			fc.trackFunctionCall("printf")
-			fc.eb.GenerateCallInstruction("printf")
+			fc.callFunction("printf", "")
 			fc.deallocateShadowSpace(shadowSpace)
 			shadowSpace = fc.allocateShadowSpace()
 			fc.out.MovImmToReg("rcx", "1")
-			fc.trackFunctionCall("exit")
-			fc.eb.GenerateCallInstruction("exit")
+			fc.callFunction("exit", "")
 			fc.deallocateShadowSpace(shadowSpace)
 		} else {
 			fc.out.LeaSymbolToReg("rdi", "_vibe67_str_arena_alloc_error")
-			fc.trackFunctionCall("printf")
-			fc.eb.GenerateCallInstruction("printf")
+			fc.callFunction("printf", "")
 			fc.out.MovImmToReg("rdi", "1")
-			fc.trackFunctionCall("exit")
-			fc.eb.GenerateCallInstruction("exit")
+			fc.callFunction("exit", "")
 		}
 
 		// Generate _vibe67_arena_alloc(arena_ptr, size) -> allocation_ptr
@@ -9888,8 +9860,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 		// Arena is NULL - print error and return NULL
 		fc.out.LeaSymbolToReg("rdi", "_arena_null_error")
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 		fc.out.XorRegWithReg("rax", "rax") // return NULL
 		fc.out.PopReg("r14")
 		fc.out.PopReg("r13")
@@ -9906,8 +9877,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		if false { // Disabled for now - causes stack alignment issues
 			fc.out.MovRegToReg("rsi", "rbx") // arena ptr in rsi for printf
 			fc.out.LeaSymbolToReg("rdi", "_str_debug_arena_value")
-			fc.trackFunctionCall("printf")
-			fc.eb.GenerateCallInstruction("printf")
+			fc.callFunction("printf", "")
 			// rbx is callee-saved, so it's preserved across the call
 		}
 
@@ -10013,8 +9983,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 				fc.out.MovRegToReg("rdi", "r8") // rdi = old buffer_ptr
 				fc.out.MovRegToReg("rsi", "r9") // rsi = new_capacity
 			}
-			fc.trackFunctionCall("realloc")
-			fc.eb.GenerateCallInstruction("realloc")
+			fc.callFunction("realloc", "")
 			fc.deallocateShadowSpace(shadowSpace)
 
 			// Check if realloc failed (returns NULL)
@@ -10054,14 +10023,12 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 			// Windows: use printf
 			shadowSpace := fc.allocateShadowSpace()
 			fc.out.LeaSymbolToReg("rcx", errorLabel)
-			fc.trackFunctionCall("printf")
-			fc.eb.GenerateCallInstruction("printf")
+			fc.callFunction("printf", "")
 			fc.deallocateShadowSpace(shadowSpace)
 
 			shadowSpace = fc.allocateShadowSpace()
 			fc.out.MovImmToReg("rcx", "1") // exit code 1
-			fc.trackFunctionCall("exit")
-			fc.eb.GenerateCallInstruction("exit")
+			fc.callFunction("exit", "")
 			fc.deallocateShadowSpace(shadowSpace)
 		} else {
 			// Linux: use write syscall
@@ -10167,8 +10134,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	fc.out.MovMemToReg("rdi", "rdi", 0) // rdi = meta-arena array pointer
 	fc.out.MovMemToReg("rdi", "rdi", 0) // rdi = arena[0] struct pointer
 	fc.out.MovImmToReg("rsi", "16")     // rsi = 16 bytes
-	fc.trackFunctionCall("_vibe67_arena_alloc")
-	fc.eb.GenerateCallInstruction("_vibe67_arena_alloc")
+	fc.callFunction("_vibe67_arena_alloc", "")
 	// rax now contains pointer to cons cell
 
 	// Write head (element) at [cell+0]
@@ -10413,8 +10379,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 	// Call _vibe67_arena_alloc(rdi=arena_ptr, rsi=size)
 	fc.out.MovRegToReg("rdi", "r15") // arena ptr in rdi
 	fc.out.MovRegToReg("rsi", "rax") // size in rsi
-	fc.trackFunctionCall("_vibe67_arena_alloc")
-	fc.eb.GenerateCallInstruction("_vibe67_arena_alloc")
+	fc.callFunction("_vibe67_arena_alloc", "")
 	fc.out.MovRegToReg("r12", "rax") // r12 = new list ptr
 
 	// Write length to new list
@@ -10526,8 +10491,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.SubImmFromReg("rsp", 32) // Shadow space
 		fc.out.LeaSymbolToReg("rcx", charFmtLabel)
 		// rdx already has the character
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 		fc.out.AddImmToReg("rsp", 32)
 
 		// Increment and loop
@@ -10546,8 +10510,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 		fc.out.SubImmFromReg("rsp", 32)
 		fc.out.LeaSymbolToReg("rcx", newlineFmtLabel)
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 		fc.out.AddImmToReg("rsp", 32)
 
 		// Restore
@@ -10678,8 +10641,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 		fc.out.SubImmFromReg("rsp", 32) // Shadow space
 		fc.out.LeaSymbolToReg("rcx", charFmtLabel2)
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 		fc.out.AddImmToReg("rsp", 32)
 
 		// Increment and loop
@@ -10796,8 +10758,7 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 		// HANDLE GetProcessHeap() - returns process heap handle
 		shadowSpace := fc.allocateShadowSpace()
 		fc.cFunctionLibs["GetProcessHeap"] = "kernel32"
-		fc.trackFunctionCall("GetProcessHeap")
-		fc.eb.GenerateCallInstruction("GetProcessHeap")
+		fc.callFunction("GetProcessHeap", "")
 		fc.deallocateShadowSpace(shadowSpace)
 		// rax now contains heap handle
 		fc.out.MovRegToReg("r12", "rax") // Save heap handle in r12
@@ -10808,8 +10769,7 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 		fc.out.MovImmToReg("rdx", "0") // dwFlags = 0
 		fc.out.MovImmToReg("r8", fmt.Sprintf("%d", 8*initialCapacity)) // dwBytes
 		fc.cFunctionLibs["HeapAlloc"] = "kernel32"
-		fc.trackFunctionCall("HeapAlloc")
-		fc.eb.GenerateCallInstruction("HeapAlloc")
+		fc.callFunction("HeapAlloc", "")
 		fc.deallocateShadowSpace(shadowSpace)
 	} else {
 		// Linux: use mmap syscall
@@ -10843,8 +10803,7 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 		fc.out.MovImmToReg("rdx", "0") // dwFlags = 0
 		fc.out.MovImmToReg("r8", "1048576") // dwBytes = 1MB
 		fc.cFunctionLibs["HeapAlloc"] = "kernel32"
-		fc.trackFunctionCall("HeapAlloc")
-		fc.eb.GenerateCallInstruction("HeapAlloc")
+		fc.callFunction("HeapAlloc", "")
 		fc.deallocateShadowSpace(shadowSpace)
 	} else {
 		// Linux: use mmap
@@ -10867,16 +10826,13 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 	if fc.eb.target.OS() == OSWindows {
 		shadowSpace := fc.allocateShadowSpace()
 		fc.out.LeaSymbolToReg("rcx", "_malloc_failed_msg")
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 		fc.deallocateShadowSpace(shadowSpace)
 		fc.out.MovImmToReg("rcx", "1") // exit code 1
-		fc.trackFunctionCall("exit")
-		fc.eb.GenerateCallInstruction("exit")
+		fc.callFunction("exit", "")
 	} else {
 		fc.out.LeaSymbolToReg("rdi", "_malloc_failed_msg")
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 		fc.out.MovImmToReg("rdi", "1")  // exit code 1
 		fc.out.MovImmToReg("rax", "60") // sys_exit
 		fc.out.Syscall()
@@ -10893,8 +10849,7 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 		// Windows: use HeapAlloc (r12 no longer has heap handle, need to get it again)
 		shadowSpace := fc.allocateShadowSpace()
 		fc.cFunctionLibs["GetProcessHeap"] = "kernel32"
-		fc.trackFunctionCall("GetProcessHeap")
-		fc.eb.GenerateCallInstruction("GetProcessHeap")
+		fc.callFunction("GetProcessHeap", "")
 		fc.deallocateShadowSpace(shadowSpace)
 		// rax now has heap handle
 		fc.out.PushReg("r12") // Save arena buffer
@@ -10903,8 +10858,7 @@ func (fc *C67Compiler) initializeMetaArenaAndGlobalArena() {
 		fc.out.MovImmToReg("rdx", "0") // dwFlags = 0
 		fc.out.MovImmToReg("r8", "32") // dwBytes
 		fc.cFunctionLibs["HeapAlloc"] = "kernel32"
-		fc.trackFunctionCall("HeapAlloc")
-		fc.eb.GenerateCallInstruction("HeapAlloc")
+		fc.callFunction("HeapAlloc", "")
 		fc.deallocateShadowSpace(shadowSpace)
 		fc.out.PopReg("r12") // Restore arena buffer
 	} else {
@@ -10958,8 +10912,7 @@ func (fc *C67Compiler) generateArenaInitFunction() {
 		// Windows: use HeapAlloc from kernel32
 		shadowSpace := fc.allocateShadowSpace()
 		fc.cFunctionLibs["GetProcessHeap"] = "kernel32"
-		fc.trackFunctionCall("GetProcessHeap")
-		fc.eb.GenerateCallInstruction("GetProcessHeap")
+		fc.callFunction("GetProcessHeap", "")
 		fc.deallocateShadowSpace(shadowSpace)
 		fc.out.MovRegToReg("r12", "rax") // Save heap handle in r12
 		
@@ -10968,8 +10921,7 @@ func (fc *C67Compiler) generateArenaInitFunction() {
 		fc.out.MovImmToReg("rdx", "0") // dwFlags = 0
 		fc.out.MovImmToReg("r8", fmt.Sprintf("%d", 8*initialCapacity)) // dwBytes
 		fc.cFunctionLibs["HeapAlloc"] = "kernel32"
-		fc.trackFunctionCall("HeapAlloc")
-		fc.eb.GenerateCallInstruction("HeapAlloc")
+		fc.callFunction("HeapAlloc", "")
 		fc.deallocateShadowSpace(shadowSpace)
 	} else {
 		// Linux: use mmap syscall
@@ -10999,8 +10951,7 @@ func (fc *C67Compiler) generateArenaInitFunction() {
 		fc.out.MovImmToReg("rdx", "0") // dwFlags = 0
 		fc.out.MovImmToReg("r8", "1048576") // dwBytes = 1MB
 		fc.cFunctionLibs["HeapAlloc"] = "kernel32"
-		fc.trackFunctionCall("HeapAlloc")
-		fc.eb.GenerateCallInstruction("HeapAlloc")
+		fc.callFunction("HeapAlloc", "")
 		fc.deallocateShadowSpace(shadowSpace)
 	} else {
 		fc.out.MovImmToReg("rdi", "0")
@@ -11022,8 +10973,7 @@ func (fc *C67Compiler) generateArenaInitFunction() {
 	if fc.eb.target.OS() == OSWindows {
 		shadowSpace := fc.allocateShadowSpace()
 		fc.out.MovImmToReg("rcx", "1") // exit code 1
-		fc.trackFunctionCall("ExitProcess")
-		fc.eb.GenerateCallInstruction("ExitProcess")
+		fc.callFunction("ExitProcess", "")
 		fc.deallocateShadowSpace(shadowSpace)
 	} else {
 		fc.out.MovImmToReg("rdi", "1")
@@ -11045,13 +10995,11 @@ func (fc *C67Compiler) generateArenaInitFunction() {
 		fc.out.MovImmToReg("rdx", "0") // dwFlags = 0
 		fc.out.MovImmToReg("r8", "32") // dwBytes
 		fc.cFunctionLibs["HeapAlloc"] = "kernel32"
-		fc.trackFunctionCall("HeapAlloc")
-		fc.eb.GenerateCallInstruction("HeapAlloc")
+		fc.callFunction("HeapAlloc", "")
 		fc.deallocateShadowSpace(shadowSpace)
 	} else {
 		fc.out.MovImmToReg("rdi", "32")
-		fc.trackFunctionCall("malloc")
-		fc.eb.GenerateCallInstruction("malloc")
+		fc.callFunction("malloc", "")
 	}
 	
 	// Initialize arena struct
@@ -11109,8 +11057,7 @@ func (fc *C67Compiler) cleanupAllArenas() {
 	if fc.eb.target.OS() == OSWindows {
 		shadowSpace := fc.allocateShadowSpace()
 		fc.cFunctionLibs["GetProcessHeap"] = "kernel32"
-		fc.trackFunctionCall("GetProcessHeap")
-		fc.eb.GenerateCallInstruction("GetProcessHeap")
+		fc.callFunction("GetProcessHeap", "")
 		fc.deallocateShadowSpace(shadowSpace)
 		fc.out.MovRegToReg("r12", "rax") // Save heap handle in r12 for entire cleanup
 	}
@@ -11137,8 +11084,7 @@ func (fc *C67Compiler) cleanupAllArenas() {
 		fc.out.MovImmToReg("rdx", "0")   // dwFlags = 0
 		fc.out.MovMemToReg("r8", "r9", 0) // lpMem = buffer_ptr (arena[0])
 		fc.cFunctionLibs["HeapFree"] = "kernel32"
-		fc.trackFunctionCall("HeapFree")
-		fc.eb.GenerateCallInstruction("HeapFree")
+		fc.callFunction("HeapFree", "")
 		fc.deallocateShadowSpace(shadowSpace)
 	} else {
 		// Linux: use munmap syscall
@@ -11155,8 +11101,7 @@ func (fc *C67Compiler) cleanupAllArenas() {
 		fc.out.MovRegToReg("rcx", "r12") // hHeap (still in r12 from previous HeapFree)
 		fc.out.MovImmToReg("rdx", "0")   // dwFlags = 0
 		fc.out.MovRegToReg("r8", "r9")   // lpMem = arena struct pointer
-		fc.trackFunctionCall("HeapFree")
-		fc.eb.GenerateCallInstruction("HeapFree")
+		fc.callFunction("HeapFree", "")
 		fc.deallocateShadowSpace(shadowSpace)
 	} else {
 		// Linux: use munmap syscall
@@ -11182,8 +11127,7 @@ func (fc *C67Compiler) cleanupAllArenas() {
 		fc.out.MovRegToReg("rcx", "r12") // hHeap (still in r12)
 		fc.out.MovImmToReg("rdx", "0")   // dwFlags = 0
 		fc.out.MovRegToReg("r8", "rbx")  // lpMem = meta-arena pointer
-		fc.trackFunctionCall("HeapFree")
-		fc.eb.GenerateCallInstruction("HeapFree")
+		fc.callFunction("HeapFree", "")
 		fc.deallocateShadowSpace(shadowSpace)
 	} else {
 		// Linux: use munmap
@@ -11435,8 +11379,7 @@ func (fc *C67Compiler) generateArenaEnsureCapacity() {
 	fc.patchJumpImmediate(fc.firstMetaArenaMallocErrorJump+2, int32(errorLabel-(fc.firstMetaArenaMallocErrorJump+6)))
 
 	fc.out.MovImmToReg("rdi", "1")
-	fc.trackFunctionCall("exit")
-	fc.eb.GenerateCallInstruction("exit")
+	fc.callFunction("exit", "")
 }
 
 func (fc *C67Compiler) compileStoredFunctionCall(call *CallExpr) {
@@ -11724,8 +11667,7 @@ func (fc *C67Compiler) compileMemoizedCall(call *CallExpr, lambda *LambdaFunc) {
 	fc.out.MovRegToReg("rdi", "r13")
 	fc.out.MovRegToReg("rsi", "rbx")
 	fc.out.SubImmFromReg("rsp", 16)
-	fc.trackFunctionCall("memcpy")
-	fc.eb.GenerateCallInstruction("memcpy")
+	fc.callFunction("memcpy", "")
 	fc.out.AddImmToReg("rsp", 16)
 
 	// Old cache is arena-allocated, no need to free (arena cleanup handles it)
@@ -12900,13 +12842,11 @@ func (fc *C67Compiler) compileRecursiveCall(call *CallExpr) {
 
 		// Exceeded max recursion - print error and exit
 		fc.out.LeaSymbolToReg("rdi", "_recursion_max_exceeded_msg")
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 
 		// exit(1)
 		fc.out.MovImmToReg("rdi", "1")
-		fc.trackFunctionCall("exit")
-		fc.eb.GenerateCallInstruction("exit")
+		fc.callFunction("exit", "")
 
 		// Patch the jump
 		notExceededPos := fc.eb.text.Len()
@@ -13966,8 +13906,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.eb.Define(labelName+"_z", strExpr.Value+"\x00")
 				shadowSpace := fc.allocateShadowSpace()
 				fc.out.LeaSymbolToReg(fc.getIntArgReg(0), labelName+"_z")
-				fc.trackFunctionCall("printf")
-				fc.eb.GenerateCallInstruction("printf")
+				fc.callFunction("printf", "")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
 			return
@@ -13986,14 +13925,12 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 			if fc.eb.target.OS() == OSLinux {
 				// Call syscall-based helper
 				shadowSpace := fc.allocateShadowSpace()
-				fc.trackFunctionCall("_vibe67_print_syscall")
-				fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
+				fc.callFunction("_vibe67_print_syscall", "")
 				fc.deallocateShadowSpace(shadowSpace)
 			} else {
 				// Call Windows helper (printf-based)
 				shadowSpace := fc.allocateShadowSpace()
-				fc.trackFunctionCall("_vibe67_print_syscall")
-				fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
+				fc.callFunction("_vibe67_print_syscall", "")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
 			return
@@ -14010,13 +13947,11 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 			if fc.eb.target.OS() == OSLinux {
 				shadowSpace := fc.allocateShadowSpace()
-				fc.trackFunctionCall("_vibe67_print_syscall")
-				fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
+				fc.callFunction("_vibe67_print_syscall", "")
 				fc.deallocateShadowSpace(shadowSpace)
 			} else {
 				shadowSpace := fc.allocateShadowSpace()
-				fc.trackFunctionCall("_vibe67_print_syscall")
-				fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
+				fc.callFunction("_vibe67_print_syscall", "")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
 			return
@@ -14034,8 +13969,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.out.MovRegToReg("r15", "rsp")
 
 				// Call _vibe67_itoa
-				fc.trackFunctionCall("_vibe67_itoa")
-				fc.eb.GenerateCallInstruction("_vibe67_itoa")
+				fc.callFunction("_vibe67_itoa", "")
 
 				// Write to stdout
 				fc.out.MovImmToReg("rax", "1")
@@ -14055,8 +13989,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.out.MovXmmToXmm("xmm1", "xmm0")
 				fc.out.MovqXmmToReg(fc.getIntArgReg(1), "xmm0")
 				fc.out.MovImmToReg("rax", "1")
-				fc.trackFunctionCall("printf")
-				fc.eb.GenerateCallInstruction("printf")
+				fc.callFunction("printf", "")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
 		}
@@ -14085,8 +14018,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.eb.Define(newlineLabel+"_z", "\n\x00") // null-terminated
 				shadowSpace := fc.allocateShadowSpace()
 				fc.out.LeaSymbolToReg(fc.getIntArgReg(0), newlineLabel+"_z")
-				fc.trackFunctionCall("printf")
-				fc.eb.GenerateCallInstruction("printf")
+				fc.callFunction("printf", "")
 				fc.deallocateShadowSpace(shadowSpace)
 			}
 			return
@@ -14111,8 +14043,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 					fc.eb.Define(spaceLabel+"_z", " \x00")
 					shadowSpace := fc.allocateShadowSpace()
 					fc.out.LeaSymbolToReg(fc.getIntArgReg(0), spaceLabel+"_z")
-					fc.trackFunctionCall("printf")
-					fc.eb.GenerateCallInstruction("printf")
+					fc.callFunction("printf", "")
 					fc.deallocateShadowSpace(shadowSpace)
 				}
 			}
@@ -14142,8 +14073,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 					shadowSpace := fc.allocateShadowSpace()
 					fc.out.LeaSymbolToReg(fc.getIntArgReg(0), fmtLabel)
 					fc.out.LeaSymbolToReg(fc.getIntArgReg(1), labelName+"_z")
-					fc.trackFunctionCall("printf")
-					fc.eb.GenerateCallInstruction("printf")
+					fc.callFunction("printf", "")
 					fc.deallocateShadowSpace(shadowSpace)
 				}
 			} else if argType == "string" {
@@ -14161,11 +14091,9 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				// Call helper function (syscall-based on Linux, printf-based on Windows)
 				shadowSpace := fc.allocateShadowSpace()
 				if fc.eb.target.OS() == OSLinux {
-					fc.trackFunctionCall("_vibe67_print_syscall")
-					fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
+					fc.callFunction("_vibe67_print_syscall", "")
 				} else {
-					fc.trackFunctionCall("_vibe67_string_print")
-					fc.eb.GenerateCallInstruction("_vibe67_string_print")
+					fc.callFunction("_vibe67_string_print", "")
 				}
 				fc.deallocateShadowSpace(shadowSpace)
 			} else if fstrExpr, ok := arg.(*FStringExpr); ok {
@@ -14181,11 +14109,9 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 				shadowSpace := fc.allocateShadowSpace()
 				if fc.eb.target.OS() == OSLinux {
-					fc.trackFunctionCall("_vibe67_print_syscall")
-					fc.eb.GenerateCallInstruction("_vibe67_print_syscall")
+					fc.callFunction("_vibe67_print_syscall", "")
 				} else {
-					fc.trackFunctionCall("_vibe67_string_print")
-					fc.eb.GenerateCallInstruction("_vibe67_string_print")
+					fc.callFunction("_vibe67_string_print", "")
 				}
 				fc.deallocateShadowSpace(shadowSpace)
 			} else if argType == "list" || argType == "map" {
@@ -14260,8 +14186,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 				// Set rax = 1 (one vector register used) for variadic printf
 				fc.out.MovImmToReg("rax", "1")
-				fc.trackFunctionCall("printf")
-				fc.eb.GenerateCallInstruction("printf")
+				fc.callFunction("printf", "")
 				fc.deallocateShadowSpace(shadowSpace)
 
 				// Increment index on stack
@@ -14296,8 +14221,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 					fc.out.MovRegToReg("r15", "rsp") // Save buffer pointer
 
 					// Call _vibe67_itoa(rdi=number)
-					fc.trackFunctionCall("_vibe67_itoa")
-					fc.eb.GenerateCallInstruction("_vibe67_itoa")
+					fc.callFunction("_vibe67_itoa", "")
 					// Returns: rsi=string start, rdx=length
 
 					// Write to stdout: write(1, rsi, rdx)
@@ -14320,8 +14244,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 					fc.out.MovXmmToXmm("xmm1", "xmm0")
 					fc.out.MovqXmmToReg(fc.getIntArgReg(1), "xmm0")
 					fc.out.MovImmToReg("rax", "1")
-					fc.trackFunctionCall("printf")
-					fc.eb.GenerateCallInstruction("printf")
+					fc.callFunction("printf", "")
 					fc.deallocateShadowSpace(shadowSpace)
 				}
 			}
@@ -14342,8 +14265,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 			fc.eb.Define(newlineLabel+"_z", "\n\x00")
 			shadowSpace := fc.allocateShadowSpace()
 			fc.out.LeaSymbolToReg(fc.getIntArgReg(0), newlineLabel+"_z")
-			fc.trackFunctionCall("printf")
-			fc.eb.GenerateCallInstruction("printf")
+			fc.callFunction("printf", "")
 			fc.deallocateShadowSpace(shadowSpace)
 		}
 		return
@@ -14605,8 +14527,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		// Stack should be 16-byte aligned at this point because:
 		// - Function prologue ensures alignment
 		// - All stack allocations (loops, variables) use multiples of 16 bytes
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 
 		// Flush stdout immediately on Linux to ensure correct output ordering
 		// (printf buffers output by default, which can cause ordering issues)
@@ -14617,8 +14538,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 			// Call fflush(stdout): fflush(NULL) flushes all streams
 			fc.out.XorRegWithReg("rdi", "rdi") // NULL argument flushes all streams
-			fc.trackFunctionCall("fflush")
-			fc.eb.GenerateCallInstruction("fflush")
+			fc.callFunction("fflush", "")
 
 			// Restore registers
 			fc.out.PopReg("rdi")
@@ -14700,8 +14620,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 					fc.out.MovRegToReg("r15", "rsp")
 
 					// Call _vibe67_itoa(rdi=number)
-					fc.trackFunctionCall("_vibe67_itoa")
-					fc.eb.GenerateCallInstruction("_vibe67_itoa")
+					fc.callFunction("_vibe67_itoa", "")
 					// Returns: rsi=string start, rdx=length
 
 					// Write to stderr: write(2, rsi, rdx)
@@ -14756,8 +14675,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 				fc.out.MovRegToReg("r15", "rsp")
 
 				// Call _vibe67_itoa(rdi=number)
-				fc.trackFunctionCall("_vibe67_itoa")
-				fc.eb.GenerateCallInstruction("_vibe67_itoa")
+				fc.callFunction("_vibe67_itoa", "")
 				// Returns: rsi=string start, rdx=length
 
 				// Write to stderr: write(2, rsi, rdx)
@@ -14899,8 +14817,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 						if needsConversion {
 							// Convert C67 string to C string
-							fc.trackFunctionCall("_vibe67_string_to_cstr")
-							fc.eb.GenerateCallInstruction("_vibe67_string_to_cstr")
+							fc.callFunction("_vibe67_string_to_cstr", "")
 							if targetReg != "" && strings.HasPrefix(targetReg, "xmm") {
 								fc.out.MovqRegToXmm(targetReg, "rax")
 							} else if targetReg != "" {
@@ -14926,15 +14843,13 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 					}
 				}
 
-				fc.trackFunctionCall("printf")
-				fc.eb.GenerateCallInstruction("printf")
+				fc.callFunction("printf", "")
 				fc.deallocateShadowSpace(shadowSpace)
 
 				// Flush stdout before exit to ensure message is printed
 				shadowSpace = fc.allocateShadowSpace()
 				fc.out.XorRegWithReg("rcx", "rcx") // fflush(NULL) flushes all streams
-				fc.trackFunctionCall("fflush")
-				fc.eb.GenerateCallInstruction("fflush")
+				fc.callFunction("fflush", "")
 				fc.deallocateShadowSpace(shadowSpace)
 			} else {
 				// Unix: For simple case with no extra args, just write to stderr (fd=2) using syscall
@@ -14972,8 +14887,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 							if needsConversion {
 								// Convert C67 string to C string
-								fc.trackFunctionCall("_vibe67_string_to_cstr")
-								fc.eb.GenerateCallInstruction("_vibe67_string_to_cstr")
+								fc.callFunction("_vibe67_string_to_cstr", "")
 							} else {
 								// Already a char* from C FFI - just convert from float64 representation to pointer
 								fc.out.MovqXmmToReg("rax", "xmm0")
@@ -14987,8 +14901,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 						}
 					}
 
-					fc.trackFunctionCall("dprintf")
-					fc.eb.GenerateCallInstruction("dprintf")
+					fc.callFunction("dprintf", "")
 				}
 			}
 
@@ -15004,12 +14917,10 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 			// Exit with appropriate code
 			if fc.platform.OS == OSWindows {
 				fc.out.MovImmToReg("rcx", fmt.Sprintf("%d", exitCode))
-				fc.trackFunctionCall("exit")
-				fc.eb.GenerateCallInstruction("exit")
+				fc.callFunction("exit", "")
 			} else {
 				fc.out.MovImmToReg("rdi", fmt.Sprintf("%d", exitCode))
-				fc.trackFunctionCall("exit")
-				fc.eb.GenerateCallInstruction("exit")
+				fc.callFunction("exit", "")
 			}
 			fc.hasExplicitExit = true
 
@@ -15049,8 +14960,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 					fc.eb.Define(fmtLabel, "%g\n\x00")
 					fc.out.LeaSymbolToReg("rdx", fmtLabel)
 					fc.out.MovImmToReg("rax", "1")
-					fc.trackFunctionCall("snprintf")
-					fc.eb.GenerateCallInstruction("snprintf")
+					fc.callFunction("snprintf", "")
 
 					fc.out.MovRegToReg("rdx", "rax")
 					fc.out.MovRegToReg("rsi", "rsp")
@@ -15087,8 +14997,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 					fc.eb.Define(fmtLabel, "%g\x00")
 					fc.out.LeaSymbolToReg("rdx", fmtLabel)
 					fc.out.MovImmToReg("rax", "1")
-					fc.trackFunctionCall("snprintf")
-					fc.eb.GenerateCallInstruction("snprintf")
+					fc.callFunction("snprintf", "")
 
 					fc.out.MovRegToReg("rdx", "rax")
 					fc.out.MovRegToReg("rsi", "rsp")
@@ -15103,8 +15012,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 		// Exit with code 1
 		fc.out.MovImmToReg("rdi", "1")
-		fc.trackFunctionCall("exit")
-		fc.eb.GenerateCallInstruction("exit")
+		fc.callFunction("exit", "")
 		fc.hasExplicitExit = true
 		return
 
@@ -15133,11 +15041,9 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		if fc.eb.target.OS() == OSWindows {
 			fc.allocateShadowSpace()
 			fc.cFunctionLibs["ExitProcess"] = "kernel32"
-			fc.trackFunctionCall("ExitProcess")
-			fc.eb.GenerateCallInstruction("ExitProcess")
+			fc.callFunction("ExitProcess", "")
 		} else {
-			fc.trackFunctionCall("exit")
-			fc.eb.GenerateCallInstruction("exit")
+			fc.callFunction("exit", "")
 		}
 
 	case "append":
@@ -15204,8 +15110,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovRegToReg("rdx", "rcx")
 		fc.out.ShlImmReg("rdx", 4) // size = old_count * 16
 
-		fc.trackFunctionCall("memcpy")
-		fc.eb.GenerateCallInstruction("memcpy")
+		fc.callFunction("memcpy", "")
 
 		// Restore saved values
 		fc.out.PopReg("rcx") // old count
@@ -15318,8 +15223,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovRegToReg("rdx", "r13")
 		fc.out.ShlImmReg("rdx", 4) // size = (count-1) * 16
 
-		fc.trackFunctionCall("memcpy")
-		fc.eb.GenerateCallInstruction("memcpy")
+		fc.callFunction("memcpy", "")
 
 		// Restore callee-saved registers
 		fc.out.PopReg("r15")
@@ -15532,8 +15436,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		if len(call.Args) != 0 {
 			compilerError("getpid() takes no arguments")
 		}
-		fc.trackFunctionCall("getpid")
-		fc.eb.GenerateCallInstruction("getpid")
+		fc.callFunction("getpid", "")
 		// Convert result from rax to xmm0
 		fc.out.Cvtsi2sd("xmm0", "rax")
 
@@ -16912,8 +16815,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		// rdi = C string (already in rax from _vibe67_string_to_cstr)
 		fc.out.MovRegToReg("rdi", "rax")
 		fc.out.XorRegWithReg("rsi", "rsi") // endptr = NULL
-		fc.trackFunctionCall("strtod")
-		fc.eb.GenerateCallInstruction("strtod")
+		fc.callFunction("strtod", "")
 		// Result in xmm0
 
 	case "upper":
@@ -17410,8 +17312,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovMemToReg("rdi", "rdi", 0) // rdi = arena struct pointer (meta-arena[0])
 
 		// Call _vibe67_arena_alloc(arena=rdi, size=rsi) -> returns pointer in xmm0
-		fc.trackFunctionCall("_vibe67_arena_alloc")
-		fc.eb.GenerateCallInstruction("_vibe67_arena_alloc")
+		fc.callFunction("_vibe67_arena_alloc", "")
 
 	case "free":
 		// free(ptr) - No-op, arena cleanup happens automatically
@@ -17609,8 +17510,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 		// Free the lineptr buffer
 		fc.out.MovMemToReg("rdi", "rsp", StackSlotSize) // Load lineptr from original position
-		fc.trackFunctionCall("free")
-		fc.eb.GenerateCallInstruction("free")
+		fc.callFunction("free", "")
 
 		// Restore result
 		fc.out.MovMemToXmm("xmm0", "rsp", 16)
@@ -17797,8 +17697,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.stringCounter++
 		fc.eb.Define(labelName, "w\x00")
 		fc.out.LeaSymbolToReg("rsi", labelName) // mode = "w"
-		fc.trackFunctionCall("fopen")
-		fc.eb.GenerateCallInstruction("fopen")
+		fc.callFunction("fopen", "")
 
 		// Check if fopen succeeded
 		fc.out.TestRegReg("rax", "rax")
@@ -17810,8 +17709,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 
 		// Get content length using strlen
 		fc.out.MovMemToReg("rdi", "rsp", StackSlotSize) // content
-		fc.trackFunctionCall("strlen")
-		fc.eb.GenerateCallInstruction("strlen")
+		fc.callFunction("strlen", "")
 		fc.out.PushReg("rax") // Save length
 
 		// Write file: fwrite(content, 1, length, file)
@@ -17819,13 +17717,11 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovImmToReg("rsi", "1")                    // element size = 1
 		fc.out.MovMemToReg("rdx", "rsp", 0)               // length
 		fc.out.MovMemToReg("rcx", "rsp", StackSlotSize)   // FILE*
-		fc.trackFunctionCall("fwrite")
-		fc.eb.GenerateCallInstruction("fwrite")
+		fc.callFunction("fwrite", "")
 
 		// Close file: fclose(file)
 		fc.out.MovMemToReg("rdi", "rsp", StackSlotSize) // FILE*
-		fc.trackFunctionCall("fclose")
-		fc.eb.GenerateCallInstruction("fclose")
+		fc.callFunction("fclose", "")
 
 		// Clean up stack (length + FILE* + content)
 		fc.out.AddImmToReg("rsp", StackSlotSize*3)
@@ -18222,8 +18118,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		}
 
 		// Call channel_create from runtime
-		fc.trackFunctionCall("channel_create")
-		fc.eb.GenerateCallInstruction("channel_create")
+		fc.callFunction("channel_create", "")
 
 		// Return channel pointer as float64
 		fc.out.Cvtsi2sd("xmm0", "rax")
@@ -18239,8 +18134,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.Cvttsd2si("rdi", "xmm0") // rdi = channel pointer
 
 		// Call channel_close from runtime
-		fc.trackFunctionCall("channel_close")
-		fc.eb.GenerateCallInstruction("channel_close")
+		fc.callFunction("channel_close", "")
 
 		// Return 0
 		fc.out.XorRegWithReg("rax", "rax")
@@ -18289,8 +18183,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovMemToReg("rdx", "rdx", arenaOffset) // rdx = arena pointer from slot
 
 		// Call the runtime function
-		fc.trackFunctionCall("_vibe67_list_update")
-		fc.eb.GenerateCallInstruction("_vibe67_list_update")
+		fc.callFunction("_vibe67_list_update", "")
 
 		// Convert result (rax = pointer) to float64 in xmm0
 		fc.out.SubImmFromReg("rsp", 8)
@@ -18315,8 +18208,7 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 		fc.out.MovRegToReg("rdx", "rax") // Second %lx
 		fc.out.LeaSymbolToReg("rdi", fmtLabel)
 		fc.out.XorRegWithReg("rax", "rax") // Clear rax (for variadic)
-		fc.trackFunctionCall("printf")
-		fc.eb.GenerateCallInstruction("printf")
+		fc.callFunction("printf", "")
 
 		// Return 0 in xmm0 (printa doesn't return meaningful value)
 		fc.out.XorpdXmm("xmm0", "xmm0")
@@ -18906,6 +18798,16 @@ func (fc *C67Compiler) trackFunctionCall(funcName string) {
 	fc.callOrder = append(fc.callOrder, funcName)
 }
 
+// callFunction is a unified helper for calling functions (C FFI or internal).
+// It handles tracking for DCE, library registration, and instruction emission.
+func (fc *C67Compiler) callFunction(funcName string, library string) error {
+	fc.trackFunctionCall(funcName)
+	if library != "" {
+		fc.cFunctionLibs[funcName] = library
+	}
+	return fc.eb.GenerateCallInstruction(funcName)
+}
+
 // callMallocAligned calls malloc with proper stack alignment.
 // This helper ensures the stack is 16-byte aligned before calling malloc,
 // which is required by the x86-64 System V ABI.
@@ -18959,11 +18861,9 @@ func (fc *C67Compiler) callMallocAligned(sizeReg string, pushCount int) {
 
 	// malloc returned NULL - print error and exit
 	fc.out.LeaSymbolToReg("rdi", "_malloc_failed_msg")
-	fc.trackFunctionCall("printf")
-	fc.eb.GenerateCallInstruction("printf")
+	fc.callFunction("printf", "")
 	fc.out.MovImmToReg("rdi", "1")
-	fc.trackFunctionCall("exit")
-	fc.eb.GenerateCallInstruction("exit")
+	fc.callFunction("exit", "")
 
 	// Patch the jump to skip error handling
 	okPos := fc.eb.text.Len()

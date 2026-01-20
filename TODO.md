@@ -32,17 +32,30 @@
    - More fixes may be needed
 
 ### Next Steps (in order)
-1. **Fix arena alloc() inside arena blocks**
+1. **Refactor function call tracking** - READY TO IMPLEMENT
+   - Created unified `callFunction(name, library)` helper (DONE ✅)
+   - Replace all `trackFunctionCall() + eb.GenerateCallInstruction()` pairs
+   - Replace all `cFunctionLibs[x]=lib + trackFunctionCall() + GenerateCallInstruction()` triples
+   - Simplifies code, reduces errors, easier maintenance
+   - Impact: ~300+ call sites to update across codegen.go, arm64_codegen.go, etc.
+
+2. **Ensure cross-platform consistency**
+   - When Windows/Linux/macOS-specific code is added, add to ALL platforms
+   - Check arena allocator (Windows uses HeapAlloc, Linux uses mmap, macOS needs VirtualAlloc equivalent)
+   - Check syscalls (exit, write, etc.)
+   - Check calling conventions (System V vs Microsoft x64)
+
+3. **Fix arena alloc() inside arena blocks**
    - Debug why arena[1] pointer is invalid
    - Check _vibe67_arena_ensure_capacity on Windows
    - Verify meta-arena initialization
 
-2. **Fix string conversion**
+4. **Fix string conversion**
    - Likely will be fixed once arena alloc() works
 
-3. **Run full test suite on Linux** - Many tests are Linux-specific (ELF, etc.)
+5. **Run full test suite on Linux** - Many tests are Linux-specific (ELF, etc.)
 
-4. **Clean up temporary test files** - Remove test executables and intermediate files
+6. **Clean up temporary test files** - Remove test executables and intermediate files
 
 ---
 
