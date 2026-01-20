@@ -1,0 +1,26 @@
+import sdl3 as sdl
+
+printf("About to init SDL\n")
+
+result := sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
+
+printf("SDL_Init returned: %d\n", result)
+
+result {
+    0 => {
+        printf("SDL initialized successfully\n")
+        
+        count := 0
+        @ count < 3 {
+            printf("Loop iteration %d\n", count)
+            count <- count + 1
+            sdl.SDL_Delay(500)
+        }
+        
+        sdl.SDL_Quit()
+        printf("SDL quit\n")
+    }
+    ~> {
+        printf("SDL_Init failed with code %d\n", result)
+    }
+}

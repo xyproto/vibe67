@@ -1,41 +1,46 @@
 # TODO
 
-## Priority 0: CRITICAL - Windows PE Arena Initialization Crash
+## Priority 0: CRITICAL - Windows Issues PARTIALLY FIXED
 
-**CURRENT STATUS:** Significant progress made, but arena programs still crash.
+**CURRENT STATUS:** Major loop bug fixed! Windows arenas still broken.
+
+### Recent Fixes ✅
+1. **FIXED: `max inf` loop bug** - Loops with `@ condition max inf` were exiting after 1 iteration
+   - Issue: `MaxIterations == math.MaxInt64` was being mov'd as `-1`, causing `cmp >= -1` to always be true
+   - Fix: Skip max iteration check entirely when `MaxIterations == math.MaxInt64`
+   - SDL3 example now loops properly!
+
+2. **FIXED: PE crash investigation** - Found multiple issues
+   - Bad address detection implemented
+   - IAT patching fixed
+   - Entry point calculation corrected
+
+### Remaining Issues
+1. **Windows Arena Allocator Broken** - Crashing with ACCESS_VIOLATION (0xC0000005)
+   - Changed from malloc to HeapAlloc/GetProcessHeap (kernel32.dll)
+   - Still crashes - needs deep debugging with WinDbg
+   - Linux arena works fine (uses mmap syscall)
+   - Affects: `arena { alloc(N) }` blocks
+   - **Workaround:** Use `c.malloc/c.free` instead of arena for now on Windows
+
+2. **Missing `_vibe67_arena_cleanup`** warning
+   - Warning appears but doesn't block compilation
+   - Need to implement cleanup function or adjust DCE guards
 
 ### What Works ✅
 1. Minimal programs (`main = { 42 }`) - EXIT CODE 42 ✅
-2. Variable arithmetic (`x = 10; y = 32; x + y`) - EXIT CODE 42 ✅
+2. Variable arithmetic (`x = 10; y = 32; x + y`) - EXIT CODE 42 ✅  
 3. Function calls (`add(20, 22)`) - EXIT CODE 42 ✅
-4. PC relocations for arena metadata - NO MORE 0xDEADBEEF ✅
-5. Arena init function generation - CALL patched correctly ✅
-6. No compiler errors or warnings ✅
+4. **Loops with `max inf`** - Now working! ✅
+5. **SDL3 rendering** - Window displays, loop runs ✅
+6. Compilation completes without errors ✅
+7. Tests pass on Linux ✅
 
-### What Doesn't Work ❌
-- Programs with arenas crash with ACCESS_VIOLATION (0xC0000005)
-- Arena init function appears to be called but crashes during execution
-
-### Investigation
-**Root cause identified:** Arena metadata symbols (_vibe67_arena_meta, etc.) were not defined when `usesArenas` was checked too early.
-
-**Fix applied:**
-1. Moved symbol definitions to `generateRuntimeHelpers()` (after code gen)
-2. Created `generateArenaInitFunction()` - standalone function for init
-3. Patch 5 NOPs at offset with CALL to `_vibe67_init_arenas`
-4. All relocations now patched correctly
-
-**Still failing:**
-- Runtime crash in arena init function execution
-- Likely issues: shadow space, calling conventions, HeapAlloc usage
-- Need WinDbg debugging to see exact crash location
-
-### Next Steps
-1. Debug with WinDbg to find exact crash instruction
-2. Verify shadow space allocation in arena init function
-3. Check Windows calling convention compliance (rcx, rdx, r8, r9)
-4. Test simpler arena init without HeapAlloc (use malloc only)
-5. Compare working Linux mmap version with Windows HeapAlloc version
+### Next Steps (in order)
+1. Debug Windows HeapAlloc arena issue with WinDbg/objdump
+2. Implement `_vibe67_arena_cleanup` function
+3. Full SDL3 event handling testing (mouse, keyboard)
+4. Cross-platform validation (Linux, macOS)
 
 ---
 

@@ -1,19 +1,10 @@
 import sdl3 as sdl
 
-// Initialize SDL
-sdl.SDL_Init(sdl.SDL_INIT_VIDEO) or! {
-    println("SDL_Init failed")
-    ret 1
-}
+printf("About to init SDL\n")
 
-// Try to create window (will fail if DISPLAY not set)
-println("About to call SDL_CreateWindow")
-raw_result := sdl.SDL_CreateWindow("Test", 100, 100, 0)!
-printf("Raw result from SDL_CreateWindow: %p\n", raw_result as cptr)
+result := sdl.SDL_Init(sdl.SDL_INIT_VIDEO)
 
-window := raw_result or! {
-    println("or! block executed - SDL_CreateWindow returned NULL")
-    ret 0
-}
+printf("SDL_Init returned: %d\n", result)
 
-printf("Window created: %p\n", window as cptr)
+sdl.SDL_Quit()
+printf("Done\n")

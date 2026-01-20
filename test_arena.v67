@@ -1,0 +1,9 @@
+arena {
+    x := alloc(100)
+    arena {
+        y := alloc(200)
+        println("Inner")
+    }
+    println("Outer")
+}
+println("Done")

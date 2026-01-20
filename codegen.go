@@ -2461,24 +2461,29 @@ func (fc *C67Compiler) compileWhileStatement(stmt *WhileStmt) {
 	// Increment iteration counter
 	if useRegister {
 		fc.out.IncReg(counterReg)
-		// Check against max iterations
-		fc.out.MovImmToReg("r10", fmt.Sprintf("%d", stmt.MaxIterations))
-		fc.out.CmpRegToReg(counterReg, "r10")
 	} else {
-		// Load counter, increment, store back
 		fc.out.MovMemToReg("rax", "rbp", counterOffset)
 		fc.out.IncReg("rax")
 		fc.out.MovRegToMem("rax", "rbp", counterOffset)
-		// Check against max iterations
-		fc.out.MovImmToReg("r10", fmt.Sprintf("%d", stmt.MaxIterations))
-		fc.out.CmpRegToReg("rax", "r10")
 	}
 
-	// Jump to end if counter >= max
-	maxCheckJumpPos := fc.eb.text.Len()
-	fc.out.JumpConditional(JumpGreaterOrEqual, 0) // Placeholder
-	fc.activeLoops[len(fc.activeLoops)-1].EndPatches = append(
-		fc.activeLoops[len(fc.activeLoops)-1].EndPatches, maxCheckJumpPos)
+	// Check against max iterations (skip if infinite)
+	if stmt.MaxIterations != math.MaxInt64 {
+		if useRegister {
+			fc.out.MovImmToReg("r10", fmt.Sprintf("%d", stmt.MaxIterations))
+			fc.out.CmpRegToReg(counterReg, "r10")
+		} else {
+			fc.out.MovMemToReg("rax", "rbp", counterOffset)
+			fc.out.MovImmToReg("r10", fmt.Sprintf("%d", stmt.MaxIterations))
+			fc.out.CmpRegToReg("rax", "r10")
+		}
+
+		// Jump to end if counter >= max
+		maxCheckJumpPos := fc.eb.text.Len()
+		fc.out.JumpConditional(JumpGreaterOrEqual, 0) // Placeholder
+		fc.activeLoops[len(fc.activeLoops)-1].EndPatches = append(
+			fc.activeLoops[len(fc.activeLoops)-1].EndPatches, maxCheckJumpPos)
+	}
 
 	// Jump back to loop start
 	currentPos := fc.eb.text.Len()
@@ -9667,6 +9672,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		fc.out.MovRegToReg("rbp", "rsp")
 		fc.out.PushReg("rbx")
 		fc.out.PushReg("r12")
+		fc.out.PushReg("r13") // r13 used on Windows to store heap handle
 
 		// Save capacity argument (calling convention: rdi on Linux, rcx on Windows)
 		if fc.eb.target.OS() == OSWindows {
@@ -9678,11 +9684,21 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		// Allocate arena structure (platform-specific)
 		fc.out.PushReg("r12") // Save capacity
 		if fc.eb.target.OS() == OSWindows {
-			// Windows: use malloc for 32 bytes
+			// Windows: use HeapAlloc from kernel32 (doesn't need CRT initialization)
 			shadowSpace := fc.allocateShadowSpace()
-			fc.out.MovImmToReg("rcx", "32")
-			fc.trackFunctionCall("malloc")
-			fc.eb.GenerateCallInstruction("malloc")
+			fc.cFunctionLibs["GetProcessHeap"] = "kernel32"
+			fc.trackFunctionCall("GetProcessHeap")
+			fc.eb.GenerateCallInstruction("GetProcessHeap")
+			fc.deallocateShadowSpace(shadowSpace)
+			fc.out.MovRegToReg("r13", "rax") // Save heap handle in r13
+			
+			shadowSpace = fc.allocateShadowSpace()
+			fc.out.MovRegToReg("rcx", "r13") // hHeap
+			fc.out.MovImmToReg("rdx", "0")   // dwFlags = 0
+			fc.out.MovImmToReg("r8", "32")   // dwBytes = 32
+			fc.cFunctionLibs["HeapAlloc"] = "kernel32"
+			fc.trackFunctionCall("HeapAlloc")
+			fc.eb.GenerateCallInstruction("HeapAlloc")
 			fc.deallocateShadowSpace(shadowSpace)
 		} else {
 			// Linux: use mmap (4096 bytes = 1 page)
@@ -9706,11 +9722,14 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 
 		// Allocate arena buffer (platform-specific)
 		if fc.eb.target.OS() == OSWindows {
-			// Windows: use malloc
+			// Windows: use HeapAlloc (r13 still has heap handle)
 			shadowSpace := fc.allocateShadowSpace()
-			fc.out.MovRegToReg("rcx", "r12") // rcx = capacity
-			fc.trackFunctionCall("malloc")
-			fc.eb.GenerateCallInstruction("malloc")
+			fc.out.MovRegToReg("rcx", "r13") // hHeap
+			fc.out.MovImmToReg("rdx", "0")   // dwFlags = 0
+			fc.out.MovRegToReg("r8", "r12")  // dwBytes = capacity
+			fc.cFunctionLibs["HeapAlloc"] = "kernel32"
+			fc.trackFunctionCall("HeapAlloc")
+			fc.eb.GenerateCallInstruction("HeapAlloc")
 			fc.deallocateShadowSpace(shadowSpace)
 		} else {
 			// Linux: use mmap
@@ -9738,6 +9757,7 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 		// Return arena pointer in rax
 		fc.out.MovRegToReg("rax", "rbx")
 
+		fc.out.PopReg("r13") // Restore r13
 		fc.out.PopReg("r12")
 		fc.out.PopReg("rbx")
 		fc.out.PopReg("rbp")
@@ -17186,6 +17206,31 @@ func (fc *C67Compiler) compileCall(call *CallExpr) {
 			fc.out.Cvtsi2sd("xmm0", "rax")
 		}
 
+	case "peek32":
+		// peek32(ptr, offset) - Read uint32 from pointer + offset
+		// ptr: pointer (as float64), offset: byte offset (as float64)
+		// Returns: uint32 value (as float64)
+		if len(call.Args) != 2 {
+			compilerError("peek32() requires 2 arguments (ptr, offset)")
+		}
+
+		// Evaluate pointer argument
+		fc.compileExpression(call.Args[0])
+		fc.out.Cvttsd2si("rdi", "xmm0") // ptr in rdi
+
+		// Evaluate offset argument
+		fc.compileExpression(call.Args[1])
+		fc.out.Cvttsd2si("rsi", "xmm0") // offset in rsi
+
+		// Read uint32 from [rdi + rsi]
+		fc.out.MovMemToReg("eax", "rdi", 0) // Use offset from rsi
+		fc.out.AddRegToReg("rdi", "rsi")    // Add offset to pointer
+		fc.out.MovMemToReg("eax", "rdi", 0) // Read 32-bit value
+
+		// Zero-extend eax to rax, convert to float64
+		fc.out.MovRegToReg("rax", "rax") // Clears upper 32 bits
+		fc.out.Cvtsi2sd("xmm0", "rax")   // Convert to float64
+
 	case "alloc":
 		// alloc(size) - Allocates memory from current arena
 		// Current arena is always available (starts at arena 1 = meta-arena[0])
@@ -19181,7 +19226,7 @@ func getUnknownFunctions(program *Program) []string {
 	builtins := map[string]bool{
 		"printf": true, "exit": true, "syscall": true,
 		"getpid": true, "me": true,
-		"print": true, "println": true, // print/println are builtin optimizations, not dependencies
+		"print": true, "println": true, "peek32": true, // builtin optimizations, not dependencies
 		"eprint": true, "eprintln": true, "eprintf": true, // stderr printing with Result return
 		"exitln": true, "exitf": true, // stderr printing with exit(1)
 		"malloc": true, "free": true, // memory management built-ins
