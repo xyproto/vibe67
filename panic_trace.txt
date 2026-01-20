@@ -1,0 +1,14 @@
+=== RUN   TestQuickSort
+DEBUG: CallSymbol(_vibe67_arena_alloc) at text position 160 (0xA0)
+DEBUG: CallSymbol(_vibe67_arena_alloc) at text position 363 (0x16B)
+DEBUG: CallSymbol(_vibe67_arena_alloc) at text position 566 (0x236)
+DEBUG: CallSymbol(_vibe67_arena_alloc) at text position 769 (0x301)
+DEBUG: CallSymbol(_vibe67_arena_alloc) at text position 972 (0x3CC)
+DEBUG: CallSymbol(_vibe67_arena_alloc) at text position 1175 (0x497)
+DEBUG: CallSymbol(_vibe67_arena_alloc) at text position 1378 (0x562)
+DEBUG: CallSymbol(_vibe67_arena_alloc) at text position 1581 (0x62D)
+    example_test.go:170: Compilation failed: runtime error: index out of range [3] with length 3
+--- FAIL: TestQuickSort (0.01s)
+FAIL
+exit status 1
+FAIL	github.com/xyproto/vibe67	0.343s
