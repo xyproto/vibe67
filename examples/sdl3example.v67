@@ -41,25 +41,29 @@ printf("Starting main loop...\n")
 
 running := 1
 loop_count := 0
+max_frames = 300
 
 event := (c.malloc(192) as SDL_Event)
 printf("Allocated event at: %p\n", event)
 
-@ running > 0 max inf {
-    printf("About to poll events...\n")
-    @ sdl.SDL_PollEvent(event) > 0 max 100 {
-        printf("Got event\n")
-        event.type {
-            256 => { 
-                printf("Quit event received\n")
-                running <- 0 
-            }
-            768 => {
-                sc = peek32(event, 16)
-                sc {
-                    41 => { 
-                        printf("Escape key pressed\n")
-                        running <- 0 
+@ loop_count < max_frames max inf {
+    poll_result = sdl.SDL_PollEvent(event)
+    poll_result {
+        | poll_result > 0 => {
+            printf("Got event type: %d\n", event.type)
+            event.type {
+                256 => { 
+                    printf("Quit event received\n")
+                    break @1
+                }
+                768 => {
+                    sc = peek32(event, 16)
+                    printf("Key event, scancode: %d\n", sc)
+                    sc {
+                        41 => { 
+                            printf("Escape key pressed\n")
+                            break @1
+                        }
                     }
                 }
             }
@@ -79,5 +83,5 @@ printf("Allocated event at: %p\n", event)
 }
 
 c.free(event)
-printf("Done!\n")
+printf("Exited after %d frames\n", loop_count)
 

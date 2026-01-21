@@ -1,0 +1,6 @@
+import sdl3 as sdl
+main = {
+    x = sdl.SDL_INIT_VIDEO
+    printf("SDL_INIT_VIDEO = %d\n", x)
+    42
+}
