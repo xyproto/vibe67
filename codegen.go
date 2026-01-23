@@ -8370,6 +8370,14 @@ func (fc *C67Compiler) generateRuntimeHelpers() {
 			fc.eb.Define(cacheName, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00")
 		}
 	}
+	
+	// Define memoization caches (for pure function automatic memoization)
+	if len(fc.memoCaches) > 0 {
+		for cacheName := range fc.memoCaches {
+			// Allocate initial cache: 8 bytes for count
+			fc.eb.DefineWritable(cacheName, "\x00\x00\x00\x00\x00\x00\x00\x00")
+		}
+	}
 
 	// Generate _vibe67_string_concat only if used
 	if fc.usedFunctions["_vibe67_string_concat"] {
@@ -11522,8 +11530,9 @@ func (fc *C67Compiler) compileLambdaDirectCall(call *CallExpr) {
 		}
 	}
 
-	// For pure single-argument functions, add memoization
-	if targetLambda != nil && targetLambda.IsPure && len(call.Args) == 1 {
+	// For pure single-argument functions, add memoization (DISABLED for now - has bugs)
+	// TODO: Fix memoization crashes on Windows
+	if false && targetLambda != nil && targetLambda.IsPure && len(call.Args) == 1 {
 		fc.compileMemoizedCall(call, targetLambda)
 		return
 	}
@@ -11666,8 +11675,16 @@ func (fc *C67Compiler) compileMemoizedCall(call *CallExpr, lambda *LambdaFunc) {
 	// Reallocate with malloc
 	fc.out.MovRegToReg("rdi", "rax")
 	fc.out.SubImmFromReg("rsp", 16) // Align stack
-	// Allocate from arena
-	fc.callArenaAlloc()
+	// Use malloc for memo cache (simpler and more reliable than arena)
+	if fc.eb.target.OS() == OSWindows {
+		fc.out.MovRegToReg("rcx", "rax") // Windows: first arg in rcx
+		shadowSpace := fc.allocateShadowSpace()
+		fc.callFunction("malloc", "")
+		fc.deallocateShadowSpace(shadowSpace)
+	} else {
+		fc.out.MovRegToReg("rdi", "rax") // Linux/Mac: first arg in rdi
+		fc.callFunction("malloc", "")
+	}
 	fc.out.AddImmToReg("rsp", 16)
 	// rax = new cache pointer (r14 still has old count - malloc preserves callee-saved regs)
 
@@ -11729,8 +11746,16 @@ func (fc *C67Compiler) compileMemoizedCall(call *CallExpr, lambda *LambdaFunc) {
 	// Allocate initial cache: 8 bytes for count
 	fc.out.MovImmToReg("rdi", "8")
 	fc.out.SubImmFromReg("rsp", 16)
-	// Allocate from arena
-	fc.callArenaAlloc()
+	// Use malloc for initial memo cache
+	if fc.eb.target.OS() == OSWindows {
+		fc.out.MovRegToReg("rcx", "rdi") // Windows: first arg in rcx
+		shadowSpace := fc.allocateShadowSpace()
+		fc.callFunction("malloc", "")
+		fc.deallocateShadowSpace(shadowSpace)
+	} else {
+		// Linux/Mac: rdi already set
+		fc.callFunction("malloc", "")
+	}
 	fc.out.AddImmToReg("rsp", 16)
 	// rax = cache pointer
 
@@ -12821,8 +12846,9 @@ func (fc *C67Compiler) compileRecursiveCall(call *CallExpr) {
 
 	fc.nonTailCalls++
 
-	// Check if this is a pure single-argument function eligible for automatic memoization
-	if fc.currentLambda != nil && fc.currentLambda.IsPure && len(call.Args) == 1 {
+	// Check if this is a pure single-argument function eligible for automatic memoization (DISABLED)
+	// TODO: Fix memoization crashes on Windows
+	if false && fc.currentLambda != nil && fc.currentLambda.IsPure && len(call.Args) == 1 {
 		fc.compileMemoizedCall(call, fc.currentLambda)
 		return
 	}
