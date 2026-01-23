@@ -6810,8 +6810,26 @@ func (fc *C67Compiler) compileCastExpr(expr *CastExpr) {
 		fc.out.MovRegToReg("rax", "r13")
 		fc.out.ShlRegByImm("rax", 4) // len * 16
 		fc.out.AddImmToReg("rax", 8) // + 8 for count
-		fc.out.MovRegToReg("rdi", "rax")
-		fc.callArenaAlloc()
+		
+		// Use malloc for string conversion (avoids arena complexity in cast expressions)
+		// Save r13 (length) and r15 (buffer) before malloc call
+		fc.out.PushReg("r13")
+		fc.out.PushReg("r15")
+		
+		// Set up malloc argument
+		if fc.eb.target.OS() == OSWindows {
+			fc.out.MovRegToReg("rcx", "rax") // Windows: first arg in rcx
+			shadowSpace := fc.allocateShadowSpace()
+			fc.callFunction("malloc", "")
+			fc.deallocateShadowSpace(shadowSpace)
+		} else {
+			fc.out.MovRegToReg("rdi", "rax") // Linux/Mac: first arg in rdi
+			fc.callFunction("malloc", "")
+		}
+		
+		fc.out.PopReg("r15")
+		fc.out.PopReg("r13")
+		
 		fc.out.MovRegToReg("r14", "rax") // r14 = C67 string
 
 		// Store count
