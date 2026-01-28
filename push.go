@@ -218,12 +218,3 @@ func (o *Out) popRISCVReg(reg string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

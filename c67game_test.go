@@ -110,12 +110,3 @@ main = {
 
 	t.Log("Simple vibe67game program works")
 }
-
-
-
-
-
-
-
-
-

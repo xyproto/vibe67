@@ -113,12 +113,3 @@ printf("First: %f\n", result[0])
 		})
 	}
 }
-
-
-
-
-
-
-
-
-

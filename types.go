@@ -17,6 +17,7 @@ const (
 	TypeString            // Vibe67's native string (map-based)
 	TypeList              // Vibe67's native list (map-based)
 	TypeMap               // Vibe67's native map
+	TypeBoolean           // Vibe67's native boolean (yes/no)
 	TypeCString           // C char* (null-terminated string)
 	TypeCInt              // C int, int32_t, etc.
 	TypeCLong             // C long, int64_t
@@ -43,6 +44,8 @@ func (t *Vibe67Type) String() string {
 		return "list"
 	case TypeMap:
 		return "map"
+	case TypeBoolean:
+		return "bool"
 	case TypeCString:
 		return "cstring"
 	case TypeCInt:
@@ -67,7 +70,7 @@ func (t *Vibe67Type) String() string {
 // IsNative returns true if this is a native Vibe67 type
 func (t *Vibe67Type) IsNative() bool {
 	switch t.Kind {
-	case TypeNumber, TypeString, TypeList, TypeMap:
+	case TypeNumber, TypeString, TypeList, TypeMap, TypeBoolean:
 		return true
 	default:
 		return false
@@ -176,15 +179,7 @@ var (
 	TypeStringValue  = &Vibe67Type{Kind: TypeString}
 	TypeListValue    = &Vibe67Type{Kind: TypeList}
 	TypeMapValue     = &Vibe67Type{Kind: TypeMap}
+	TypeBooleanValue = &Vibe67Type{Kind: TypeBoolean}
 	TypeCStringValue = &Vibe67Type{Kind: TypeCString, CType: "char*"}
 	TypeUnknownValue = &Vibe67Type{Kind: TypeUnknown}
 )
-
-
-
-
-
-
-
-
-

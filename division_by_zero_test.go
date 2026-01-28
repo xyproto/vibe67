@@ -163,12 +163,3 @@ println(safe_divide(10, 0))
 		t.Errorf("Expected output to contain -1 (division by zero fallback), got: %s", output)
 	}
 }
-
-
-
-
-
-
-
-
-

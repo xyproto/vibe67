@@ -105,12 +105,3 @@ func TestScopedBufferMustCompleteBeforeRead(t *testing.T) {
 
 	_ = scope.Bytes()
 }
-
-
-
-
-
-
-
-
-

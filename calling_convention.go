@@ -241,12 +241,3 @@ func (csm *CallSiteManager) RestoreAfterCall(fc *C67Compiler) {
 func isXmmReg(reg string) bool {
 	return len(reg) >= 3 && reg[0:3] == "xmm"
 }
-
-
-
-
-
-
-
-
-

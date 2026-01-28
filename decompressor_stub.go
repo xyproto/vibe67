@@ -136,12 +136,3 @@ func decompressRLE(data []byte) ([]byte, error) {
 
 	return result, nil
 }
-
-
-
-
-
-
-
-
-

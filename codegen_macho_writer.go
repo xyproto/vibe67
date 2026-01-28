@@ -314,12 +314,3 @@ func (fc *C67Compiler) writeMachOARM64(outputPath string) error {
 }
 
 // writeELFRiscv64 writes a RISC-V64 ELF executable
-
-
-
-
-
-
-
-
-

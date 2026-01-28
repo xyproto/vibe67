@@ -222,32 +222,6 @@ func TestCTypeSize(t *testing.T) {
 	}
 }
 
-func testParallelSimpleCompilesOLD(t *testing.T) {
-	// FIXED: Lambda epilogue fix resolved crashes on all platforms including ARM64
-
-	tmpDir := t.TempDir()
-	output := filepath.Join(tmpDir, "parallel_simple.bin")
-
-	cmd := exec.Command("go", "run", ".", "-o", output, "testprograms/parallel_simple.vibe67")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to compile parallel_simple.vibe67: %v\n%s", err, string(out))
-	}
-
-	info, err := os.Stat(output)
-	if err != nil {
-		t.Fatalf("compiled executable missing: %v", err)
-	}
-	if info.Size() == 0 {
-		t.Fatalf("compiled executable is empty")
-	}
-
-	runCmd := exec.Command(output)
-	runOutput, err := runCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("parallel_simple executable failed: %v\n%s", err, string(runOutput))
-	}
-}
-
 // TestCompilationErrors tests that the compiler correctly rejects invalid code
 func TestCompilationErrors(t *testing.T) {
 	tests := []struct {
@@ -356,12 +330,3 @@ func stringContains(s, substr string) bool {
 	}
 	return false
 }
-
-
-
-
-
-
-
-
-

@@ -47,12 +47,3 @@ func (ds *DynamicSections) generatePLTARM64(functions []string, gotBase uint64, 
 		ds.plt.Write([]byte{0x20, 0x02, 0x1f, 0xd6})
 	}
 }
-
-
-
-
-
-
-
-
-

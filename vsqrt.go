@@ -234,12 +234,3 @@ func (o *Out) vsqrtRISCVVectorToVector(dst, src string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

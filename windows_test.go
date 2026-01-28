@@ -74,12 +74,3 @@ c.printf("C FFI works: %d\n", 42)
 		t.Errorf("Invalid PE header: expected 'MZ', got %c%c", data[0], data[1])
 	}
 }
-
-
-
-
-
-
-
-
-

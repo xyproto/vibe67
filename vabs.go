@@ -214,12 +214,3 @@ func (o *Out) vabsRISCVVectorToVector(dst, src string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

@@ -227,12 +227,3 @@ func createMinimalELF(code []byte) []byte {
 
 	return elf
 }
-
-
-
-
-
-
-
-
-

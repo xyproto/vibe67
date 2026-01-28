@@ -70,22 +70,22 @@ func (dg *DependencyGraph) GetReachable() map[string]bool {
 func (dg *DependencyGraph) PrintDependencyTree() {
 	fmt.Println("=== Dependency Tree ===")
 	fmt.Println()
-	
+
 	fmt.Println("Entry Points:")
 	for root := range dg.roots {
 		fmt.Printf("  - %s\n", root)
 	}
 	fmt.Println()
-	
+
 	reachable := dg.GetReachable()
 	unreachable := make(map[string]bool)
-	
+
 	for funcName := range dg.graph {
 		if !reachable[funcName] {
 			unreachable[funcName] = true
 		}
 	}
-	
+
 	fmt.Printf("Reachable Functions: %d\n", len(reachable))
 	funcs := make([]string, 0, len(reachable))
 	for fn := range reachable {
@@ -106,7 +106,7 @@ func (dg *DependencyGraph) PrintDependencyTree() {
 		}
 	}
 	fmt.Println()
-	
+
 	if len(unreachable) > 0 {
 		fmt.Printf("Dead Code (Eliminated): %d functions\n", len(unreachable))
 		deadFuncs := make([]string, 0, len(unreachable))
@@ -120,12 +120,3 @@ func (dg *DependencyGraph) PrintDependencyTree() {
 		fmt.Println()
 	}
 }
-
-
-
-
-
-
-
-
-

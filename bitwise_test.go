@@ -76,12 +76,3 @@ main = {
 `
 	compileAndRun(t, code)
 }
-
-
-
-
-
-
-
-
-

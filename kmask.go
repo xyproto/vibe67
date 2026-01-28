@@ -483,12 +483,3 @@ func (o *Out) knotRISCVMaskToMask(dst, src string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

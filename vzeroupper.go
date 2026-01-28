@@ -155,12 +155,3 @@ func (o *Out) vzeroallRISCV() {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

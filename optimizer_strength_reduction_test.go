@@ -290,12 +290,3 @@ func TestStrengthReductionInLoop(t *testing.T) {
 func toString(n int) string {
 	return fmt.Sprintf("%d", n)
 }
-
-
-
-
-
-
-
-
-

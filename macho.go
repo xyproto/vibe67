@@ -1317,12 +1317,3 @@ func (eb *ExecutableBuilder) WriteMachO() error {
 
 	return nil
 }
-
-
-
-
-
-
-
-
-

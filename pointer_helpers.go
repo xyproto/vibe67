@@ -81,12 +81,3 @@ func EmitStorePointerToStack(out *Out, srcGpr string, baseReg string, offset int
 	EmitPointerToFloat64(out, "xmm15", srcGpr)
 	out.MovXmmToMem("xmm15", baseReg, offset)
 }
-
-
-
-
-
-
-
-
-

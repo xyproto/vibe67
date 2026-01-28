@@ -149,12 +149,3 @@ func (fi *FileInfo) IsARM64() bool {
 func (fi *FileInfo) IsX86_64() bool {
 	return fi.Arch == ArchX86_64
 }
-
-
-
-
-
-
-
-
-

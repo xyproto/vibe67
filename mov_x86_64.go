@@ -52,12 +52,3 @@ func (r *Riscv64) ELFMachineType() uint16 {
 func (r *Riscv64) Name() string {
 	return "riscv64"
 }
-
-
-
-
-
-
-
-
-

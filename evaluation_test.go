@@ -80,12 +80,3 @@ func TestEvaluation(t *testing.T) {
 		})
 	}
 }
-
-
-
-
-
-
-
-
-

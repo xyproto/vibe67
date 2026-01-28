@@ -796,12 +796,3 @@ func (r *RISCV64Backend) Syscall() {
 	instr := uint32(0x00000073)
 	r.writeInstruction(instr)
 }
-
-
-
-
-
-
-
-
-

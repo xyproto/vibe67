@@ -249,12 +249,3 @@ void vibe67_enet_receive(const char *bind_address, ENetRecvResult *result, int t
 
 	return sendMachineCode, recvMachineCode, nil
 }
-
-
-
-
-
-
-
-
-

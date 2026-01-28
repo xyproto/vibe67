@@ -346,12 +346,3 @@ func BenchmarkSeparateOps(b *testing.B) {
 		_ = compileAndRunFloat(b, code)
 	}
 }
-
-
-
-
-
-
-
-
-

@@ -255,12 +255,3 @@ printf("Result: %f\n", compute(5))
 		})
 	}
 }
-
-
-
-
-
-
-
-
-

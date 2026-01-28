@@ -429,12 +429,3 @@ func (o *Out) vmaxRISCVVectorToVector(dst, src1, src2 string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

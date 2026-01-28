@@ -389,12 +389,3 @@ func (ds *DynamicSections) updateRelocationAddress(oldAddr, newAddr uint64) {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-

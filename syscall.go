@@ -88,12 +88,3 @@ func (eb *ExecutableBuilder) SysExit(code ...string) {
 		eb.SysExitRiscv64(code...)
 	}
 }
-
-
-
-
-
-
-
-
-

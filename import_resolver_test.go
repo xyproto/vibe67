@@ -28,12 +28,3 @@ func TestImportVersionParsing(t *testing.T) {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-

@@ -65,12 +65,3 @@ func (o *Out) movzxRegRegRISCV64(dst, src string) {
 	// For simplicity, we'll emit a MOV
 	o.MovRegToReg(dst, src)
 }
-
-
-
-
-
-
-
-
-

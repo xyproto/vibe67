@@ -291,12 +291,3 @@ func isSymbolName(s string) bool {
 	}
 	return true // It's a symbol
 }
-
-
-
-
-
-
-
-
-

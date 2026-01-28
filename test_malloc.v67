@@ -1,4 +1,0 @@
-ptr: cptr = malloc(64)
-println("Allocated memory")
-free(ptr)
-println("Freed memory")

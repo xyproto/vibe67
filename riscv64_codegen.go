@@ -264,12 +264,3 @@ func (rcg *RiscvCodeGen) compileExit(call *CallExpr) error {
 
 	return nil
 }
-
-
-
-
-
-
-
-
-

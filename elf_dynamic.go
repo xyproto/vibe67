@@ -110,12 +110,3 @@ func (eb *ExecutableBuilder) WriteDynamicELF() error {
 
 	return nil
 }
-
-
-
-
-
-
-
-
-

@@ -1,5 +1,0 @@
-arena {
-	x := alloc(100)
-	println("Inside")
-}
-println("Outside")

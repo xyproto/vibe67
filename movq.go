@@ -231,12 +231,3 @@ func (out *Out) MovqRegToXmm(destXmm string, srcReg string) {
 	out.Write(0x6E)
 	out.Write(modRM)
 }
-
-
-
-
-
-
-
-
-

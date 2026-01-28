@@ -48,7 +48,7 @@ func (eb *ExecutableBuilder) WriteCompleteDynamicELF(ds *DynamicSections, functi
 	// OPTIMIZED: Use single RWX LOAD segment (like static ELF does)
 	// Modern Linux supports this, saves ~8KB from segment separation
 	// We need: PHDR, INTERP, LOAD(rwx), DYNAMIC
-	numProgHeaders := 4
+	numProgHeaders := 4 // PT_PHDR, PT_INTERP, PT_LOAD, PT_DYNAMIC
 	headersSize := uint64(elfHeaderSize + progHeaderSize*numProgHeaders)
 
 	// Align to page boundary
@@ -358,7 +358,7 @@ func (eb *ExecutableBuilder) WriteCompleteDynamicELF(ds *DynamicSections, functi
 	w.Write(1)    // ELF version
 	w.Write(3)    // Linux
 	w.WriteN(0, 8)
-	w.Write2(3) // DYN
+	w.Write2(2) // EXEC (Executable file)
 	w.Write2(byte(GetELFMachineType(eb.target.Arch())))
 	w.Write4(1)
 
@@ -396,25 +396,25 @@ func (eb *ExecutableBuilder) WriteCompleteDynamicELF(ds *DynamicSections, functi
 	w.Write8u(uint64(interpLayout.size))
 	w.Write8u(1)
 
-	// OPTIMIZED: Single RWX LOAD segment (like static ELF)
-	// Covers entire binary from start to end, saves ~8KB vs 3-segment layout
+	// Single LOAD segment with RWX (temporary - for debugging)
+	// TODO: Split into separate R-X and RW- segments for W^X compliance
 	loadStart := uint64(0)
 	loadEnd := layout["rodata"].offset + uint64(layout["rodata"].size) + uint64(eb.data.Len())
 	loadSize := loadEnd - loadStart
 
 	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "\n=== Single RWX LOAD Segment ===\n")
-		fmt.Fprintf(os.Stderr, "Range: 0x%x - 0x%x (%d bytes)\n", loadStart, loadEnd, loadSize)
+		fmt.Fprintf(os.Stderr, "\n=== Single LOAD Segment (RWX) ===\n")
+		fmt.Fprintf(os.Stderr, "Range: 0x0 - 0x%x (%d bytes)\n", loadStart, loadEnd)
 	}
 
 	w.Write4(1) // PT_LOAD
-	w.Write4(7) // PF_R | PF_W | PF_X
+	w.Write4(7) // PF_R | PF_W | PF_X (all permissions for now)
 	w.Write8u(loadStart)
 	w.Write8u(baseAddr + loadStart)
 	w.Write8u(baseAddr + loadStart)
 	w.Write8u(loadSize)
 	w.Write8u(loadSize)
-	w.Write8u(pageSize) // Keep page alignment for mmap()
+	w.Write8u(pageSize)
 
 	// PT_DYNAMIC
 	w.Write4(2) // PT_DYNAMIC
@@ -903,12 +903,3 @@ func (eb *ExecutableBuilder) patchRISCVPLTCalls(textBytes []byte, ds *DynamicSec
 		}
 	}
 }
-
-
-
-
-
-
-
-
-

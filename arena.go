@@ -314,13 +314,3 @@ func (fc *C67Compiler) callArenaAlloc() {
 
 	// Result is in rax
 }
-
-
-
-
-
-
-
-
-
-

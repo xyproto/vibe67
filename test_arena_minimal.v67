@@ -1,5 +1,0 @@
-printf("Test start\n")
-arena {
-	printf("Inside arena\n")
-}
-printf("After arena\n")

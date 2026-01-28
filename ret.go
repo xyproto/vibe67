@@ -117,12 +117,3 @@ func (o *Out) retRISCV() {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

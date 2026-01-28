@@ -200,12 +200,3 @@ func (o *Out) callRISCVRegister(reg string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

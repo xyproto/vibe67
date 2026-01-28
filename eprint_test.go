@@ -188,12 +188,3 @@ func runCommandSeparate(cmd *exec.Cmd) (stdout, stderr string, exitCode int) {
 
 	return
 }
-
-
-
-
-
-
-
-
-

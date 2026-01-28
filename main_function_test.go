@@ -24,12 +24,3 @@ func TestMainFunctionReturnValue(t *testing.T) {
 	output := compileAndRun(t, code)
 	_ = output // main returns 0, no output expected
 }
-
-
-
-
-
-
-
-
-

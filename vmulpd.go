@@ -250,12 +250,3 @@ func (o *Out) vmulpdRISCVVectorToVector(dst, src1, src2 string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

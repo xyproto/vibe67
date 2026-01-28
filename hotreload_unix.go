@@ -15,7 +15,7 @@ import (
 )
 
 type CodePage struct {
-	addr      uintptr
+	addr      unsafe.Pointer
 	size      int
 	code      []byte
 	allocated time.Time
@@ -39,7 +39,7 @@ func (hrm *HotReloadManager) AllocateExecutablePage(size int) (*CodePage, error)
 	pageSize := 4096
 	allocSize := ((size + pageSize - 1) / pageSize) * pageSize
 
-	addr, _, errno := syscall.Syscall6(
+	addrUintptr, _, errno := syscall.Syscall6(
 		syscall.SYS_MMAP,
 		0,
 		uintptr(allocSize),
@@ -54,7 +54,7 @@ func (hrm *HotReloadManager) AllocateExecutablePage(size int) (*CodePage, error)
 	}
 
 	page := &CodePage{
-		addr:      addr,
+		addr:      unsafe.Pointer(addrUintptr),
 		size:      allocSize,
 		code:      make([]byte, 0, size),
 		allocated: time.Now(),
@@ -68,7 +68,7 @@ func (page *CodePage) CopyCode(code []byte) error {
 		return fmt.Errorf("code size %d exceeds page size %d", len(code), page.size)
 	}
 
-	dst := unsafe.Slice((*byte)(unsafe.Pointer(page.addr)), page.size)
+	dst := unsafe.Slice((*byte)(page.addr), page.size)
 	copy(dst, code)
 	page.code = code
 
@@ -76,7 +76,7 @@ func (page *CodePage) CopyCode(code []byte) error {
 }
 
 func (page *CodePage) GetAddress() uintptr {
-	return page.addr
+	return uintptr(page.addr)
 }
 
 func (hrm *HotReloadManager) LoadHotFunction(name string, code []byte) (uintptr, error) {
@@ -119,13 +119,13 @@ func (hrm *HotReloadManager) cleanupOldPages() {
 }
 
 func (hrm *HotReloadManager) FreePage(page *CodePage) error {
-	if page.addr == 0 {
+	if page.addr == nil {
 		return nil
 	}
 
 	_, _, errno := syscall.Syscall(
 		syscall.SYS_MUNMAP,
-		page.addr,
+		uintptr(page.addr),
 		uintptr(page.size),
 		0,
 	)
@@ -134,13 +134,13 @@ func (hrm *HotReloadManager) FreePage(page *CodePage) error {
 		return fmt.Errorf("munmap failed: %v", errno)
 	}
 
-	page.addr = 0
+	page.addr = nil
 	return nil
 }
 
 func UpdateFunctionPointer(tableAddr uintptr, index int, newAddr uintptr) {
-	ptrAddr := tableAddr + uintptr(index*8)
-	ptr := (*uintptr)(unsafe.Pointer(ptrAddr))
+	basePtr := unsafe.Pointer(tableAddr)
+	ptr := (*uintptr)(unsafe.Add(basePtr, index*8))
 	*ptr = newAddr
 }
 
@@ -216,12 +216,3 @@ func setupReloadSignal(recompile func(string)) {
 		}
 	}()
 }
-
-
-
-
-
-
-
-
-

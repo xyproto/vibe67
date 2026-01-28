@@ -80,12 +80,3 @@ func (o *Out) lockXaddMemRegX86(base string, offset int, reg string) {
 		fmt.Fprintf(os.Stderr, "OK\n")
 	}
 }
-
-
-
-
-
-
-
-
-

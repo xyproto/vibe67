@@ -169,30 +169,109 @@ Source Code (.v67)
 
 Compile-time type annotations (`: num`, `: str`, `: cptr`, `: cstring`) provide safety without affecting runtime representation. Use these annotations at C FFI boundaries with the `as` operator for casting.
 
+### Critical Syntax Rules
+
+**⚠️ Block Disambiguation (`{...}` blocks)**
+
+When the parser encounters `{`, it determines the block type by examining contents:
+
+1. **Map Literal:** First element contains `:` (before any `=>` or `~>`)
+   ```vibe67
+   config = { port: 8080, host: "localhost" }
+   ```
+
+2. **Match Block:** Contains `=>` or `~>` arrows
+   - **Value match:** Expression before `{`, patterns match result
+     ```vibe67
+     x { 0 => "zero" | 5 => "five" ~> "other" }
+     ```
+   - **Guard match:** No expression before `{`, `|` at **line start**
+     ```vibe67
+     { | x == 0 => "zero" | x > 0 => "positive" ~> "negative" }
+     ```
+
+3. **Statement Block:** No `:` or arrows, executes sequentially
+   ```vibe67
+   compute = x -> { temp = x * 2; temp + 10 }
+   ```
+
+**⚠️ Shadow Keyword (Required for Shadowing)**
+
+Variables that shadow outer scopes MUST use `shadow` keyword:
+```vibe67
+PORT = 8080                    // Module level
+main = {
+    shadow PORT = 9000         // ✓ OK: explicitly shadows
+    PORT = 9000                // ✗ ERROR: missing shadow
+}
+```
+- Case-insensitive checks (`x` shadows `X`)
+- Prevents accidental shadowing bugs
+- Required for function parameters shadowing module vars
+
+**⚠️ Boolean Type System**
+
+Booleans are NOT numbers:
+- `yes` and `no` have special representation: `{0: val, 1: marker}`
+- `yes == 1.0` is **FALSE** (different types)
+- Comparison operators return booleans, NOT 0/1
+- Use `as num` to convert: `(x > 5) as num` → `1.0` or `0.0`
+
+**⚠️ Bitwise Operators (All Require `b` Suffix)**
+
+```vibe67
+<<b >>b <<<b >>>b    // Shifts and rotates
+&b |b ^b !b ~b       // Bitwise logic
+?b                   // Bit test (checks if bit is set)
+```
+- Eliminates ambiguity with logical `and`/`or` and pipe `|` operator
+- Always suffix bitwise ops with `b`
+
 ### Language Features
 
 **Variables:**
 - **Immutable (default):** `x = 42` - Cannot be reassigned
 - **Mutable:** `count := 0` - Can be updated with `count <- count + 1`, `count++`, `count--`
 - **Type annotations:** `ptr: cptr = c.malloc(64)`, `name: str = "Vibe67"`
+- **Shadowing:** Use `shadow` keyword when reusing names from outer scopes
 
 **Functions and Lambdas:**
 - Functions use `=` by convention: `add = (a, b) -> a + b`
 - Lambdas are first-class: `double = x -> x * 2`
-- Implicit lambda in assignment: `run = { println("Running") }`
+- Arrow omission: `(x, y) { x + y }` when params parenthesized + block body
+- Implicit lambda: `main = { println("Running") }` → `main = () -> { println("Running") }`
+- Variadic functions: `sum = (first, rest...) -> first + #rest`
 - **Pure functions automatically memoized** with limited memory cache
+- **Tail-call optimization always on** for match arms and recursive calls
+- Function composition: `f <> g <> h` means `x -> f(g(h(x)))` (right-associative)
 
 **Pattern Matching:**
-- Value match: `sign = x { | x > 0 => "positive" | x < 0 => "negative" ~> "zero" }`
-- Guard match: Uses `|` at line start for conditions
+- Value match: `sign = x { 0 => "zero" | 5 => "five" ~> "other" }`
+- Guard match: `{ | x == 0 => "zero" | x > 0 => "positive" ~> "negative" }`
+- `|` at **line start** distinguishes guard from pipe operator
 - Default case: `~>` for fallthrough
+- Tail-call optimized in match arms
 
 **Loops:**
 - Range loop: `@ i in 0..<10 { println(i) }`
 - While loop: `@ count > 0 { count <- count - 1 }`
 - Infinite loop: `@ { ... }`
 - List iteration: `@ item in list { ... }`
+- Parallel loop: `|| i in 0..10 { compute(i) }` - Fork-based, each iteration in separate process
 - Break/continue: `break @1`, `continue @2` (with loop labels)
+
+**Parallel Programming and ENet Channels:**
+- Send to channel: `&8080 <- "message"`
+- Receive from channel: `msg <= &8080`
+- Parallel map: `results = data || transform`
+- Parallel loops use fork() for true process isolation
+
+**Operators:**
+- Pipe: `data | transform | filter` (data flow)
+- Composition: `f <> g <> h` (function composition, right-associative)
+- Bitwise (all with `b` suffix): `<<b`, `>>b`, `&b`, `|b`, `^b`, `!b`, `~b`, `?b`
+- List access: `head(xs)` (first element), `tail(xs)` (rest), `#xs` (length)
+- Spread: `sum(1, 2, values..., 99)` (variadic expansion)
 
 **Unsafe Blocks:**
 - Built-in assembly-like language (similar to Battlestar programming language)
@@ -203,17 +282,104 @@ Compile-time type annotations (`: num`, `: str`, `: cptr`, `: cstring`) provide 
 **Error Handling:**
 - `or!` operator: `val = risky() or! 42` returns 42 if risky() fails (NaN or null)
 - Error blocks: `file = open("data.txt") or! { println("Failed"); ret 1 }`
+- Result types encode errors as NaN/null
+- Error field access: `result.error` to check error state
+- Error propagation: Functions return result types, callers use `or!` to handle
+
+**Import/Export System:**
+- Import syntax: `import module as alias`, `import github.com/user/repo@v1.0.0`
+- Export modes:
+  - `export *` - Global namespace (no prefix needed)
+  - `export func1 func2` - Selective (prefix required to access)
+  - No export - All available (prefix required)
+- Import resolution: libraries → git → local paths
+- Git imports support version specifiers: `@v1.0.0`, `@latest`, `@main`
+
+**Program Execution:**
+- Three entry modes:
+  1. `main` function: `main = { ... }` or `main = (args) -> { ... }`
+  2. `main` variable: `main = 42` (exit code)
+  3. Top-level code: Executed directly, last expression is exit code
+- Mixed mode: Top-level + main function requires explicit `main()` call
 
 **Memory and Resources:**
 - Arena blocks: `arena { data = alloc(1024); ... }` - auto-freed on exit
-- Nested arenas supported
-- Defer for cleanup: `defer c.free(ptr)` - LIFO execution
+- Nested arenas supported with automatic cleanup
+- Defer for cleanup: `defer c.free(ptr)` - LIFO execution order
+- Direct kernel syscalls for arena allocation (no libc dependency)
+- Use arenas instead of malloc/free when possible
+
+### Common Pitfalls and Important Restrictions
+
+**⚠️ Immutability:**
+- Variables declared with `=` CANNOT be reassigned
+  ```vibe67
+  x = 42
+  x = 43        // ✗ ERROR: cannot update immutable variable
+  x := 42       // ✓ OK: mutable variable
+  x <- 43       // ✓ OK: update mutable variable
+  ```
+- Cannot modify immutable list/map contents
+- Use `:=` for variables that need to change
+
+**⚠️ Boolean vs Number:**
+- `yes` ≠ `1.0` and `no` ≠ `0.0` (different types!)
+- Comparisons return booleans, not numbers
+- Convert with `as num`: `(x > 5) as num` → `1.0` or `0.0`
+- Default function returns are numbers (`1.0`), not booleans
+
+**⚠️ Guard vs Pipe Operator:**
+- `|` at **line start** = guard in match block
+- `|` elsewhere = pipe operator for data flow
+  ```vibe67
+  // Guard match
+  { | x > 0 => "pos" ~> "neg" }
+  
+  // Pipe operator
+  result = data | transform | filter
+  ```
+
+**⚠️ Multiple Assignment:**
+- Unpacking semantics: missing elements = `0`, extras ignored
+  ```vibe67
+  [a, b, c] = [1, 2]        // a=1, b=2, c=0
+  [x, y] = [1, 2, 3, 4]     // x=1, y=2 (3,4 ignored)
+  ```
+
+**⚠️ Type Annotations:**
+- Are metadata only, don't change runtime representation
+- All values are always `map[uint64]float64`
+- Foreign types (`cptr`, `cstring`) only for FFI boundaries
+- No runtime type checking or enforcement
+
+### Operator Precedence (Highest to Lowest)
+
+1. Function call, field access: `f(x)`, `obj.field`, `arr[i]`
+2. Unary: `+`, `-`, `not`, `!b`, `~b`, `#` (length)
+3. Exponentiation: `**`
+4. Multiplication/Division: `*`, `/`, `%`, `%%`
+5. Addition/Subtraction: `+`, `-`
+6. Bitwise shifts: `<<b`, `>>b`, `<<<b`, `>>>b`
+7. Bitwise AND: `&b`
+8. Bitwise XOR: `^b`
+9. Bitwise OR: `|b`
+10. Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`
+11. Logical AND: `and`
+12. Logical OR: `or`
+13. Pipe: `|` (data flow)
+14. Range: `..`, `..<`
+15. Composition: `<>` (function composition)
+16. Update: `<-` (mutable assignment)
+17. Assignment: `=`, `:=`
 
 **C FFI and cstruct:**
 - Define C-compatible structures: `cstruct Point { x: f32, y: f32 }`
+- Field access with `as` casting: `cstruct Point { x as float64, y as float64 }`
 - Import C libraries: `import sdl3 as sdl` (auto-detects headers with pkg-config on Linux)
-- Cast at boundaries: `ptr as cptr`, `value as num`
+- DWARF-based header parsing for automatic C bindings
+- Cast at boundaries: `ptr as cptr`, `value as num`, `str as cstring`
 - Access C functions: `sdl.SDL_Init(sdl.SDL_INIT_VIDEO)`
+- C types for FFI: `cstring`, `cptr`, `cint`, `clong`, `cfloat`, `cdouble`, `cbool`, `cvoid`
 - C NULL handling: Use `cnull` (may need implementation - check current status)
 - Field access: Use `.` for cstruct fields
 - Memory layout: cstruct follows C ABI for interoperability

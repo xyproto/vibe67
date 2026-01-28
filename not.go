@@ -125,12 +125,3 @@ func (o *Out) notRISCVReg(dst string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

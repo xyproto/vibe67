@@ -46,12 +46,3 @@ func (o *Out) rolClX86(dst string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

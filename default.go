@@ -16,7 +16,7 @@ func (eb *ExecutableBuilder) CompileDefaultProgram(outputFile string) error {
 			fmt.Fprintln(os.Stderr, "-> .rodata")
 		}
 		rodataSymbols := eb.RodataSection()
-		estimatedRodataAddr := uint64(0x403000 + 0x100)
+		estimatedRodataAddr := baseAddr + uint64(0x3000+0x100) // baseAddr + typical rodata offset
 		currentAddr := estimatedRodataAddr
 		for symbol, value := range rodataSymbols {
 			eb.WriteRodata([]byte(value))
@@ -162,12 +162,3 @@ func (eb *ExecutableBuilder) CompileDefaultProgram(outputFile string) error {
 	}
 	return nil
 }
-
-
-
-
-
-
-
-
-

@@ -243,12 +243,3 @@ func (dl *DynamicLinker) generateRISCVFunctionCall(eb *ExecutableBuilder, fn *Fu
 	eb.Emit(fmt.Sprintf("call %s", fn.Name))
 	return nil
 }
-
-
-
-
-
-
-
-
-

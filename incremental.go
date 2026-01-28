@@ -196,12 +196,3 @@ func (is *IncrementalState) GetWatchFiles() []string {
 	}
 	return files
 }
-
-
-
-
-
-
-
-
-

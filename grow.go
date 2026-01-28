@@ -228,12 +228,3 @@ func (fc *C67Compiler) generateIndividualArenaGrowth(arenaGrowJump int) int {
 
 	return arenaErrorJump
 }
-
-
-
-
-
-
-
-
-

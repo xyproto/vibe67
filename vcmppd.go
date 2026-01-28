@@ -347,12 +347,3 @@ func (o *Out) vcmppdRISCVVectorToVector(dstMask, src1, src2 string, predicate Co
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

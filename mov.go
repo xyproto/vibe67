@@ -9,20 +9,22 @@ import (
 )
 
 type Out struct {
-	target  Target
-	writer  Writer
-	eb      *ExecutableBuilder
-	backend CodeGenerator
+	target         Target
+	writer         Writer
+	eb             *ExecutableBuilder
+	backend        CodeGenerator
+	stackValidator *StackValidator // Track stack operations
 }
 
 // NewOut creates a new Out instance with the backend properly initialized
 func NewOut(target Target, writer Writer, eb *ExecutableBuilder) *Out {
 	backend := NewCodeGenerator(target.Arch(), writer, eb)
 	return &Out{
-		target:  target,
-		writer:  writer,
-		eb:      eb,
-		backend: backend, // nil for x86_64, actual backend for ARM64/RISC-V
+		target:         target,
+		writer:         writer,
+		eb:             eb,
+		backend:        backend, // nil for x86_64, actual backend for ARM64/RISC-V
+		stackValidator: NewStackValidator(),
 	}
 }
 
@@ -534,19 +536,19 @@ func (o *Out) callSymbolX86(symbol string) {
 	// On Windows: use indirect call (FF 15) for consistency with GenerateCallInstruction
 	// On other OS: use direct call (E8)
 	posBeforeCall := o.eb.text.Len()
-	
+
 	if o.target.OS() == OSWindows {
 		// Emit FF 15 (CALL [RIP+disp32]) - same as GenerateCallInstruction
 		o.Write(0xFF)
 		o.Write(0x15)
 		callPos := o.eb.text.Len()
 		o.WriteUnsigned(0x12345678) // Placeholder for displacement
-		
+
 		if envBool("DEBUG") && (symbol == "_vibe67_arena_ensure_capacity" || symbol == "malloc$stub") {
 			fmt.Fprintf(os.Stderr, "DEBUG mov.go: CallSymbol(%s) Windows: FF 15 at %d, callPos=%d\n",
 				symbol, posBeforeCall, callPos)
 		}
-		
+
 		o.eb.callPatches = append(o.eb.callPatches, CallPatch{
 			position:   callPos,
 			targetName: symbol,
@@ -556,12 +558,12 @@ func (o *Out) callSymbolX86(symbol string) {
 		o.Write(0xE8)
 		callPos := o.eb.text.Len()
 		o.WriteUnsigned(0x12345678) // Placeholder
-		
+
 		if envBool("DEBUG") && (symbol == "_vibe67_arena_ensure_capacity" || symbol == "malloc$stub") {
 			fmt.Fprintf(os.Stderr, "DEBUG mov.go: CallSymbol(%s): E8 at %d, callPos=%d\n",
 				symbol, posBeforeCall, callPos)
 		}
-		
+
 		o.eb.callPatches = append(o.eb.callPatches, CallPatch{
 			position:   callPos,
 			targetName: symbol,
@@ -642,12 +644,3 @@ func (o *Out) MovzxByteToQword(dstReg, srcReg string) {
 		compilerError("MovzxByteToQword not fully implemented for RISC-V yet")
 	}
 }
-
-
-
-
-
-
-
-
-

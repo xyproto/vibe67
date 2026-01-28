@@ -95,12 +95,3 @@ func TestArenaListAllocation(t *testing.T) {
 		t.Fatalf("Expected '1\\n2\\n3\\n', got %q", result)
 	}
 }
-
-
-
-
-
-
-
-
-

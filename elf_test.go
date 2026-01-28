@@ -509,12 +509,3 @@ func TestELFPermissions(t *testing.T) {
 		t.Errorf("File not executable: permissions = %o", info.Mode().Perm())
 	}
 }
-
-
-
-
-
-
-
-
-

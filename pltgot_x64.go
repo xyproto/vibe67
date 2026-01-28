@@ -49,12 +49,3 @@ func (ds *DynamicSections) generatePLTx86_64(functions []string, gotBase uint64,
 		binary.Write(&ds.plt, binary.LittleEndian, jumpBack)
 	}
 }
-
-
-
-
-
-
-
-
-

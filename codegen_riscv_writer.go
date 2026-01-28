@@ -40,12 +40,3 @@ func (fc *C67Compiler) writeELFRiscv64(outputPath string) error {
 
 	return nil
 }
-
-
-
-
-
-
-
-
-

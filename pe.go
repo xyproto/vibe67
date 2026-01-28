@@ -760,16 +760,16 @@ func BuildPEImportData(libraries map[string][]string, idataRVA uint32) ([]byte, 
 			// Store IAT RVA for this function
 			iatRVA := iatBase + uint32(funcIndex*8)
 			iatMap[funcName] = iatRVA
-			
+
 			if funcName == "ExitProcess" || funcName == "malloc" {
-				fmt.Fprintf(os.Stderr, "DEBUG:   %s -> IAT RVA=0x%X (iatBase=0x%X + %d*8), hint RVA=0x%X\n", 
+				fmt.Fprintf(os.Stderr, "DEBUG:   %s -> IAT RVA=0x%X (iatBase=0x%X + %d*8), hint RVA=0x%X\n",
 					funcName, iatRVA, iatBase, funcIndex, idataRVA+hintOffset)
 			}
 
 			// RVA to hint/name entry
 			hintRVA := uint64(idataRVA + hintOffset)
 			binary.Write(&buf, binary.LittleEndian, hintRVA)
-			
+
 			if funcName == "ExitProcess" || funcName == "malloc" {
 				fmt.Fprintf(os.Stderr, "DEBUG:   Writing %s IAT: hintRVA=0x%X, buf position=0x%X\n", funcName, hintRVA, buf.Len()-8)
 			}
@@ -927,7 +927,7 @@ func (eb *ExecutableBuilder) PatchPECallsToIAT(iatMap map[string]uint32, textVir
 		iatAddrRVA := uint64(iatRVA)                    // IAT RVA (relative to image base)
 
 		displacement := int64(iatAddrRVA) - int64(ripRVA)
-		
+
 		fmt.Fprintf(os.Stderr, "  IAT: %s iatRVA=0x%X, dispPos=0x%X, ripRVA=0x%X, disp=0x%X (%d)\n",
 			funcName, iatAddrRVA, dispPos, ripRVA, uint32(displacement), displacement)
 
@@ -1001,12 +1001,3 @@ func writePEImportDescriptor(buf []byte, offset int, ilt, iat, name uint32, time
 	binary.LittleEndian.PutUint32(buf[offset+12:], name)         // RVA to DLL name
 	binary.LittleEndian.PutUint32(buf[offset+16:], iat)          // RVA to IAT
 }
-
-
-
-
-
-
-
-
-

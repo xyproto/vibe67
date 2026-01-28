@@ -320,12 +320,3 @@ func TestSDL3ExampleCompiles(t *testing.T) {
 		t.Logf("Successfully compiled sdl3example.vibe67 for Windows: %d bytes", len(data))
 	})
 }
-
-
-
-
-
-
-
-
-

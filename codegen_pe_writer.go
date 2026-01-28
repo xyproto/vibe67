@@ -123,12 +123,3 @@ func mapLibraryToDLL(libName string) string {
 	// Default: add .dll extension
 	return libName + ".dll"
 }
-
-
-
-
-
-
-
-
-

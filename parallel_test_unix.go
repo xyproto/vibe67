@@ -236,12 +236,3 @@ func TestManualThreadExecution(t *testing.T) {
 		fmt.Printf("Success! Thread executed and incremented counter to %d\n", finalCount)
 	}
 }
-
-
-
-
-
-
-
-
-

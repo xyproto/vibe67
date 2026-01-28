@@ -244,12 +244,3 @@ func ExampleParseDLL() {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-

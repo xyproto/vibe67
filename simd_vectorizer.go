@@ -186,12 +186,3 @@ func vectorizeLoops(stmt Statement) Statement {
 		return stmt
 	}
 }
-
-
-
-
-
-
-
-
-

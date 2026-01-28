@@ -296,12 +296,3 @@ func (o *Out) vfmaddRISCVVectorToVector(dst, src1, src2, src3 string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

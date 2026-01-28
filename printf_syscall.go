@@ -1200,12 +1200,3 @@ func (fc *C67Compiler) emitSyscallPrintHex() {
 	fc.out.PopReg("rcx")
 	fc.out.PopReg("rbx")
 }
-
-
-
-
-
-
-
-
-

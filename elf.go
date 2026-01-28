@@ -13,7 +13,7 @@ const (
 	sectionHeaderSize = 64 // Section header entry size (ELF64)
 
 	// Memory layout
-	baseAddr   = 0x400000                       // Virtual base address
+	baseAddr   = 0x400000                       // Virtual base address (standard EXEC address)
 	pageSize   = 0x1000                         // 4KB page alignment
 	headerSize = elfHeaderSize + progHeaderSize // Total header size for simple executable
 
@@ -94,12 +94,3 @@ func (eb *ExecutableBuilder) WriteELFHeader() error {
 
 	return nil
 }
-
-
-
-
-
-
-
-
-

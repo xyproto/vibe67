@@ -311,12 +311,3 @@ func WrapWithDecompressor(originalELF []byte, arch string) ([]byte, error) {
 
 	// Rest of the function is never reached
 }
-
-
-
-
-
-
-
-
-

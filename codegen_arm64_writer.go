@@ -119,7 +119,7 @@ func (fc *C67Compiler) writeELFARM64(outputPath string) error {
 
 	// Clear rodata buffer and write sorted symbols
 	fc.eb.rodata.Reset()
-	estimatedRodataAddr := uint64(0x403000 + 0x100)
+	estimatedRodataAddr := baseAddr + uint64(0x3000+0x100) // baseAddr + typical rodata offset
 	currentAddr := estimatedRodataAddr
 	for _, symbol := range symbolNames {
 		value := rodataSymbols[symbol]
@@ -233,12 +233,3 @@ func (fc *C67Compiler) writeELFARM64(outputPath string) error {
 
 	return nil
 }
-
-
-
-
-
-
-
-
-

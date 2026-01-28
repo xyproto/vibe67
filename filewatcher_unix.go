@@ -108,12 +108,3 @@ func (fw *FileWatcher) debouncedCallback(path string) {
 func (fw *FileWatcher) Close() error {
 	return unix.Close(fw.fd)
 }
-
-
-
-
-
-
-
-
-

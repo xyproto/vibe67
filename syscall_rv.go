@@ -28,12 +28,3 @@ func (eb *ExecutableBuilder) SysExitRiscv64(code ...string) {
 	}
 	eb.Emit("ecall")
 }
-
-
-
-
-
-
-
-
-

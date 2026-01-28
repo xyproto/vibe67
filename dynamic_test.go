@@ -308,12 +308,3 @@ func TestLDDOutput(t *testing.T) {
 	// Just check that it ran successfully
 	t.Logf("ldd output:\n%s", output)
 }
-
-
-
-
-
-
-
-
-

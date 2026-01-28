@@ -246,8 +246,17 @@ func (eb *ExecutableBuilder) TextWriter() Writer {
 
 // PatchPCRelocations patches all PC-relative address loads with actual offsets
 func (eb *ExecutableBuilder) PatchPCRelocations(textAddr, rodataAddr uint64, rodataSize int) {
-	fmt.Fprintf(os.Stderr, "DEBUG PatchPCRelocations called: %d relocations, textAddr=0x%x\n", len(eb.pcRelocations), textAddr)
-	
+	fmt.Fprintf(os.Stderr, "DEBUG PatchPCRelocations called: %d relocations, textAddr=0x%x, rodataAddr=0x%x\n", len(eb.pcRelocations), textAddr, rodataAddr)
+
+	// Print which symbol addresses we have RIGHT NOW
+	if strings.Contains(fmt.Sprintf("%v", eb.consts), "arena") {
+		for name, c := range eb.consts {
+			if strings.Contains(name, "arena_meta") {
+				fmt.Fprintf(os.Stderr, "  Symbol %s has address 0x%x at start of patching\n", name, c.addr)
+			}
+		}
+	}
+
 	if VerboseMode || len(eb.pcRelocations) > 0 {
 		fmt.Fprintf(os.Stderr, "DEBUG: Relocations to patch:\n")
 		for i, reloc := range eb.pcRelocations {
@@ -258,7 +267,7 @@ func (eb *ExecutableBuilder) PatchPCRelocations(textAddr, rodataAddr uint64, rod
 			}
 		}
 	}
-	
+
 	textBytes := eb.text.Bytes()
 
 	for _, reloc := range eb.pcRelocations {
@@ -289,6 +298,8 @@ func (eb *ExecutableBuilder) PatchPCRelocations(textAddr, rodataAddr uint64, rod
 					}
 				} else if strings.Contains(reloc.symbolName, "parallel") && VerboseMode {
 					fmt.Fprintf(os.Stderr, "DEBUG PatchPCRelocations: %s found in consts with address 0x%x\n", reloc.symbolName, targetAddr)
+				} else if strings.Contains(reloc.symbolName, "arena") {
+					fmt.Fprintf(os.Stderr, "DEBUG PatchPCRelocations: ARENA symbol %s using address 0x%x (writable=%v) at reloc offset 0x%x\n", reloc.symbolName, targetAddr, c.writable, reloc.offset)
 				}
 			} else if VerboseMode {
 				fmt.Fprintf(os.Stderr, "DEBUG PatchPCRelocations: label '%s' not found in labels or consts (have %d labels)\n", reloc.symbolName, len(eb.labels))
@@ -362,9 +373,9 @@ func (eb *ExecutableBuilder) patchX86_64PCRel(textBytes []byte, offset int, text
 	textBytes[offset+2] = byte((disp32 >> 16) & 0xFF)
 	textBytes[offset+3] = byte((disp32 >> 24) & 0xFF)
 
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "Patched x86-64 PC relocation: %s at offset 0x%x, target 0x%x, RIP 0x%x, displacement %d\n",
-			symbolName, offset, targetAddr, ripAddr, displacement)
+	if strings.Contains(symbolName, "arena") || VerboseMode {
+		fmt.Fprintf(os.Stderr, "Patched x86-64 PC relocation: %s at offset 0x%x, target 0x%x, RIP 0x%x, displacement %d (0x%x)\n",
+			symbolName, offset, targetAddr, ripAddr, displacement, disp32)
 	}
 }
 
@@ -777,6 +788,10 @@ func (eb *ExecutableBuilder) DefineAddr(symbol string, addr uint64) {
 				fmt.Fprintf(os.Stderr, "DEBUG DefineAddr: %s set to 0x%x\n", symbol, addr)
 			}
 		}
+		if strings.Contains(symbol, "arena") {
+			oldAddr := c.addr
+			fmt.Fprintf(os.Stderr, "DEBUG DefineAddr: ARENA symbol %s: 0x%x -> 0x%x\n", symbol, oldAddr, addr)
+		}
 		c.addr = addr
 	} else {
 		// Symbol doesn't exist yet - create it first
@@ -784,6 +799,9 @@ func (eb *ExecutableBuilder) DefineAddr(symbol string, addr uint64) {
 			if VerboseMode {
 				fmt.Fprintf(os.Stderr, "DEBUG DefineAddr: Creating missing symbol %s with addr 0x%x\n", symbol, addr)
 			}
+		}
+		if strings.Contains(symbol, "arena") {
+			fmt.Fprintf(os.Stderr, "DEBUG DefineAddr: ARENA symbol %s created with addr 0x%x\n", symbol, addr)
 		}
 		eb.consts[symbol] = &Const{value: "", addr: addr}
 	}
@@ -978,9 +996,9 @@ func (eb *ExecutableBuilder) GenerateCallInstruction(funcName string) error {
 			w.Write(0x15)               // ModR/M: [RIP + disp32]
 			w.WriteUnsigned(0x12345678) // Placeholder - will be patched to IAT RVA
 		} else {
-			fmt.Fprintf(os.Stderr, "ERROR: Generating E8 (direct call) for %s, OS=%d (OSWindows=%d)\n", funcName, eb.target.OS(), OSWindows)
+			// Linux/Unix: E8 call with placeholder, will be patched to PLT by patchPLTCalls
 			w.Write(0xE8)               // CALL rel32
-			w.WriteUnsigned(0x12345678) // Placeholder - will be patched
+			w.WriteUnsigned(0x12345678) // Placeholder - will be patched to PLT
 		}
 	case ArchARM64:
 		w.WriteUnsigned(0x94000000) // BL placeholder
@@ -1104,6 +1122,8 @@ func (eb *ExecutableBuilder) patchTextInELF() {
 	// The ELF buffer contains: ELF header + program headers + all sections
 	// We need to find where the .text section is in the ELF buffer and replace it
 
+	fmt.Fprintf(os.Stderr, "\n*** patchTextInELF CALLED ***\n")
+
 	// For now, we'll use a simple approach: the ELF buffer is built in order,
 	// so we know the text comes after BSS in the file
 	// But actually, in WriteCompleteDynamicELF, the buffers are written in this order:
@@ -1118,10 +1138,8 @@ func (eb *ExecutableBuilder) patchTextInELF() {
 	elfBuf := eb.elf.Bytes()
 	newText := eb.text.Bytes()
 
-	if VerboseMode {
-		fmt.Fprintf(os.Stderr, "DEBUG patchTextInELF: elfBuf size=%d, newText size=%d\n", len(elfBuf), len(newText))
-		fmt.Fprintf(os.Stderr, "DEBUG patchTextInELF: newText first 50 bytes: %x\n", newText[:min(50, len(newText))])
-	}
+	fmt.Fprintf(os.Stderr, "DEBUG patchTextInELF: elfBuf size=%d, newText size=%d\n", len(elfBuf), len(newText))
+	fmt.Fprintf(os.Stderr, "DEBUG patchTextInELF: newText first 50 bytes: %x\n", newText[:min(50, len(newText))])
 
 	// Search for 49 ff d3 (call r11) in newText
 	if VerboseMode {
@@ -1150,6 +1168,9 @@ func (eb *ExecutableBuilder) patchTextInELF() {
 		fmt.Fprintf(os.Stderr, "DEBUG patchTextInELF: about to copy newText to elfBuf[0x%x:0x%x]\n", textOffset, textOffset+textSize)
 	}
 
+	fmt.Fprintf(os.Stderr, "DEBUG patchTextInELF: Before copy, elfBuf[0x309b:0x30a3] = %x\n", elfBuf[0x309b:0x30a3])
+	fmt.Fprintf(os.Stderr, "DEBUG patchTextInELF: Before copy, newText[0x9b:0xa3] = %x\n", newText[0x9b:0xa3])
+
 	// CRITICAL: The dynamic section starts 4 pages after text section
 	// Text section is pre-allocated 8 pages (32KB) at offset 0x3000
 	// Dynamic section starts at 0xB000
@@ -1170,7 +1191,9 @@ func (eb *ExecutableBuilder) patchTextInELF() {
 
 	} else {
 		// Text fits in the original space - simple copy
+		fmt.Fprintf(os.Stderr, "DEBUG patchTextInELF: Copying %d bytes from newText to elfBuf[0x%x:0x%x]\n", textSize, textOffset, textOffset+textSize)
 		copy(elfBuf[textOffset:textOffset+textSize], newText)
+		fmt.Fprintf(os.Stderr, "DEBUG patchTextInELF: After copy, elfBuf[0x309b:0x30a3] = %x\n", elfBuf[0x309b:0x30a3])
 	}
 
 	// Get fresh reference to buffer after potential resize
@@ -1710,12 +1733,3 @@ func watchAndRecompile(sourceFile, outputFile string, platform Platform) error {
 	watcher.Watch()
 	return nil
 }
-
-
-
-
-
-
-
-
-

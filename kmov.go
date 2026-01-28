@@ -361,12 +361,3 @@ func (o *Out) kmovRISCVMaskToMask(dst, src string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

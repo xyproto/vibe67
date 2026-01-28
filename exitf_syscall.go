@@ -180,12 +180,3 @@ func (fc *C67Compiler) emitStderrInteger() {
 	fc.out.PopReg("rcx")
 	fc.out.PopReg("rbx")
 }
-
-
-
-
-
-
-
-
-

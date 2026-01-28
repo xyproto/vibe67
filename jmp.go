@@ -340,12 +340,3 @@ func (o *Out) jmpRISCVUnconditional(offset int32) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

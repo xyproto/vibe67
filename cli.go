@@ -715,12 +715,3 @@ func generateTestRunner(runnerPath, testFile string, testFunctions []string) err
 	// Write the runner file
 	return os.WriteFile(runnerPath, []byte(builder.String()), 0644)
 }
-
-
-
-
-
-
-
-
-

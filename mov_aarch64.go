@@ -27,12 +27,3 @@ func (a *ARM64) ELFMachineType() uint16 {
 func (a *ARM64) Name() string {
 	return "aarch64"
 }
-
-
-
-
-
-
-
-
-

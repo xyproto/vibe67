@@ -209,12 +209,3 @@ func GetThreadWorkRange(threadID int, totalItems int, numThreads int) (int, int)
 
 	return startIdx, endIdx
 }
-
-
-
-
-
-
-
-
-

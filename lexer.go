@@ -76,14 +76,14 @@ const (
 	TOKEN_ERR_QUESTION    // err? (check if expression is error)
 	TOKEN_VAL_QUESTION    // val? (check if expression has value)
 	// TOKEN_ME and TOKEN_CME removed - recursive calls now use mandatory max
-	TOKEN_RET      // ret keyword (return value from function/lambda)
-	TOKEN_ERR      // err keyword (return error from function/lambda)
-	TOKEN_FUN      // fun keyword (optional function definition marker)
-	TOKEN_BREAK    // break keyword (alias for ret @)
-	TOKEN_CONTINUE // continue keyword (alias for ret @ [])
-	TOKEN_FOREACH  // foreach keyword (alias for @ ... in)
-	TOKEN_MALLOC   // malloc keyword (arena allocator sugar)
-	TOKEN_FREE     // free keyword (no-op, arena cleanup)
+	TOKEN_RET        // ret keyword (return value from function/lambda)
+	TOKEN_ERR        // err keyword (return error from function/lambda)
+	TOKEN_FUN        // fun keyword (optional function definition marker)
+	TOKEN_BREAK      // break keyword (alias for ret @)
+	TOKEN_CONTINUE   // continue keyword (alias for ret @ [])
+	TOKEN_FOREACH    // foreach keyword (alias for @ ... in)
+	TOKEN_MALLOC     // malloc keyword (arena allocator sugar)
+	TOKEN_FREE       // free keyword (no-op, arena cleanup)
 	TOKEN_AT_FIRST   // @first (first iteration)
 	TOKEN_AT_LAST    // @last (last iteration)
 	TOKEN_AT_COUNTER // @counter (iteration counter)
@@ -942,12 +942,3 @@ func (l *Lexer) NextToken() Token {
 
 	return Token{Type: TOKEN_EOF, Line: l.line, Column: tokenColumn}
 }
-
-
-
-
-
-
-
-
-

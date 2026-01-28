@@ -204,12 +204,3 @@ printf("\n")
 		t.Errorf("Vectorized with cleanup failed\nExpected: %s\nGot: %s", expected, output)
 	}
 }
-
-
-
-
-
-
-
-
-

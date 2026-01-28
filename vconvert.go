@@ -428,12 +428,3 @@ func (o *Out) vcvttpd2qqRISCVVectorToVector(dst, src string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

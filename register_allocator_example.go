@@ -222,12 +222,3 @@ func runRegisterAllocatorDemo() {
 	demonstrateSpilling()
 	exampleIntegration()
 }
-
-
-
-
-
-
-
-
-

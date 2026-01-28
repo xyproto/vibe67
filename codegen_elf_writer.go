@@ -80,8 +80,10 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 
 	// Enable static ELF when no dynamic libraries needed
 	// On Linux, printf is syscall-based so doesn't need dynamic linking
-	// Arenas require dynamic linking (use mmap syscall)
-	needsStatic := !needsLibc && !needsLibm && !hasCFFI && !fc.usesArenas &&
+	// Arenas on Linux TEMPORARILY use dynamic linking due to symbol resolution timing issues
+	// TODO: Fix by traversing lambda bodies during symbol collection
+	needsArenaLibc := fc.usesArenas // Force dynamic for arenas on all platforms for now
+	needsStatic := !needsLibc && !needsLibm && !hasCFFI && !needsArenaLibc &&
 		!(printfNeedsLibc && needsPrintf)
 
 	// If no dynamic libraries needed, use simple static ELF
@@ -121,7 +123,9 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 			name string
 			c    *Const
 		}{}
+		fmt.Fprintf(os.Stderr, "DEBUG: Collecting writable constants from fc.eb.consts (%d total)\n", len(fc.eb.consts))
 		for name, c := range fc.eb.consts {
+			fmt.Fprintf(os.Stderr, "DEBUG:   %s: writable=%v, value_len=%d\n", name, c.writable, len(c.value))
 			if c.writable {
 				writableConsts = append(writableConsts, struct {
 					name string
@@ -129,6 +133,7 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 				}{name, c})
 			}
 		}
+		fmt.Fprintf(os.Stderr, "DEBUG: Found %d writable constants\n", len(writableConsts))
 
 		// Write data section
 		for _, entry := range writableConsts {
@@ -158,16 +163,13 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 		textAddr := uint64(baseAddr + headerSize + rodataSize + dataSize)
 
 		// Assign addresses to data symbols
-		if VerboseMode {
-			fmt.Fprintf(os.Stderr, "Assigning data symbol addresses: dataAddr=0x%x, size=%d\n",
-				dataAddr, dataSize)
-		}
+		fmt.Fprintf(os.Stderr, "DEBUG: Assigning data symbol addresses: dataAddr=0x%x, size=%d, numSymbols=%d\n",
+			dataAddr, dataSize, len(dataSymbols))
+		fmt.Fprintf(os.Stderr, "DEBUG: dataSymbols: %v\n", dataSymbols)
 		for name, offset := range dataSymbols {
 			addr := dataAddr + uint64(offset)
 			fc.eb.DefineAddr(name, addr)
-			if VerboseMode {
-				fmt.Fprintf(os.Stderr, "  %s -> 0x%x (offset=%d)\n", name, addr, offset)
-			}
+			fmt.Fprintf(os.Stderr, "DEBUG:   %s -> 0x%x (offset=%d)\n", name, addr, offset)
 		}
 
 		// Assign addresses to rodata symbols (strings, constants) using same order
@@ -203,7 +205,7 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 
 		// Detect bad addresses (unpatched relocations)
 		fc.detectBadAddresses(elfBytes)
-		
+
 		// Validate generated code
 		fc.printCodeValidation()
 
@@ -369,7 +371,8 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	// (in case any data was written during code generation)
 	fc.eb.rodata.Reset()
 
-	estimatedRodataAddr := uint64(0x403000 + 0x100)
+	// Get estimated rodata address from compiler state (respects baseAddr setting)
+	estimatedRodataAddr := fc.compilerState.GetEstimatedRodataAddr()
 	currentAddr := estimatedRodataAddr
 	for _, symbol := range symbolNames {
 		value := rodataSymbols[symbol]
@@ -512,6 +515,10 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 	fc.out.XorRegWithReg("rbx", "rbx")
 	fc.out.XorRegWithReg("rcx", "rcx")
 	// ===== END AVX-512 DETECTION =====
+
+	// Reserve space for arena init call (same as first pass)
+	fc.arenaInitCallOffset = fc.eb.text.Len()
+	fc.out.Emit([]byte{0x90, 0x90, 0x90, 0x90, 0x90}) // 5 NOPs as placeholder
 
 	// Recompile with correct addresses
 	// NOTE: Use the original program parameter (which includes imports),
@@ -742,7 +749,7 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 			}
 		}
 	}
-	
+
 	// Validate generated code before writing
 	fc.printCodeValidation()
 
@@ -760,12 +767,3 @@ func (fc *C67Compiler) writeELF(program *Program, outputPath string) error {
 
 // Confidence that this function is working: 50%
 // writePE generates a Windows PE (Portable Executable) file for x86_64
-
-
-
-
-
-
-
-
-

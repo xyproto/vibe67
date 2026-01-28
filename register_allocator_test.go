@@ -322,12 +322,3 @@ func TestRegisterAllocatorUsedCalleeSaved(t *testing.T) {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-

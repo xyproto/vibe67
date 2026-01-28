@@ -355,12 +355,3 @@ func (o *Out) vpermRISCVVectorWithIndex(dst, src, indices string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

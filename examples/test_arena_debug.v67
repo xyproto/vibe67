@@ -1,0 +1,6 @@
+main = {
+    arena {
+        x := alloc(100)
+        println(x)
+    }
+}

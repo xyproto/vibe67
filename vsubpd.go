@@ -199,12 +199,3 @@ func (o *Out) vsubpdRISCVVectorToVector(dst, src1, src2 string) {
 		fmt.Fprintln(os.Stderr)
 	}
 }
-
-
-
-
-
-
-
-
-

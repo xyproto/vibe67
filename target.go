@@ -171,12 +171,3 @@ func (t *TargetImpl) SupportsAVX() bool {
 func (t *TargetImpl) SupportsNEON() bool {
 	return t.arch == ArchARM64
 }
-
-
-
-
-
-
-
-
-

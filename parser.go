@@ -1125,15 +1125,18 @@ func (p *Parser) parseStatement() Statement {
 			p.nextToken() // skip identifier
 			p.nextToken() // skip ':'
 
-			// Check if next token is a type keyword (contextual - comes as IDENT)
+			// Check if next token is a type keyword (contextual - comes as IDENT or TOKEN_BOOL)
 			isTypeAnnotation := false
 			if p.current.Type == TOKEN_IDENT {
 				switch p.current.Value {
-				case "num", "str", "list", "map",
+				case "num", "str", "list", "map", "bool",
 					"cstring", "cptr", "cint", "clong",
 					"cfloat", "cdouble", "cbool", "cvoid":
 					isTypeAnnotation = true
 				}
+			} else if p.current.Type == TOKEN_BOOL {
+				// bool is a keyword token, not an identifier
+				isTypeAnnotation = true
 			}
 
 			// Restore state
@@ -1348,7 +1351,7 @@ func (p *Parser) parseAssignment() *AssignStmt {
 	// Check for type annotation: name: type
 	var precision string
 	var typeAnnotation *Vibe67Type
-	if p.current.Type == TOKEN_COLON && p.peek.Type == TOKEN_IDENT {
+	if p.current.Type == TOKEN_COLON && (p.peek.Type == TOKEN_IDENT || p.peek.Type == TOKEN_BOOL) {
 		p.nextToken() // skip ':'
 
 		// Try new type system first (num, str, cstring, etc.)
@@ -1360,7 +1363,7 @@ func (p *Parser) parseAssignment() *AssignStmt {
 			precision = p.current.Value
 			// Validate precision format (bNN or fNN where NN is a number)
 			if len(precision) < 2 || (precision[0] != 'b' && precision[0] != 'f') {
-				p.error("invalid type annotation: expected num, str, list, map, cstring, cptr, cint, clong, cfloat, cdouble, cbool, cvoid, or legacy bNN/fNN")
+				p.error("invalid type annotation: expected num, str, list, map, bool, cstring, cptr, cint, clong, cfloat, cdouble, cbool, cvoid, or legacy bNN/fNN")
 			}
 			p.nextToken() // skip precision identifier
 		}
@@ -1852,14 +1855,17 @@ func (p *Parser) disambiguateBlock() BlockType {
 				// Type annotations have a type keyword (as identifier) after the colon
 				nextTok := tempLexer.NextToken()
 				isTypeAnnotation := false
-				// Type keywords are contextual - they come as TOKEN_IDENT with specific values
+				// Type keywords are contextual - they come as TOKEN_IDENT or TOKEN_BOOL with specific values
 				if nextTok.Type == TOKEN_IDENT {
 					switch nextTok.Value {
-					case "num", "str", "list", "map",
+					case "num", "str", "list", "map", "bool",
 						"cstring", "cptr", "cint", "clong",
 						"cfloat", "cdouble", "cbool", "cvoid":
 						isTypeAnnotation = true
 					}
+				} else if nextTok.Type == TOKEN_BOOL {
+					// bool is a keyword token
+					isTypeAnnotation = true
 				}
 				if !isTypeAnnotation {
 					// Found ':' before any arrows and not a type annotation → map literal
@@ -3137,7 +3143,7 @@ func (p *Parser) parseContinueStatement() Statement {
 
 func (p *Parser) parseForeachStatement() Statement {
 	p.nextToken() // skip 'foreach'
-	
+
 	// foreach is just syntax sugar for @ ... in
 	// Parse as: @ ident in expr block
 	if p.current.Type != TOKEN_IDENT {
@@ -3208,7 +3214,7 @@ func (p *Parser) parseForeachStatement() Statement {
 			body = append(body, stmt)
 		}
 	}
-	
+
 	// Consume closing brace
 	if p.peek.Type == TOKEN_RBRACE {
 		p.nextToken() // move to '}'
@@ -5323,7 +5329,12 @@ func (p *Parser) parseUnsafeValue() interface{} {
 // parseTypeAnnotation parses a type annotation (after :)
 // Returns nil if no valid type annotation found
 func (p *Parser) parseTypeAnnotation() *Vibe67Type {
-	// Native Vibe67 types
+	// Handle TOKEN_BOOL keyword
+	if p.current.Type == TOKEN_BOOL {
+		return &Vibe67Type{Kind: TypeBoolean}
+	}
+
+	// Native Vibe67 types (coming as identifiers)
 	switch p.current.Value {
 	case "num":
 		return &Vibe67Type{Kind: TypeNumber}
@@ -5333,6 +5344,8 @@ func (p *Parser) parseTypeAnnotation() *Vibe67Type {
 		return &Vibe67Type{Kind: TypeList}
 	case "map":
 		return &Vibe67Type{Kind: TypeMap}
+	case "bool":
+		return &Vibe67Type{Kind: TypeBoolean}
 	// Foreign C types
 	case "cstring":
 		return &Vibe67Type{Kind: TypeCString, CType: "char*"}
@@ -5354,12 +5367,3 @@ func (p *Parser) parseTypeAnnotation() *Vibe67Type {
 		return nil
 	}
 }
-
-
-
-
-
-
-
-
-

@@ -1,18 +1,18 @@
-# C67 Grammar Specification
+# Vibe67 Grammar Specification
 
 **Version:** 1.5.0
 **Date:** 2025-12-03
-**Status:** Canonical Grammar Reference for C67 3.0 Release
+**Status:** Canonical Grammar Reference for Vibe67 1.5.0 Release
 
-This document defines the complete formal grammar of the C67 programming language using Extended Backus-Naur Form (EBNF).
+This document defines the complete formal grammar of the Vibe67 programming language using Extended Backus-Naur Form (EBNF).
 
 ## ⚠️ CRITICAL: The Universal Type
 
-C67 has exactly ONE runtime type: `map[uint64]float64`, an ordered map.
+Vibe67 has exactly ONE runtime type: `map[uint64]float64`, an ordered map.
 
 Not "represented as" or "backed by" — every value IS this map:
 
-```c67
+```vibe67
 42              // {0: 42.0}
 "Hello"         // {0: 72.0, 1: 101.0, 2: 108.0, 3: 108.0, 4: 111.0}
 [1, 2, 3]       // {0: 1.0, 1: 2.0, 2: 3.0}
@@ -23,7 +23,7 @@ Not "represented as" or "backed by" — every value IS this map:
 
 **Even C foreign types are stored as maps:**
 
-```c67
+```vibe67
 // C pointer (0x7fff1234) stored as float64 bits
 ptr: cptr = sdl.SDL_CreateWindow(...)  // {0: <pointer_as_float64>}
 
@@ -37,7 +37,7 @@ result: cint = sdl.SDL_Init(...)       // {0: 1.0} or {0: 0.0}
 There are NO special types, NO primitives, NO exceptions.
 Everything is a map from uint64 to float64.
 
-This is not an implementation detail — this IS C67.
+This is not an implementation detail — this IS Vibe67.
 
 ## Type Annotations
 
@@ -48,7 +48,7 @@ Type annotations are **metadata** that specify:
 
 They do NOT change the runtime representation (always `map[uint64]float64`).
 
-### Native C67 Types
+### Native Vibe67 Types
 - `num` - number (default type)
 - `str` - string (map of char codes)
 - `list` - list (map with integer keys)
@@ -100,7 +100,7 @@ When the parser encounters `{`, it determines the block type by examining conten
 ### Rule 1: Map Literal
 **Condition:** First element contains `:` (before any `=>` or `~>`)
 
-```c67
+```vibe67
 config = { port: 8080, host: "localhost" }
 settings = { "key": value, "other": 42 }
 ```
@@ -113,7 +113,7 @@ There are TWO forms:
 #### Form A: Value Match (with expression before `{`)
 Evaluates expression, then matches its result against patterns:
 
-```c67
+```vibe67
 // Match on literal values
 x {
     0 => "zero"
@@ -131,7 +131,7 @@ x > 0 {
 #### Form B: Guard Match (no expression, uses `|` at line start)
 Each branch evaluates its own condition independently:
 
-```c67
+```vibe67
 // Guard branches with | at line start
 {
     | x == 0 => "zero"
@@ -147,7 +147,7 @@ Otherwise `|` is the pipe operator: `data | transform | filter`
 ### Rule 3: Statement Block
 **Condition:** No `=>` or `~>` in scope, not a map
 
-```c67
+```vibe67
 compute = x -> {
     temp = x * 2
     result = temp + 10
@@ -170,7 +170,7 @@ The `shadow` keyword is used to explicitly declare that a variable shadows (hide
 
 ### Syntax
 
-```c67
+```vibe67
 shadow identifier [: type] = expression
 shadow identifier [: type] := expression
 ```
@@ -190,7 +190,7 @@ shadow identifier [: type] := expression
 
 ### Examples
 
-```c67
+```vibe67
 // Module level
 PORT = 8080
 config = { host: "localhost" }
@@ -240,7 +240,7 @@ test = {
 
 ## Import and Export System
 
-C67's import system provides a unified way to import libraries, git repositories, and local directories. The export system controls which functions are available to importers and whether they require namespace prefixes.
+Vibe67's import system provides a unified way to import libraries, git repositories, and local directories. The export system controls which functions are available to importers and whether they require namespace prefixes.
 
 ### Export Statements
 
@@ -249,21 +249,21 @@ The `export` statement controls which functions are available to importers:
 **Three export modes:**
 
 1. **`export *`** - Export all functions into global namespace (no prefix required)
-   ```c67
+   ```vibe67
    export *
 
    hello = { println("Hello from this module!") }
    goodbye = { println("Goodbye!") }
    ```
    When imported:
-   ```c67
+   ```vibe67
    import "github.com/user/greetings" as greet
    hello()      // Works - no prefix needed
    goodbye()    // Works - no prefix needed
    ```
 
 2. **`export func1 func2 ...`** - Export only listed functions (prefix required)
-   ```c67
+   ```vibe67
    export hello goodbye
 
    hello = { println("Hello!") }
@@ -271,7 +271,7 @@ The `export` statement controls which functions are available to importers:
    internal_helper = { println("Internal") }  // Not exported
    ```
    When imported:
-   ```c67
+   ```vibe67
    import "github.com/user/greetings" as greet
    greet.hello()         // Works - prefix required
    greet.goodbye()       // Works - prefix required
@@ -279,14 +279,14 @@ The `export` statement controls which functions are available to importers:
    ```
 
 3. **No export statement** - All functions available (prefix required)
-   ```c67
+   ```vibe67
    // No export statement
 
    hello = { println("Hello!") }
    goodbye = { println("Goodbye!") }
    ```
    When imported:
-   ```c67
+   ```vibe67
    import "github.com/user/greetings" as greet
    greet.hello()    // Works - prefix required
    greet.goodbye()  // Works - prefix required
@@ -298,8 +298,8 @@ The `export` statement controls which functions are available to importers:
 - No export is for general libraries where namespace pollution is a concern
 
 **Example: Beginner-friendly library**
-```c67
-// simplelib/main.c67
+```vibe67
+// simplelib/main.v67
 export *
 
 // Library initialization
@@ -340,17 +340,17 @@ init_window(800, 600, "My App")
 
 ### Import Syntax
 
-```c67
+```vibe67
 // Library import (uses pkg-config or finds .dll)
 import sdl3 as sdl
 import raylib as rl
 
 // Git repository import
-import github.com/xyproto/c67-math as math
-import github.com/xyproto/c67-math@v1.0.0 as math
-import github.com/xyproto/c67-math@latest as math
-import github.com/xyproto/c67-math@main as math
-import git@github.com:xyproto/c67-math.git as math
+import github.com/xyproto/vibe67-math as math
+import github.com/xyproto/vibe67-math@v1.0.0 as math
+import github.com/xyproto/vibe67-math@latest as math
+import github.com/xyproto/vibe67-math@main as math
+import git@github.com:xyproto/vibe67-math.git as math
 
 // Directory import
 import . as local                    // Current directory
@@ -365,8 +365,8 @@ import SDL3.dll as sdl
 ### Import Behavior
 
 - **Libraries**: Searches for library files and headers, parses C headers for FFI
-- **Git Repos**: Clones to `~/.cache/c67/` (respects `XDG_CACHE_HOME`), imports all top-level `.c67` files
-- **Directories**: Imports all top-level `.c67` files from the directory
+- **Git Repos**: Clones to `~/.cache/vibe67/` (respects `XDG_CACHE_HOME`), imports all top-level `.v67` files
+- **Directories**: Imports all top-level `.v67` files from the directory
 - **Version Specifiers**:
   - `@v1.0.0` - Specific tag
   - `@main` or `@master` - Specific branch
@@ -375,37 +375,37 @@ import SDL3.dll as sdl
 
 ### Namespace Rules
 
-When importing a C67 module:
+When importing a Vibe67 module:
 
 1. **If module has `export *`**: Functions available without prefix
-   ```c67
+   ```vibe67
    import "github.com/user/simplelib" as lib
    init_window()  // No prefix needed
    ```
 
 2. **If module has `export func1 func2`**: Only listed functions available, prefix required
-   ```c67
+   ```vibe67
    import "github.com/user/api" as api
    api.exported_func()  // Prefix required
    api.internal_func()  // Error - not exported
    ```
 
 3. **If module has no export**: All functions available, prefix required
-   ```c67
+   ```vibe67
    import "github.com/user/utils" as utils
    utils.helper()  // Prefix required
    ```
 
 ## Program Execution Model
 
-C67 programs can be structured in three ways:
+Vibe67 programs can be structured in three ways:
 
 ### 1. Main Function
 When a `main` function is defined, it becomes the program entry point:
 
-```c67
+```vibe67
 main = { println("Hello!") }     // A lambda that returns the value returned from println (true/1.0)
-main = 42                        // A C67 number {0: 42.0}
+main = 42                        // A Vibe67 number {0: 42.0}
 main = () -> { 100 }             // A lambda that returns 100
 main = { 100 }                   // A lambda that returns 100
 ```
@@ -419,7 +419,7 @@ main = { 100 }                   // A lambda that returns 100
 ### 2. Main Variable
 When a `main` variable (not a function) is defined without top-level code:
 
-```c67
+```vibe67
 main = 42        // Exit with code 42
 main = {}        // Exit with code 0 (empty map)
 main = []        // Exit with code 0 (empty list)
@@ -432,7 +432,7 @@ main = []        // Exit with code 0 (empty list)
 ### 3. Top-Level Code
 When there's no `main` function or variable, top-level code executes:
 
-```c67
+```vibe67
 println("Hello!")
 x := 42
 println(x)
@@ -452,7 +452,7 @@ println(x)
 - If top-level doesn't call `main()`, `main()` is never executed
 - Last expression in top-level code provides exit code
 
-```c67
+```vibe67
 // Top-level setup
 x := 100
 
@@ -467,7 +467,7 @@ main = { println(x); 42 }
 - `main` variable is accessible but not special
 - Last top-level expression provides exit code
 
-```c67
+```vibe67
 main = 99
 
 println("Setup")
@@ -554,10 +554,6 @@ assignment      = [ "fun" ] identifier [ ":" type_annotation ] ("=" | ":=" | "<-
                 | identifier_list ("=" | ":=" | "<-") expression ;  // Multiple assignment
 
 identifier_list = identifier { "," identifier } ;
-
-// Module-level naming constraint (enforced by parser):
-// All assignments at module level (outside functions/lambdas) MUST use UPPERCASE identifiers.
-// This prevents shadowing and makes globals visually distinct from locals.
 
 type_annotation = native_type | foreign_type ;
 
@@ -793,12 +789,12 @@ digit      = "0" | "1" | ... | "9" ;
 - Can include Unicode letters
 
 **Valid examples:**
-```c67
+```vibe67
 x, count, user_name, myVar, value2, Temperature, λ
 ```
 
 **Invalid:**
-```c67
+```vibe67
 2count     // starts with digit
 _private   // starts with underscore
 my-var     // contains hyphen
@@ -813,7 +809,7 @@ boolean = "yes" | "no" ;
 ```
 
 **Examples:**
-```c67
+```vibe67
 yes             // {0: 1.0, 1: 1.0} (marker: key 1 exists with value 1.0)
 no              // {0: 0.0, 1: 0.0} (marker: key 1 exists with value 0.0)
 ```
@@ -828,7 +824,7 @@ no              // {0: 0.0, 1: 0.0} (marker: key 1 exists with value 0.0)
 
 **Comparison with numbers:**
 Booleans are NOT the same as `1.0` or `0.0`. They have a distinct internal representation:
-```c67
+```vibe67
 yes == 1.0      // no (different internal structure)
 no == 0.0       // no (different internal structure)
 yes == yes      // yes (same boolean value)
@@ -847,7 +843,7 @@ number = [ "-" ] digit { digit } [ "." digit { digit } ] ;
 ```
 
 **Examples:**
-```c67
+```vibe67
 42              // {0: 42.0}
 3.14159         // {0: 3.14159}
 -17             // {0: -17.0}
@@ -871,7 +867,7 @@ string = '"' { character } '"' ;
 ```
 
 **Examples:**
-```c67
+```vibe67
 "Hello"         // {0: 72.0, 1: 101.0, 2: 108.0, 3: 108.0, 4: 111.0}
 "A"             // {0: 65.0}
 ""              // {} (empty map)
@@ -901,7 +897,7 @@ fstring = 'f"' { character | "{" expression "}" } '"' ;
 ```
 
 **Examples:**
-```c67
+```vibe67
 name = "World"
 greeting = f"Hello, {name}!"
 result = f"2 + 2 = {2 + 2}"
@@ -909,7 +905,7 @@ result = f"2 + 2 = {2 + 2}"
 
 ### Comments
 
-```c67
+```vibe67
 // Single-line comment (C++ style)
 ```
 
@@ -924,7 +920,7 @@ ret arena unsafe cstruct class as max this defer spawn import shadow yes no
 fun break continue foreach malloc free
 ```
 
-**Note:** In C67, lambda definitions use `->` (thin arrow) and match arms use `=>` (fat arrow), similar to Rust syntax, except that `~>` is used for the default case.
+**Note:** In Vibe67, lambda definitions use `->` (thin arrow) and match arms use `=>` (fat arrow), similar to Rust syntax, except that `~>` is used for the default case.
 
 **No-argument lambdas** can be written as `-> expr` or inferred from context in assignments: `name = { ... }`
 
@@ -934,7 +930,7 @@ The `shadow` keyword is required when declaring a variable that would shadow an 
 
 Type annotations use these keywords (context-dependent):
 
-**Native C67 types:**
+**Native Vibe67 types:**
 ```
 num str list map bool
 ```
@@ -951,7 +947,7 @@ cptr cstring number string address packed aligned
 ```
 
 **Usage:**
-```c67
+```vibe67
 // Type annotations (preferred)
 x: num = 42
 name: str = "Alice"
@@ -963,7 +959,7 @@ value = unsafe int32 { ... }
 
 Type keywords are contextual - you can still use them as variable names in most contexts:
 
-```c67
+```vibe67
 num = 100              // OK - variable named num
 x: num = num * 2       // OK - type annotation vs variable
 ```
@@ -1068,7 +1064,7 @@ All bitwise operators use `b` suffix:
 ```
 
 Example of bit test:
-```c67
+```vibe67
 x = 0b10110  // Binary 22
 bit2 = x ?b 2  // Returns 1 (bit 2 is set)
 bit3 = x ?b 3  // Returns 0 (bit 3 is not set)
@@ -1111,7 +1107,7 @@ bit3 = x ?b 3  // Returns 0 (bit 3 is not set)
 
 **Multiple Assignment (Tuple Unpacking):**
 
-```c67
+```vibe67
 // Functions can return multiple values as a list
 a, b = some_function()  // Unpack first two elements
 x, y, z := [1, 2, 3]    // Unpack list literal
@@ -1188,25 +1184,25 @@ From highest to lowest precedence:
 
 ### Minimal Parentheses Philosophy
 
-C67 minimizes parenthesis usage. Use parentheses only when:
+Vibe67 minimizes parenthesis usage. Use parentheses only when:
 
 1. **Precedence override needed:**
-   ```c67
+   ```vibe67
    (x + y) * z      // Override precedence
    ```
 
 2. **Complex condition grouping:**
-   ```c67
+   ```vibe67
    (x > 0 && y < 10) { ... }  // Group condition
    ```
 
 3. **Multiple lambda parameters:**
-   ```c67
+   ```vibe67
    (x, y) -> x + y  // Multiple params
    ```
 
 **Not needed:**
-```c67
+```vibe67
 // Good: no unnecessary parens
 x > 0 { => "positive" ~> "negative" }
 result = x + y * z
@@ -1221,7 +1217,7 @@ compute = (x) -> (x * 2)
 
 Statements are terminated by newlines:
 
-```c67
+```vibe67
 x = 10
 y = 20
 z = x + y
@@ -1229,7 +1225,7 @@ z = x + y
 
 Multiple statements on one line require explicit semicolons:
 
-```c67
+```vibe67
 x = 10; y = 20; z = x + y
 ```
 
@@ -1245,7 +1241,7 @@ x = 10; y = 20; z = x + y
 
 The `|` character is context-dependent:
 
-```c67
+```vibe67
 // Pipe operator (| not at line start)
 result = data | transform | filter
 
@@ -1261,7 +1257,7 @@ classify = x -> {
 
 #### Arrow Disambiguation
 
-```c67
+```vibe67
 =>   Match arm result
 ~>   Default match arm
 ->   Lambda or receive
@@ -1269,7 +1265,7 @@ classify = x -> {
 
 Context determines meaning:
 
-```c67
+```vibe67
 f = x -> x + 1             // Lambda with one arg
 msg <= &8080               // Receive from channel
 x { 0 => "zero" }          // Match arm
@@ -1279,7 +1275,7 @@ greet = { println("Hi") }  // No-arg lambda
 
 #### No-Argument Lambdas
 
-```c67
+```vibe67
 // Inferred lambda (in assignment context):
 greet = { println("Hello!") }            // Inferred: greet = -> { println("Hello!") }
 worker = { @ { process_forever() } }     // Inferred: worker = -> { @ { process_forever() } }
@@ -1307,7 +1303,7 @@ process(-> get_data())                      // Function argument, need explicit 
 
 The `@` symbol introduces loops (one of three forms):
 
-```c67
+```vibe67
 @ { ... }                  // Infinite loop
 @ i in collection { ... }  // For-each loop
 @ condition { ... }        // While loop
@@ -1315,7 +1311,7 @@ The `@` symbol introduces loops (one of three forms):
 
 **Loop Control with `ret @` and Numbered Labels:**
 
-Instead of `break`/`continue` keywords, C67 uses `ret @` with automatically numbered loop labels.
+Instead of `break`/`continue` keywords, Vibe67 uses `ret @` with automatically numbered loop labels.
 
 **Loop Numbering:** Loops are numbered from outermost to innermost:
 - `@1` = outermost loop
@@ -1323,7 +1319,7 @@ Instead of `break`/`continue` keywords, C67 uses `ret @` with automatically numb
 - `@3` = third level (nested inside @2)
 - `@` = current/innermost loop
 
-```c67
+```vibe67
 // Exit current loop
 @ i in 0..<100 {
     i > 50 { ret @ }      // Exit current loop (same as ret @1 here)
@@ -1355,7 +1351,7 @@ compute = n -> {
 
 Loops with unknown bounds or modified counters require `max`:
 
-```c67
+```vibe67
 // Counter modified - needs max
 @ i in 0..<10 max 20 {
     i++  // Modified counter
@@ -1377,7 +1373,7 @@ defer_statement = "defer" expression ;
 ```
 
 **Examples:**
-```c67
+```vibe67
 // Resource cleanup with defer
 init_resources = () -> {
     file := open("data.txt") or! {
@@ -1414,7 +1410,7 @@ defer sdl.SDL_DestroyWindow(window)  // Executes before SDL_Quit
 
 **Execution Order:**
 Deferred calls execute in reverse order of declaration (LIFO):
-```c67
+```vibe67
 defer println("1")  // Executes third
 defer println("2")  // Executes second
 defer println("3")  // Executes first
@@ -1435,7 +1431,7 @@ defer println("3")  // Executes first
 5. Return from error blocks instead of `exit()` - defer ensures cleanup
 
 **Common Pattern:**
-```c67
+```vibe67
 // Railway-oriented with defer
 resource := acquire() or! {
     println("Acquisition failed")
@@ -1451,14 +1447,14 @@ defer cleanup(resource)
 
 The `&` symbol creates ENet addresses (network endpoints):
 
-```c67
+```vibe67
 &8080                      // Port only: & followed by digits
 &localhost:8080            // Host:port: & followed by identifier/IP + :
 &192.168.1.1:3000          // IP:port
 ```
 
 **Examples:**
-```c67
+```vibe67
 // Loops (statement context)
 @ { println("Forever") }           // Infinite loop
 @ i in [1, 2, 3] { println(i) }    // For-each loop
@@ -1478,7 +1474,7 @@ listen(&8080)                       // Function call with address
 
 Disambiguated by contents (see Block Disambiguation Rules above):
 
-```c67
+```vibe67
 { x: 10 }                // Map: contains :
 x { 0 -> "zero" }        // Match: contains ->
 { temp = x * 2; temp }   // Statement block: no : or ->
@@ -1486,7 +1482,7 @@ x { 0 -> "zero" }        // Match: contains ->
 
 ## Error Handling and Result Types
 
-C67 uses a **Result type** for operations that can fail. A Result is still `map[uint64]float64`, but with special semantic meaning tracked by the compiler.
+Vibe67 uses a **Result type** for operations that can fail. A Result is still `map[uint64]float64`, but with special semantic meaning tracked by the compiler.
 
 ### Result Type Design
 
@@ -1499,11 +1495,11 @@ A Result is encoded as follows:
 
 **Type Bytes:**
 ```
-0x01 - C67 Number (success)
-0x02 - C67 String (success)
-0x03 - C67 List (success)
-0x04 - C67 Map (success)
-0x05 - C67 Address (success)
+0x01 - Vibe67 Number (success)
+0x02 - Vibe67 String (success)
+0x03 - Vibe67 List (success)
+0x04 - Vibe67 Map (success)
+0x05 - Vibe67 Address (success)
 0xE0 - Error (failure, followed by 4-char error code)
 0x10 - C int8
 0x11 - C int16
@@ -1520,7 +1516,7 @@ A Result is encoded as follows:
 ```
 
 **Success case:**
-- Type byte indicates the C67 or C type
+- Type byte indicates the Vibe67 or C type
 - Length field (uint64) indicates number of key-value pairs
 - Key-value pairs follow (each pair is uint64 key, float64 value)
 - Terminated with 0x00 byte
@@ -1555,7 +1551,7 @@ Every value has a `.error` accessor that:
 - Returns `""` (empty string) for success values
 - Returns the error code string (spaces stripped) for error values
 
-```c67
+```vibe67
 x = 10 / 2              // Success: returns 5.0
 x.error                 // Returns "" (empty)
 
@@ -1573,7 +1569,7 @@ result.error {
 
 The `or!` operator provides a default value or executes a block when the left side is an error or null:
 
-```c67
+```vibe67
 // Handle errors
 x = 10 / 0              // Error result
 safe = x or! 99         // Returns 99 (error case)
@@ -1615,7 +1611,7 @@ ptr := c_malloc(1024) or! 0  // Returns 0 if allocation failed
 
 ### Error Propagation Patterns
 
-```c67
+```vibe67
 // Check and early return
 process = input -> {
     step1 = validate(input)
@@ -1648,7 +1644,7 @@ result.error {
 
 Use the `error` function to create error Results:
 
-```c67
+```vibe67
 // Create error with code
 err = error("arg")  // Type byte 0xE0 + "arg "
 
@@ -1660,7 +1656,7 @@ fail = 0 / 0        // Returns error "dv0"
 
 The compiler tracks whether a value is a Result type:
 
-```c67
+```vibe67
 // Compiler knows this returns Result
 divide = (a, b) -> {
     b == 0 { ret error("dv0") }
@@ -1711,7 +1707,7 @@ The `or!` operator:
 
 ## Classes and Object-Oriented Programming
 
-C67 supports classes as syntactic sugar over maps and closures, providing a familiar OOP interface while maintaining the language's fundamental simplicity.
+Vibe67 supports classes as syntactic sugar over maps and closures, providing a familiar OOP interface while maintaining the language's fundamental simplicity.
 
 ### Core Principles
 
@@ -1720,12 +1716,12 @@ C67 supports classes as syntactic sugar over maps and closures, providing a fami
 - **Composition over inheritance:** Use `<>` to compose with behavior maps
 - **Dot notation:** `.field` inside methods for instance fields
 - **Minimal syntax:** Only one new keyword (`class`)
-- **Desugars to regular C67:** Classes compile to maps and lambdas
+- **Desugars to regular Vibe67:** Classes compile to maps and lambdas
 - **`this` keyword:** Reference to current instance
 
 ### Class Declaration
 
-```c67
+```vibe67
 class Point {
     // Constructor (implicit)
     init = (x, y) -> {
@@ -1755,9 +1751,9 @@ p1.move(5, 5)
 
 ### Desugaring
 
-Classes desugar to regular C67 code:
+Classes desugar to regular Vibe67 code:
 
-```c67
+```vibe67
 // class Point { ... } becomes:
 Point := (x, y) -> {
     instance := {}
@@ -1783,7 +1779,7 @@ Point := (x, y) -> {
 
 Use `.field` inside class methods to access instance state:
 
-```c67
+```vibe67
 class Counter {
     init = start -> {
         .count = start
@@ -1807,7 +1803,7 @@ println(c.get())  // 1
 
 Use `ClassName.field` for class-level state:
 
-```c67
+```vibe67
 class Entity {
     Entity.count = 0
     Entity.all = []
@@ -1829,7 +1825,7 @@ println(Entity.count)  // 2
 
 Extend classes with behavior maps using `<>`:
 
-```c67
+```vibe67
 Serializable = {
     to_json: {
         // Convert instance to JSON
@@ -1852,7 +1848,7 @@ json := p.to_json()
 
 **Multiple composition** - chain `<>` operators:
 
-```c67
+```vibe67
 class User {
     <> Serializable
     <> Validatable
@@ -1871,7 +1867,7 @@ Inside class methods:
 - `ClassName.field` → class field access
 - `other.field` → other instance field access
 
-```c67
+```vibe67
 class Point {
     Point.origin = nil  // Class field
 
@@ -1898,7 +1894,7 @@ Point.origin = Point(0, 0)  // Initialize class field
 
 Use underscore prefix for "private" methods (by convention):
 
-```c67
+```vibe67
 class Account {
     init = balance -> {
         .balance = balance
@@ -1922,7 +1918,7 @@ class Account {
 
 Combine classes with CStruct for performance:
 
-```c67
+```vibe67
 cstruct Vec2Data {
     x as float64,
     y as float64
@@ -1953,9 +1949,9 @@ class Vec2 {
 
 ### Operator Overloading via Methods
 
-While C67 doesn't have operator overloading syntax, you can define methods with operator-like names:
+While Vibe67 doesn't have operator overloading syntax, you can define methods with operator-like names:
 
-```c67
+```vibe67
 class Complex {
     init = (real, imag) -> {
         .real = real
@@ -1984,7 +1980,7 @@ class_decl      = "class" identifier { "<>" identifier } "{" { class_member } "}
 
 Semantically:
 
-```c67
+```vibe67
 class Point {
     <> Serializable
     <> Validatable
@@ -2008,7 +2004,7 @@ Point = (...) -> {
 
 Methods that return `. ` (this) enable chaining:
 
-```c67
+```vibe67
 class Builder {
     init = () -> {
         .parts = []
@@ -2027,9 +2023,9 @@ result = Builder().add("A").add("B").add("C").build()
 
 ### No Inheritance
 
-C67 deliberately avoids inheritance hierarchies. Use composition:
+Vibe67 deliberately avoids inheritance hierarchies. Use composition:
 
-```c67
+```vibe67
 // Instead of inheritance
 Drawable = {
     draw: { println("Drawing...") }
@@ -2095,7 +2091,7 @@ class {
 
 **Memory Management:**
 - **ALWAYS use arena allocation** instead of malloc/free when possible
-- The arena allocator (`c67_arena_alloc`) provides fast bump allocation with automatic growth
+- The arena allocator (`vibe67_arena_alloc`) provides fast bump allocation with automatic growth
 - Arena memory is freed in bulk, avoiding fragmentation
 - Only use malloc for external C library compatibility
 
@@ -2117,7 +2113,7 @@ Type annotations are **optional metadata** that specify semantic intent and guid
 ### Syntax
 
 **Variable declarations:**
-```c67
+```vibe67
 x: num = 42                    // Number annotation
 name: str = "Alice"            // String annotation
 items: list = [1, 2, 3]        // List annotation
@@ -2131,7 +2127,7 @@ value: cdouble = 3.14159
 ```
 
 **Function signatures:**
-```c67
+```vibe67
 // Parameter and return types
 add(x: num, y: num) -> num { x + y }
 
@@ -2169,30 +2165,30 @@ format_error(code: cint) -> str {
 
 Type annotations guide automatic conversions at C FFI boundaries:
 
-**C67 → C conversions:**
-```c67
-// C67 string → C string (calls c67_string_to_cstr)
+**Vibe67 → C conversions:**
+```vibe67
+// Vibe67 string → C string (calls c67_string_to_cstr)
 title: str = "Window"
 window = sdl.SDL_CreateWindow(title, 640, 480, 0)  // title converted to char*
 
-// C67 number → C int (extracts {0: value})
-result: cint = sdl.SDL_Init(0x00000020)  // C67 num → C int
+// Vibe67 number → C int (extracts {0: value})
+result: cint = sdl.SDL_Init(0x00000020)  // Vibe67 num → C int
 ```
 
-**C → C67 conversions:**
-```c67
+**C → Vibe67 conversions:**
+```vibe67
 // C char* → cstring (stored as pointer in {0: <ptr>})
 err: cstring = sdl.SDL_GetError()  // char* stored as-is
 
 // When needed, convert cstring → str manually
-err_str: str = str(err)  // Convert C string to C67 string
+err_str: str = str(err)  // Convert C string to Vibe67 string
 ```
 
 ### Type Inference
 
 When annotations are omitted, the compiler infers types:
 
-```c67
+```vibe67
 x = 42              // Inferred: num
 name = "Alice"      // Inferred: str
 items = [1, 2, 3]   // Inferred: list
@@ -2214,7 +2210,7 @@ ptr = sdl.SDL_CreateWindow(...)  // Inferred: cptr (from FFI signature)
 
 ---
 
-**Note:** This grammar is the canonical reference for C67 3.0. The compiler implementation (lexer.go, parser.go) must match this specification exactly.
+**Note:** This grammar is the canonical reference for Vibe67 3.0. The compiler implementation (lexer.go, parser.go) must match this specification exactly.
 
 **See also:**
 - [LANGUAGESPEC.md](LANGUAGESPEC.md) - Complete language semantics

@@ -47,12 +47,3 @@ func (fc *C67Compiler) detectBadAddresses(data []byte) {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-

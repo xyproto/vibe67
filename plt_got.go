@@ -65,12 +65,3 @@ func (ds *DynamicSections) GetPLTOffset(funcName string) int {
 	}
 	return -1
 }
-
-
-
-
-
-
-
-
-

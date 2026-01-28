@@ -331,12 +331,3 @@ func EmitPrintfRuntime(eb *ExecutableBuilder, out *Out, arch string) error {
 		return fmt.Errorf("unsupported architecture for printf: %s", arch)
 	}
 }
-
-
-
-
-
-
-
-
-

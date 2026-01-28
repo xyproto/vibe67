@@ -324,12 +324,3 @@ func (fc *C67Compiler) generatePrintfSyscall() {
 		fmt.Fprintf(os.Stderr, "DEBUG: printf uses inline f-string + print\n")
 	}
 }
-
-
-
-
-
-
-
-
-

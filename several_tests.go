@@ -4367,12 +4367,3 @@ result + computation
 		})
 	}
 }
-
-
-
-
-
-
-
-
-

@@ -99,12 +99,3 @@ func TestExistingCStructPrograms(t *testing.T) {
 		})
 	}
 }
-
-
-
-
-
-
-
-
-

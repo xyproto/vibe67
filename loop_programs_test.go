@@ -175,12 +175,3 @@ println(count)
 `
 	testInlineVibe67(t, "6_level_nesting", source6, "64\n")
 }
-
-
-
-
-
-
-
-
-

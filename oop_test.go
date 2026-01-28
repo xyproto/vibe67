@@ -198,12 +198,3 @@ println(d1.equals(d2))
 		t.Errorf("Expected output to contain '1', got: %s", result)
 	}
 }
-
-
-
-
-
-
-
-
-
